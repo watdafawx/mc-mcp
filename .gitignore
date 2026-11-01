@@ -1,0 +1,39 @@
+# Gradle / build
+.gradle/
+build/
+out/
+bin/
+local.properties
+
+# Dev runs
+run/
+run-server/
+runs/
+logs/
+crash-reports/
+*.log
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+
+# Local JDK
+toolchain/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json

@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "dev.mtop.mcmcp.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "dev.mtop.mcmcp.mixin.McMcpMixinPlugin",
+  "mixins": [],
+  "client": [
+    "ChatComponentMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

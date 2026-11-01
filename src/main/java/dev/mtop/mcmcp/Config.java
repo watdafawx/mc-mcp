@@ -1,0 +1,78 @@
+package dev.mtop.mcmcp;
+
+import java.util.List;
+
+import net.neoforged.neoforge.common.ModConfigSpec;
+
+/**
+ * One COMMON config file ({@code config/mcmcp-common.toml}) for both sides. The client section is
+ * used by the game client (which also covers singleplayer's integrated server); the server section
+ * only by a dedicated server.
+ */
+public final class Config {
+    private static final ModConfigSpec.Builder B = new ModConfigSpec.Builder();
+
+    // --- client ---
+    public static final ModConfigSpec.BooleanValue CLIENT_ENABLED;
+    public static final ModConfigSpec.ConfigValue<String> CLIENT_BIND;
+    public static final ModConfigSpec.IntValue CLIENT_PORT;
+    public static final ModConfigSpec.ConfigValue<String> CLIENT_TOKEN;
+
+    // --- server ---
+    public static final ModConfigSpec.BooleanValue SERVER_ENABLED;
+    public static final ModConfigSpec.ConfigValue<String> SERVER_BIND;
+    public static final ModConfigSpec.IntValue SERVER_PORT;
+    public static final ModConfigSpec.ConfigValue<String> SERVER_TOKEN;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> SERVER_ALLOWLIST;
+
+    // --- features ---
+    public static final ModConfigSpec.BooleanValue SPARK_TOOLS;
+    public static final ModConfigSpec.BooleanValue MIXIN_TOOLS;
+    public static final ModConfigSpec.BooleanValue CHAT_BRIDGE;
+    public static final ModConfigSpec.ConfigValue<String> CHAT_PREFIX;
+    public static final ModConfigSpec.BooleanValue ACTIONS;
+    public static final ModConfigSpec.BooleanValue ACTIONS_COMMANDS;
+
+    static {
+        B.comment("MCP server inside the game client (also serves singleplayer's integrated server).").push("client");
+        CLIENT_ENABLED = B.define("enabled", true);
+        CLIENT_BIND = B.comment("Address to bind. Keep 127.0.0.1 unless you know why not.")
+                .define("bind", "127.0.0.1");
+        CLIENT_PORT = B.defineInRange("port", 47860, 1024, 65535);
+        CLIENT_TOKEN = B.comment("Optional bearer token. Empty = none (localhost only). Required if bind is not loopback.")
+                .define("token", "");
+        B.pop();
+
+        B.comment("MCP server on a dedicated server.").push("server");
+        SERVER_ENABLED = B.define("enabled", true);
+        SERVER_BIND = B.comment("Address to bind. 127.0.0.1 = this machine only; 0.0.0.0 or a LAN IP = LAN.",
+                        "Only loopback and private (LAN) client addresses are ever accepted.")
+                .define("bind", "127.0.0.1");
+        SERVER_PORT = B.defineInRange("port", 47870, 1024, 65535);
+        SERVER_TOKEN = B.comment("Bearer token. Always required on a dedicated server; generated on first start if empty.")
+                .define("token", "");
+        SERVER_ALLOWLIST = B.comment("Client IPs or CIDR ranges allowed to connect (on top of the LAN-only rule).")
+                .defineListAllowEmpty("allowlist", List.of("127.0.0.1", "::1", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"),
+                        () -> "", o -> o instanceof String);
+        B.pop();
+
+        B.comment("Tool groups. Read-only unless 'actions' is on.").push("features");
+        SPARK_TOOLS = B.comment("spark_* tools (need spark installed; skipped cleanly otherwise).").define("spark", true);
+        MIXIN_TOOLS = B.comment("mixins tool (reads Mixin's internal state by reflection).").define("mixins", true);
+        CHAT_BRIDGE = B.comment("chat_* tools: [Claude] messages to the local player and @claude messages back.",
+                        "Turning this off also skips the chat capture mixin (needs a restart).")
+                .define("chatBridge", true);
+        CHAT_PREFIX = B.comment("Chat messages starting with this go to Claude instead of the server.")
+                .define("chatPrefix", "@claude");
+        ACTIONS = B.comment("Test actions: save/teleport to spots, change config values and video options, measure.",
+                        "Off by default: with it off, every tool only reads.")
+                .define("actions", false);
+        ACTIONS_COMMANDS = B.comment("Also allow run_command (any command, op level). Needs 'actions' too.")
+                .define("actionsCommands", false);
+        B.pop();
+    }
+
+    public static final ModConfigSpec SPEC = B.build();
+
+    private Config() {}
+}

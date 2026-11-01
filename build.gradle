@@ -1,0 +1,82 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.146'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+neoForge {
+    version = neo_version
+
+    runs {
+        client {
+            client()
+            gameDirectory = file('run')
+            // ./gradlew runClient -PquickPlay=<world> drops straight into a singleplayer world.
+            if (project.hasProperty('quickPlay')) programArguments.addAll('--quickPlaySingleplayer', project.property('quickPlay'))
+        }
+        server {
+            server()
+            gameDirectory = file('run-server')
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // No compile-time dependencies on other mods. Spark is reached by reflection and by its own
+    // commands, so it stays fully optional.
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def expandProps = [
+            mod_id     : mod_id,
+            mod_name   : mod_name,
+            mod_version: mod_version,
+            mod_license: mod_license,
+            mod_authors: mod_authors,
+            neo_version: neo_version
+    ]
+    inputs.properties(expandProps)
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand expandProps
+    }
+}
+
+// Hopper naming: <modid>-<version>+neoforge-<mc>.jar; project.version stays plain.
+tasks.withType(Jar).configureEach {
+    archiveVersion = "${project.version}+neoforge-${minecraft_version}"
+}
+
+jar {
+    manifest {
+        attributes([
+                'Implementation-Title'  : mod_name,
+                'Implementation-Version': mod_version,
+                'Implementation-Vendor' : mod_authors
+        ])
+    }
+}

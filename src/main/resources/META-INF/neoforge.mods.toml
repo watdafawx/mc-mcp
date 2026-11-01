@@ -1,0 +1,41 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "${mod_license}"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "${mod_name}"
+logoFile = "mcmcp.png"
+authors = "${mod_authors}"
+description = '''
+Runs an MCP server (streamable HTTP) inside the game, on the client and on dedicated servers, so an
+AI assistant can profile and debug a modpack: frame metrics, TPS/MSPT, loaded chunks and entities,
+heap and GC, applied mixins, spark profiler control, and a chat bridge.
+
+Localhost only by default. Read-only unless test actions are switched on in the config.
+'''
+
+[[mixins]]
+config = "mcmcp.mixins.json"
+
+[[dependencies.${mod_id}]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1.0,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.22)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "spark"
+type = "optional"
+versionRange = "[1.10,)"
+ordering = "NONE"
+side = "BOTH"
