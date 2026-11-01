@@ -1,9 +1,9 @@
 {
   "required": false,
   "minVersion": "0.8",
-  "package": "dev.mtop.mcmcp.mixin",
+  "package": "dev.watdafawx.mcmcp.mixin",
   "compatibilityLevel": "JAVA_21",
-  "plugin": "dev.mtop.mcmcp.mixin.McMcpMixinPlugin",
+  "plugin": "dev.watdafawx.mcmcp.mixin.McMcpMixinPlugin",
   "mixins": [],
   "client": [
     "ChatComponentMixin"

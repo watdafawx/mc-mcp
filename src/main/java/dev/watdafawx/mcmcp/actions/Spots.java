@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.actions;
+package dev.watdafawx.mcmcp.actions;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -17,8 +17,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.loading.FMLPaths;
 
-import dev.mtop.mcmcp.mcp.J;
-import dev.mtop.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.McpServer;
 
 /** Named positions in {@code config/mcmcp/spots.json}, for repeatable measurements. */
 public final class Spots {

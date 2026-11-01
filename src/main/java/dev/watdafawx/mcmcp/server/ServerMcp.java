@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.server;
+package dev.watdafawx.mcmcp.server;
 
 import java.security.SecureRandom;
 import java.util.HexFormat;
@@ -15,16 +15,16 @@ import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
-import dev.mtop.mcmcp.CommonTools;
-import dev.mtop.mcmcp.Config;
-import dev.mtop.mcmcp.GameThread;
-import dev.mtop.mcmcp.McMcp;
-import dev.mtop.mcmcp.chat.ChatLog;
-import dev.mtop.mcmcp.mcp.J;
-import dev.mtop.mcmcp.mcp.McpServer;
-import dev.mtop.mcmcp.mcp.McpServer.Tool;
-import dev.mtop.mcmcp.mcp.NetRules;
-import dev.mtop.mcmcp.spark.SparkBridge;
+import dev.watdafawx.mcmcp.CommonTools;
+import dev.watdafawx.mcmcp.Config;
+import dev.watdafawx.mcmcp.GameThread;
+import dev.watdafawx.mcmcp.McMcp;
+import dev.watdafawx.mcmcp.chat.ChatLog;
+import dev.watdafawx.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.McpServer.Tool;
+import dev.watdafawx.mcmcp.mcp.NetRules;
+import dev.watdafawx.mcmcp.spark.SparkBridge;
 
 /** The dedicated server's MCP server: always token-protected and LAN-only. */
 public final class ServerMcp {

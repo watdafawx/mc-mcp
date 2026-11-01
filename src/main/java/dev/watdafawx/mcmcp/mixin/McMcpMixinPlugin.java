@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.mixin;
+package dev.watdafawx.mcmcp.mixin;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

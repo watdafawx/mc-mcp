@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp;
+package dev.watdafawx.mcmcp;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,16 +20,16 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLEnvironment;
 
-import dev.mtop.mcmcp.actions.ModConfigs;
-import dev.mtop.mcmcp.actions.Spots;
-import dev.mtop.mcmcp.mcp.J;
-import dev.mtop.mcmcp.mcp.McpServer;
-import dev.mtop.mcmcp.mcp.McpServer.Tool;
-import dev.mtop.mcmcp.metrics.GcMonitor;
-import dev.mtop.mcmcp.metrics.MixinReport;
-import dev.mtop.mcmcp.metrics.TickStats;
-import dev.mtop.mcmcp.metrics.WorldState;
-import dev.mtop.mcmcp.spark.SparkBridge;
+import dev.watdafawx.mcmcp.actions.ModConfigs;
+import dev.watdafawx.mcmcp.actions.Spots;
+import dev.watdafawx.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.McpServer.Tool;
+import dev.watdafawx.mcmcp.metrics.GcMonitor;
+import dev.watdafawx.mcmcp.metrics.MixinReport;
+import dev.watdafawx.mcmcp.metrics.TickStats;
+import dev.watdafawx.mcmcp.metrics.WorldState;
+import dev.watdafawx.mcmcp.spark.SparkBridge;
 
 /** Tools that work on both sides: JVM, mixins, mod configs, and anything needing a (possibly integrated) server. */
 public final class CommonTools {

@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp;
+package dev.watdafawx.mcmcp;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,7 +9,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.loading.FMLEnvironment;
 
-import dev.mtop.mcmcp.metrics.GcMonitor;
+import dev.watdafawx.mcmcp.metrics.GcMonitor;
 
 /**
  * MCP server inside Minecraft. The client side ({@code client.ClientMcp}) and the dedicated-server
@@ -31,9 +31,9 @@ public final class McMcp {
         container.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         GcMonitor.install();
         if (FMLEnvironment.dist.isClient()) {
-            dev.mtop.mcmcp.client.ClientMcp.init(modBus);
+            dev.watdafawx.mcmcp.client.ClientMcp.init(modBus);
         } else {
-            dev.mtop.mcmcp.server.ServerMcp.init();
+            dev.watdafawx.mcmcp.server.ServerMcp.init();
         }
     }
 

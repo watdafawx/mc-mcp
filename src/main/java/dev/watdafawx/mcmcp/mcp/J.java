@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.mcp;
+package dev.watdafawx.mcmcp.mcp;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

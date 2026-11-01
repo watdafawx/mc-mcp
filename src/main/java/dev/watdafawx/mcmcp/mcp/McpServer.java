@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.mcp;
+package dev.watdafawx.mcmcp.mcp;
 
 import java.io.IOException;
 import java.io.InputStream;

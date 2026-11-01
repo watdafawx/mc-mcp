@@ -1,9 +1,9 @@
-package dev.mtop.mcmcp.metrics;
+package dev.watdafawx.mcmcp.metrics;
 
 import java.util.Arrays;
 import java.util.Map;
 
-import dev.mtop.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.J;
 
 /**
  * Frame-time ring buffer, fed once per frame from the render thread. Frame time is the gap between

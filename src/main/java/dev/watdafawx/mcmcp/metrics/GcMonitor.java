@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.metrics;
+package dev.watdafawx.mcmcp.metrics;
 
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
@@ -16,7 +16,7 @@ import javax.management.openmbean.CompositeData;
 
 import com.sun.management.GarbageCollectionNotificationInfo;
 
-import dev.mtop.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.J;
 
 /** Records every GC event the JVM reports, plus heap/JVM snapshots. */
 public final class GcMonitor {

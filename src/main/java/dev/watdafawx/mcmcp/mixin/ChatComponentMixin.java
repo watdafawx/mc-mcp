@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.mixin;
+package dev.watdafawx.mcmcp.mixin;
 
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
@@ -11,7 +11,7 @@ import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MessageSignature;
 
-import dev.mtop.mcmcp.client.ClientMcp;
+import dev.watdafawx.mcmcp.client.ClientMcp;
 
 /** Copies every line shown in the chat box (player chat, system, command output) to chat_read. */
 @Mixin(ChatComponent.class)

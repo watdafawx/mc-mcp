@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.spark;
+package dev.watdafawx.mcmcp.spark;
 
 import java.lang.reflect.Method;
 import java.nio.file.Files;
@@ -12,8 +12,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import dev.mtop.mcmcp.mcp.J;
-import dev.mtop.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.McpServer;
 
 /**
  * Turns a saved {@code .sparkprofile} (spark's own protobuf, {@code SamplerData}) into JSON: the

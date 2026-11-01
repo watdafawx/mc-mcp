@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.metrics;
+package dev.watdafawx.mcmcp.metrics;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -8,7 +8,7 @@ import java.util.Map;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
-import dev.mtop.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.J;
 
 /** TPS/MSPT from the server's own last-100-ticks buffers (whole server and per dimension). */
 public final class TickStats {

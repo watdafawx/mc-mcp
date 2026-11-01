@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.chat;
+package dev.watdafawx.mcmcp.chat;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -6,7 +6,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 
-import dev.mtop.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.J;
 
 /**
  * Two logs: everything shown in chat ({@link #shown}), and the inbox of player messages addressed

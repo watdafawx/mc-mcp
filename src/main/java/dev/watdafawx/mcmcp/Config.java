@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp;
+package dev.watdafawx.mcmcp;
 
 import java.util.List;
 

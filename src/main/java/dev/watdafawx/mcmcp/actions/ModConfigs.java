@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.actions;
+package dev.watdafawx.mcmcp.actions;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -15,8 +15,8 @@ import net.neoforged.fml.config.ConfigTracker;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-import dev.mtop.mcmcp.mcp.J;
-import dev.mtop.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.McpServer;
 
 /** Lists and changes NeoForge ({@link ModConfigSpec}) config values of any loaded mod. */
 public final class ModConfigs {

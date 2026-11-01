@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.metrics;
+package dev.watdafawx.mcmcp.metrics;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,7 +14,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.TickingBlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 
-import dev.mtop.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.J;
 
 /** Entity / block-entity counts by type for one level. Call on that level's own thread. */
 public final class WorldState {

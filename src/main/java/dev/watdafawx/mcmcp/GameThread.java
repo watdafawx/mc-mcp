@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp;
+package dev.watdafawx.mcmcp;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -7,7 +7,7 @@ import java.util.function.Supplier;
 
 import net.minecraft.util.thread.BlockableEventLoop;
 
-import dev.mtop.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.McpServer;
 
 /** Runs a read on the game's own thread and waits for it from an HTTP worker thread. */
 public final class GameThread {

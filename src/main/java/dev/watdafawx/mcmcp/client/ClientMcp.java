@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.client;
+package dev.watdafawx.mcmcp.client;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -31,20 +31,20 @@ import net.neoforged.neoforge.client.event.ClientChatEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
-import dev.mtop.mcmcp.CommonTools;
-import dev.mtop.mcmcp.Config;
-import dev.mtop.mcmcp.GameThread;
-import dev.mtop.mcmcp.McMcp;
-import dev.mtop.mcmcp.chat.ChatLog;
-import dev.mtop.mcmcp.mcp.J;
-import dev.mtop.mcmcp.mcp.McpServer;
-import dev.mtop.mcmcp.mcp.McpServer.Tool;
-import dev.mtop.mcmcp.mcp.NetRules;
-import dev.mtop.mcmcp.metrics.FrameStats;
-import dev.mtop.mcmcp.metrics.GcMonitor;
-import dev.mtop.mcmcp.metrics.TickStats;
-import dev.mtop.mcmcp.metrics.WorldState;
-import dev.mtop.mcmcp.spark.SparkBridge;
+import dev.watdafawx.mcmcp.CommonTools;
+import dev.watdafawx.mcmcp.Config;
+import dev.watdafawx.mcmcp.GameThread;
+import dev.watdafawx.mcmcp.McMcp;
+import dev.watdafawx.mcmcp.chat.ChatLog;
+import dev.watdafawx.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.McpServer.Tool;
+import dev.watdafawx.mcmcp.mcp.NetRules;
+import dev.watdafawx.mcmcp.metrics.FrameStats;
+import dev.watdafawx.mcmcp.metrics.GcMonitor;
+import dev.watdafawx.mcmcp.metrics.TickStats;
+import dev.watdafawx.mcmcp.metrics.WorldState;
+import dev.watdafawx.mcmcp.spark.SparkBridge;
 
 /** The game client's MCP server. In singleplayer it also reaches the integrated server. */
 public final class ClientMcp {

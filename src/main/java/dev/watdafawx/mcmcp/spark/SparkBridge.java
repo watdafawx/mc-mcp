@@ -1,4 +1,4 @@
-package dev.mtop.mcmcp.spark;
+package dev.watdafawx.mcmcp.spark;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,10 +16,10 @@ import com.google.gson.JsonObject;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLPaths;
 
-import dev.mtop.mcmcp.Config;
-import dev.mtop.mcmcp.mcp.J;
-import dev.mtop.mcmcp.mcp.McpServer;
-import dev.mtop.mcmcp.mcp.McpServer.Tool;
+import dev.watdafawx.mcmcp.Config;
+import dev.watdafawx.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.McpServer.Tool;
 
 /**
  * Drives spark through its own commands ({@code sparkc} on the client, {@code spark} on a server)
