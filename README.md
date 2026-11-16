@@ -49,7 +49,7 @@ claude mcp add --transport http minecraft-server http://<server-ip>:47870/mcp --
 | `chat_poll` / `chat_wait` | both | player messages starting with the prefix (default `@claude`); they are intercepted and never reach server chat. `chat_wait` blocks until one arrives |
 | `config_set` | both, action | change + save one NeoForge config value (fires the mod's reload event) |
 | `spot_save` / `spot_list` / `teleport` | both*, action | named positions in `config/mcmcp/spots.json`; teleport across dimensions |
-| `video_get` / `video_set` | client (set = action) | any `Options` value: renderDistance, simulationDistance, enableVsync, framerateLimit, graphicsMode, … |
+| `video_get` / `video_set` | client (set = action) | any `Options` value: renderDistance, simulationDistance, enableVsync, framerateLimit, graphicsMode, pauseOnLostFocus, … (`save=false`: until restart only) |
 | `chat_selftest` | client, action | posts `@claude <text>` through NeoForge's chat hook to test the bridge |
 | `run_command` | both*, actionsCommands | run a command at op level as the player, returns its output |
 | `block_info` | both* | blockstate, block id, block entity type, optional NBT at x/y/z (server-side truth) |

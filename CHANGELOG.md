@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- `video_get` / `video_set` also cover plain boolean options such as `pauseOnLostFocus`, so a tool can stop the pause menu from opening while the game window is in the background.
+- `video_set` takes `save=false` to change an option only until the game restarts (options.txt untouched), and returns the old value for restoring.
+
 ## 0.2.0
 
 - Ghost builds: `ghost_set`, `ghost_list`, `ghost_info`, `ghost_move`, `ghost_show`, `ghost_clear`, `ghost_export`. See-through blocks drawn only on this client, never placed in the world. Specs use a palette plus boxes (fill / hollow / walls / frame) and single blocks; edits merge in place.

@@ -433,9 +433,11 @@ public final class ClientMcp {
         mcp.add(new Tool("video_get", "Current video/game options (Options.* OptionInstance values), filtered by name.",
                 J.Schema.of().str("filter", "option name substring").build(), true, a -> GameThread.call(mc(), () -> options(J.str(a, "filter", "")))));
         mcp.add(new Tool("video_set",
-                "[action] Set one video/game option, e.g. renderDistance 12, simulationDistance 8, enableVsync false, framerateLimit 260, graphicsMode FAST. Saved to options.txt.",
-                J.Schema.of().str("option", "name from video_get").anyValue("value", "new value").required("option", "value").build(),
-                false, a -> GameThread.call(mc(), () -> setOption(J.req(a, "option"), J.req(a, "value")))));
+                "[action] Set one video/game option, e.g. renderDistance 12, simulationDistance 8, enableVsync false, framerateLimit 260, graphicsMode FAST, "
+                        + "pauseOnLostFocus false. Saved to options.txt unless save=false (then it lasts until the game restarts). Returns the old value so it can be restored.",
+                J.Schema.of().str("option", "name from video_get").anyValue("value", "new value")
+                        .bool("save", "write options.txt (default true)").required("option", "value").build(),
+                false, a -> GameThread.call(mc(), () -> setOption(J.req(a, "option"), J.req(a, "value"), J.b(a, "save", true)))));
 
         // spark: client = sparkc (profiles this JVM; with threads='*' that includes the integrated server),
         // server = the integrated server's own /spark.
@@ -544,16 +546,33 @@ public final class ClientMcp {
                 out.put(m.getName(), String.valueOf(((OptionInstance<?>) m.invoke(mc().options)).get()));
             } catch (Exception ignored) {}
         }
+        for (java.lang.reflect.Field fl : Options.class.getFields()) { // plain boolean options, e.g. pauseOnLostFocus
+            if (fl.getType() != boolean.class || java.lang.reflect.Modifier.isStatic(fl.getModifiers())) continue;
+            if (!f.isEmpty() && !fl.getName().toLowerCase(Locale.ROOT).contains(f)) continue;
+            try {
+                out.put(fl.getName(), String.valueOf(fl.getBoolean(mc().options)));
+            } catch (Exception ignored) {}
+        }
         return out;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static Map<String, Object> setOption(String name, String raw) {
+    private static Map<String, Object> setOption(String name, String raw, boolean save) {
         Method m;
         try {
             m = Options.class.getMethod(name);
         } catch (NoSuchMethodException e) {
-            throw new McpServer.ToolError("no option " + name + " (see video_get)");
+            try {
+                java.lang.reflect.Field fl = Options.class.getField(name);
+                if (fl.getType() != boolean.class || java.lang.reflect.Modifier.isStatic(fl.getModifiers()))
+                    throw new McpServer.ToolError("not an option: " + name);
+                boolean old = fl.getBoolean(mc().options), v = Boolean.parseBoolean(raw.trim());
+                fl.setBoolean(mc().options, v);
+                if (save) mc().options.save();
+                return J.obj("option", name, "old", String.valueOf(old), "new", String.valueOf(v), "accepted", true, "saved", save);
+            } catch (NoSuchFieldException | IllegalAccessException e2) {
+                throw new McpServer.ToolError("no option " + name + " (see video_get)");
+            }
         }
         if (m.getReturnType() != OptionInstance.class) throw new McpServer.ToolError("not an option: " + name);
         try {
@@ -570,9 +589,9 @@ public final class ClientMcp {
                 if (v == null) throw new McpServer.ToolError("expected one of " + java.util.Arrays.toString(en.getDeclaringClass().getEnumConstants()));
             } else throw new McpServer.ToolError("option type " + (old == null ? "?" : old.getClass().getSimpleName()) + " not supported");
             opt.set(v); // the option's own validation rejects out-of-range values (logged, value unchanged)
-            mc().options.save();
+            if (save) mc().options.save();
             return J.obj("option", name, "old", String.valueOf(old), "new", String.valueOf(opt.get()),
-                    "accepted", String.valueOf(opt.get()).equals(String.valueOf(v)));
+                    "accepted", String.valueOf(opt.get()).equals(String.valueOf(v)), "saved", save);
         } catch (McpServer.ToolError e) {
             throw e;
         } catch (Exception e) {
