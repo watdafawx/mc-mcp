@@ -52,6 +52,25 @@ claude mcp add --transport http minecraft-server http://<server-ip>:47870/mcp --
 | `video_get` / `video_set` | client (set = action) | any `Options` value: renderDistance, simulationDistance, enableVsync, framerateLimit, graphicsMode, … |
 | `chat_selftest` | client, action | posts `@claude <text>` through NeoForge's chat hook to test the bridge |
 | `run_command` | both*, actionsCommands | run a command at op level as the player, returns its output |
+| `block_info` | both* | blockstate, block id, block entity type, optional NBT at x/y/z (server-side truth) |
+| `screenshot` | client, action | save a PNG of the current frame under `<gameDir>/screenshots/`, returns its path |
+| `screen` | client | open screen class/title, GUI size/scale, container geometry, widgets |
+| `click` | client, action | click GUI-scaled x/y in the open screen (fires `ScreenEvent.MouseButtonPressed.Pre`) |
+| `key` | client, action | send a key press to the open screen |
+| `close_screen` | client, action | close the current screen without the mouse |
+| `look` / `look_at` | client, action | set the client player's yaw/pitch, or aim at a world position |
+| `crosshair` | client | what the crosshair is actually on (block pos/face or entity) |
+| `hold_key` | client, action | hold/release a key (shift, sprint/ctrl, use, attack, jump, movement) or any KeyMapping by name, including controller-bound ones |
+| `click_world` | client, action | real left/right click through `startAttack`/`useItemOn`; refreshes the pick first |
+| `hotbar` | client, action | select hotbar slot 0–8 |
+| `chunk_rebuild` | client, action | rebuild all chunk meshes (F3+A) |
+| `ghost_set` | client | create or edit a ghost build (see-through blocks drawn only on this client, never placed): palette, boxes, blocks; replace or merge |
+| `ghost_list` / `ghost_info` | client | all ghosts, or one ghost's bounds and palette counts |
+| `ghost_move` | client | move, shift or rotate a ghost (stairs, logs etc. turn with it) |
+| `ghost_show` | client | show/hide and opacity per ghost; global `xray` (draw over terrain), `solid` (full colour), `hud` |
+| `ghost_clear` | client | delete one ghost, a `prefix/`, or all |
+| `ghost_export` | client | save ghosts as `.litematic` (Litematica), `.schem` or `.nbt` under `<gameDir>/schematics/` |
+| `registry_blocks` / `block_describe` | client | blocks that exist in this pack (by mod id or substring, optional state properties), or one block in detail |
 
 \* on a client these need a singleplayer world (they use the integrated server).
 

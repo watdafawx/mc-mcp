@@ -6,7 +6,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import com.google.gson.JsonObject;
@@ -16,10 +18,15 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
+import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -59,6 +66,7 @@ public final class ClientMcp {
     public static void init(IEventBus modBus) {
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> FrameStats.onFrame());
         NeoForge.EVENT_BUS.addListener(ClientMcp::onChatSend);
+        dev.watdafawx.mcmcp.ghost.GhostRenderer.init();
         modBus.addListener((FMLClientSetupEvent e) -> start());
     }
 
@@ -132,6 +140,7 @@ public final class ClientMcp {
     // ------------------------------------------------------------------ tools
 
     private static void registerTools(McpServer mcp) {
+        dev.watdafawx.mcmcp.ghost.GhostTools.register(mcp);
         mcp.add(new Tool("status",
                 "What is running: game side, versions, mod count, world, player position/dimension, enabled tool groups. Start here.",
                 J.Schema.of().build(), true, a -> GameThread.call(mc(), () -> {
@@ -218,6 +227,209 @@ public final class ClientMcp {
 
         CommonTools.register(mcp, ClientMcp::server, ClientMcp::localServerPlayer);
 
+        mcp.add(new Tool("screenshot",
+                "[action] Save a PNG of the current client frame to <gameDir>/screenshots/<name> and return its path. Name defaults to a timestamp; use this to prove what the game actually shows.",
+                J.Schema.of().str("name", "file name, e.g. drawer-lock.png (default: mcmcp-<timestamp>.png)").build(),
+                false, a -> {
+                    String name = J.str(a, "name", "mcmcp-" + System.currentTimeMillis() + ".png");
+                    if (name.contains("/") || name.contains("\\") || name.contains("..")) throw new McpServer.ToolError("name must be a plain file name");
+                    if (!name.toLowerCase(Locale.ROOT).endsWith(".png")) name += ".png";
+                    final String fileName = name;
+                    java.io.File dir = mc().gameDirectory;
+                    java.io.File out = new java.io.File(new java.io.File(dir, "screenshots"), fileName);
+                    CompletableFuture<Component> saved = new CompletableFuture<>();
+                    GameThread.call(mc(), () -> {
+                        if (mc().level == null) throw new McpServer.ToolError("not in a world");
+                        Screenshot.grab(dir, fileName, mc().getMainRenderTarget(), saved::complete);
+                        return null;
+                    });
+                    Component message;
+                    try {
+                        message = saved.get(15, TimeUnit.SECONDS);
+                    } catch (Exception e) {
+                        throw new McpServer.ToolError("screenshot did not finish: " + e);
+                    }
+                    if (!out.isFile()) throw new McpServer.ToolError("screenshot not written: " + message.getString());
+                    return J.obj("path", out.getAbsolutePath(), "message", message.getString(), "bytes", out.length());
+                }));
+
+        mcp.add(new Tool("screen",
+                "Current client screen: class, title, GUI-scaled size, GUI scale, container geometry (guiLeft/guiTop/xSize/ySize) and every AbstractWidget (x/y/w/h, message). Use the coordinates with `click`. Read-only.",
+                J.Schema.of().bool("widgets", "include widgets, default true").build(),
+                true, a -> GameThread.call(mc(), () -> screenInfo(J.b(a, "widgets", true)))));
+
+        mcp.add(new Tool("click",
+                "[action] Click in the open screen at GUI-scaled coordinates (the same x/y `screen` reports). Fires NeoForge's ScreenEvent.MouseButtonPressed.Pre first, so this exercises mod buttons exactly like a real click.",
+                J.Schema.of().integer("x", "GUI-scaled x").integer("y", "GUI-scaled y").integer("button", "0 left, 1 right, 2 middle; default 0")
+                        .required("x", "y").build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    Screen s = mc().screen;
+                    if (s == null) throw new McpServer.ToolError("no screen open");
+                    int x = J.i(a, "x", 0), y = J.i(a, "y", 0), button = J.i(a, "button", 0);
+                    // Mirror MouseHandler#onPress: Screen.mouseClicked itself does not post NeoForge's
+                    // ScreenEvent.MouseButtonPressed, so mod buttons listening to it never see a click.
+                    boolean handled = net.neoforged.neoforge.client.ClientHooks.onScreenMouseClickedPre(s, x, y, button);
+                    if (!handled) {
+                        handled = s.mouseClicked(x, y, button);
+                        net.neoforged.neoforge.client.ClientHooks.onScreenMouseClickedPost(s, x, y, button, handled);
+                    }
+                    s.mouseReleased(x, y, button);
+                    return J.obj("x", x, "y", y, "button", button, "handled", handled,
+                            "screen_after", mc().screen == null ? null : mc().screen.getClass().getName());
+                })));
+
+        mcp.add(new Tool("key",
+                "[action] Send a key press to the open screen (GLFW key/scan codes, e.g. 256 Escape, 257 Enter, 69 E).",
+                J.Schema.of().integer("key", "GLFW key code").integer("scan", "scan code, default 0").integer("modifiers", "GLFW modifiers, default 0")
+                        .required("key").build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    Screen s = mc().screen;
+                    if (s == null) throw new McpServer.ToolError("no screen open");
+                    int key = J.i(a, "key", 0), scan = J.i(a, "scan", 0), mods = J.i(a, "modifiers", 0);
+                    boolean handled = net.neoforged.neoforge.client.ClientHooks.onScreenKeyPressedPre(s, key, scan, mods);
+                    if (!handled) {
+                        handled = s.keyPressed(key, scan, mods);
+                        net.neoforged.neoforge.client.ClientHooks.onScreenKeyPressedPost(s, key, scan, mods);
+                    }
+                    return J.obj("key", key, "handled", handled, "screen_after", mc().screen == null ? null : mc().screen.getClass().getName());
+                })));
+
+        mcp.add(new Tool("close_screen",
+                "[action] Close the current client screen (equivalent to Escape) without touching the mouse.",
+                J.Schema.of().build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    String before = mc().screen == null ? null : mc().screen.getClass().getName();
+                    mc().setScreen(null);
+                    return J.obj("closed", before);
+                })));
+
+        mcp.add(new Tool("look",
+                "[action] Set the client player's yaw/pitch in degrees (client camera and, in singleplayer, the server player), so MCP can aim without the mouse.",
+                J.Schema.of().num("yaw", "degrees; 0 = south, 90 = west, 180 = north, 270 = east").num("pitch", "degrees; -90 up, +90 down").build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    if (mc().player == null) throw new McpServer.ToolError("not in a world");
+                    float yaw = (float) J.d(a, "yaw", mc().player.getYRot());
+                    float pitch = (float) J.d(a, "pitch", mc().player.getXRot());
+                    return applyLook(yaw, pitch);
+                })));
+
+        mcp.add(new Tool("look_at",
+                "[action] Aim the client player at a world position (x/y/z). Convenience wrapper over `look`, no mouse.",
+                J.Schema.of().num("x", "block/entity x").num("y", "x").num("z", "z").required("x", "y", "z").build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    if (mc().player == null) throw new McpServer.ToolError("not in a world");
+                    double dx = J.d(a, "x", 0) - mc().player.getX();
+                    double dy = J.d(a, "y", 0) - mc().player.getEyeY();
+                    double dz = J.d(a, "z", 0) - mc().player.getZ();
+                    double horizontal = Math.sqrt(dx * dx + dz * dz);
+                    float yaw = (float) (Math.atan2(-dx, dz) * 180.0 / Math.PI);
+                    float pitch = (float) (-Math.atan2(dy, horizontal) * 180.0 / Math.PI);
+                    return applyLook(yaw, pitch);
+                })));
+
+        mcp.add(new Tool("click_world",
+                "[action] Left- or right-click in the world through the game's real input path (Minecraft.startAttack / MultiPlayerGameMode.useItemOn), including NeoForge's InteractionKeyMappingTriggered event on the left. The crosshair pick is refreshed first, so a look/look_at in the same tick is honoured. This is how a mod's in-world click button gets tested. No screen may be open.",
+                J.Schema.of().enumOf("button", "left or right", "left", "right").build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    if (mc().player == null) throw new McpServer.ToolError("not in a world");
+                    if (mc().screen != null) throw new McpServer.ToolError("a screen is open; use `click`");
+                    String button = J.str(a, "button", "left");
+
+                    // The ray trace only refreshes on a client tick, so re-pick here to make a
+                    // look/look_at issued in the same MCP batch take effect.
+                    mc().hitResult = mc().player.pick(mc().player.blockInteractionRange(), 1.0F, false);
+                    var hit = mc().hitResult;
+                    var hitDesc = hit instanceof net.minecraft.world.phys.BlockHitResult b
+                            ? b.getBlockPos().toShortString() + " " + b.getDirection()
+                            : String.valueOf(hit == null ? null : hit.getType());
+
+                    try {
+                        if (button.equalsIgnoreCase("right")) {
+                            if (!(hit instanceof net.minecraft.world.phys.BlockHitResult blockHit))
+                                throw new McpServer.ToolError("not looking at a block (" + hitDesc + ")");
+                            var result = mc().gameMode.useItemOn(mc().player, net.minecraft.world.InteractionHand.MAIN_HAND, blockHit);
+                            if (result.consumesAction()) mc().player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+                            return J.obj("button", "right", "sent", true, "result", result.name(), "hit", hitDesc);
+                        }
+                        Method m = Minecraft.class.getDeclaredMethod("startAttack");
+                        m.setAccessible(true);
+                        Object result = m.invoke(mc());
+                        return J.obj("button", "left", "attacked", result, "hit", hitDesc);
+                    } catch (ReflectiveOperationException e) {
+                        throw new McpServer.ToolError("could not invoke the game's click path: " + e);
+                    }
+                })));
+
+        mcp.add(new Tool("crosshair",
+                "What the client crosshair is actually on: hit type, block position, face, or entity. Useful when a look/look_at and the expected block disagree. Read-only.",
+                J.Schema.of().build(),
+                true, a -> GameThread.call(mc(), () -> {
+                    var hit = mc().hitResult;
+                    if (hit == null) return J.obj("type", "miss");
+                    if (hit instanceof net.minecraft.world.phys.BlockHitResult b)
+                        return J.obj("type", "block", "pos", b.getBlockPos().toShortString(), "face", b.getDirection().getName(),
+                                "location", J.obj("x", J.r2(b.getLocation().x), "y", J.r2(b.getLocation().y), "z", J.r2(b.getLocation().z)));
+                    if (hit instanceof net.minecraft.world.phys.EntityHitResult e)
+                        return J.obj("type", "entity", "entity", e.getEntity().getName().getString());
+                    return J.obj("type", hit.getType().name());
+                })));
+
+        mcp.add(new Tool("hold_key",
+                "[action] Hold or release a key without the keyboard: shift, sprint/ctrl, use, attack, jump, forward, back, left, right. Alternatively pass `mapping` (a KeyMapping name such as key.foxstweaks.reveal_drawer_lock) to hold a mod keybind, including one bound to a controller button.",
+                J.Schema.of().str("key", "shift | sprint/ctrl | use | attack | jump | forward | back | left | right").str("mapping", "KeyMapping name, instead of key").bool("down", "true to hold, false to release; default true").build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    if (mc().player == null) throw new McpServer.ToolError("not in a world");
+                    String mappingName = J.str(a, "mapping", "");
+                    if (!mappingName.isEmpty()) {
+                        for (net.minecraft.client.KeyMapping mapping : mc().options.keyMappings) {
+                            if (mapping.getName().equals(mappingName)) {
+                                boolean down = J.b(a, "down", true);
+                                mapping.setDown(down);
+                                return J.obj("mapping", mappingName, "down", down, "is_down", mapping.isDown());
+                            }
+                        }
+                        throw new McpServer.ToolError("no key mapping named " + mappingName);
+                    }
+                    String name = J.str(a, "key", "").toLowerCase(Locale.ROOT);
+                    var options = mc().options;
+                    net.minecraft.client.KeyMapping mapping = switch (name) {
+                        case "shift", "sneak" -> options.keyShift;
+                        case "sprint", "ctrl" -> options.keySprint;
+                        case "use" -> options.keyUse;
+                        case "attack" -> options.keyAttack;
+                        case "jump" -> options.keyJump;
+                        case "forward", "up" -> options.keyUp;
+                        case "back", "down" -> options.keyDown;
+                        case "left" -> options.keyLeft;
+                        case "right" -> options.keyRight;
+                        default -> throw new McpServer.ToolError("unknown key: " + name);
+                    };
+                    boolean down = J.b(a, "down", true);
+                    mapping.setDown(down);
+                    return J.obj("key", name, "down", down, "is_down", mapping.isDown());
+                })));
+
+        mcp.add(new Tool("hotbar",
+                "[action] Select a hotbar slot (0-8) and tell the server.",
+                J.Schema.of().integer("slot", "0-8").required("slot").build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    if (mc().player == null) throw new McpServer.ToolError("not in a world");
+                    int slot = J.i(a, "slot", 0);
+                    if (slot < 0 || slot > 8) throw new McpServer.ToolError("slot must be 0-8");
+                    mc().player.getInventory().selected = slot;
+                    if (mc().getConnection() != null) mc().getConnection().send(new ServerboundSetCarriedItemPacket(slot));
+                    return J.obj("slot", slot);
+                })));
+
+        mcp.add(new Tool("chunk_rebuild",
+                "[action] Rebuild all client chunk meshes (what F3+A does). Useful after /setblock when the model did not arrive.",
+                J.Schema.of().build(),
+                false, a -> GameThread.call(mc(), () -> {
+                    if (mc().level == null) throw new McpServer.ToolError("not in a world");
+                    mc().levelRenderer.allChanged();
+                    return J.obj("rebuilt", true);
+                })));
+
         mcp.add(new Tool("video_get", "Current video/game options (Options.* OptionInstance values), filtered by name.",
                 J.Schema.of().str("filter", "option name substring").build(), true, a -> GameThread.call(mc(), () -> options(J.str(a, "filter", "")))));
         mcp.add(new Tool("video_set",
@@ -258,6 +470,51 @@ public final class ClientMcp {
             }
             if (!ClientCommandHandler.runCommand("sparkc " + cmd)) sink.accept("Unknown command: sparkc");
         });
+    }
+
+    private static Map<String, Object> screenInfo(boolean widgets) {
+        Screen s = mc().screen;
+        if (s == null) return J.obj("open", false);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("open", true);
+        m.put("class", s.getClass().getName());
+        m.put("title", s.getTitle().getString());
+        m.put("width", s.width);
+        m.put("height", s.height);
+        m.put("gui_scale", mc().getWindow().getGuiScale());
+        if (s instanceof AbstractContainerScreen<?> c) {
+            m.put("container", J.obj("gui_left", c.getGuiLeft(), "gui_top", c.getGuiTop(),
+                    "x_size", c.getXSize(), "y_size", c.getYSize()));
+        }
+        if (widgets) {
+            List<Map<String, Object>> list = new ArrayList<>();
+            for (var child : s.children()) {
+                if (child instanceof AbstractWidget w) {
+                    list.add(J.obj("type", w.getClass().getSimpleName(), "message", w.getMessage().getString(),
+                            "x", w.getX(), "y", w.getY(), "width", w.getWidth(), "height", w.getHeight(),
+                            "active", w.active, "visible", w.visible));
+                }
+            }
+            m.put("widgets", list);
+        }
+        return m;
+    }
+
+    private static Map<String, Object> applyLook(float yaw, float pitch) {
+        var p = mc().player;
+        if (p == null) throw new McpServer.ToolError("not in a world");
+        p.setYRot(yaw);
+        p.setXRot(pitch);
+        p.yRotO = yaw;
+        p.xRotO = pitch;
+        ServerPlayer sp = localServerPlayer();
+        if (sp != null) {
+            sp.setYRot(yaw);
+            sp.setXRot(pitch);
+            sp.yRotO = yaw;
+            sp.xRotO = pitch;
+        }
+        return J.obj("yaw", J.r2(yaw), "pitch", J.r2(pitch), "server_player", sp != null);
     }
 
     private static Map<String, Object> frameContext() {

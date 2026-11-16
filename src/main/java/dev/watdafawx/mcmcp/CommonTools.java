@@ -174,6 +174,34 @@ public final class CommonTools {
                         });
                         return J.obj("output", out);
                     }));
+
+        mcp.add(new Tool("block_info",
+                "Block state and block entity at a position: block id, full state string, block entity type, and (nbt=true) its saved NBT. Server-side truth, so it shows what a client may not have received yet.",
+                J.Schema.of().integer("x", "block x").integer("y", "block y").integer("z", "block z")
+                        .str("dimension", "default: the player's dimension").bool("nbt", "include block entity NBT, default false")
+                        .required("x", "y", "z").build(),
+                true, a -> {
+                    MinecraftServer s = need(server);
+                    return GameThread.call(s, () -> {
+                        ServerPlayer p = null;
+                        try { p = player(s, a, defaultPlayer); } catch (McpServer.ToolError ignored) {}
+                        ServerLevel level = level(s, a, p);
+                        net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(J.i(a, "x", 0), J.i(a, "y", 0), J.i(a, "z", 0));
+                        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
+                        Map<String, Object> m = J.obj(
+                                "dimension", level.dimension().location().toString(),
+                                "block", net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(),
+                                "state", state.toString(),
+                                "air", state.isAir());
+                        net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
+                        if (be != null) {
+                            m.put("block_entity", net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(be.getType()).toString());
+                            if (J.b(a, "nbt", false))
+                                m.put("nbt", be.saveWithFullMetadata(level.registryAccess()).toString());
+                        }
+                        return m;
+                    });
+                }));
     }
 
     private static ServerLevel level(MinecraftServer s, JsonObject a, ServerPlayer p) {

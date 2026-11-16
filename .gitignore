@@ -37,3 +37,6 @@ Thumbs.db
 # Claude Code
 .claude/worktrees/
 .claude/settings.local.json
+
+# Eclipse (Gradle import)
+.eclipse/

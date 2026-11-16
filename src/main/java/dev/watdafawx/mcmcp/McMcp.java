@@ -25,7 +25,8 @@ public final class McMcp {
             FPS: frame_stats / measure. Server lag: tick_stats, server_world_state. Memory: jvm_state.
             CPU hot spots: spark_start then spark_stop (returns threads, mods by self time, hot methods, tree=true for the call tree).
             Mixins: mixins (status=skipped). Chat: chat_send shows [Claude] lines to the player; chat_wait/chat_poll return messages the player typed starting with the chat prefix (default @claude).
-            Tools marked [action] change game state and exist only when actions are enabled in config/mcmcp-common.toml.""";
+            Tools marked [action] change game state and exist only when actions are enabled in config/mcmcp-common.toml.
+            Dev loop: screenshot proves what is on screen; screen reports container geometry + widgets; click/key/close_screen drive any GUI; look/look_at aim without the mouse; crosshair shows the actual pick; hold_key holds Shift/Ctrl/etc; click_world uses the real left/right-click path (including InteractionKeyMappingTriggered); chunk_rebuild is F3+A; block_info reads the server-side blockstate + block entity NBT.""";
 
     public McMcp(IEventBus modBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
