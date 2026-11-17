@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.joml.Matrix4f;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -25,6 +24,7 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -46,13 +46,17 @@ import net.neoforged.neoforge.common.NeoForge;
 
 /** Draws every visible ghost as see-through blocks plus a bounding box. Meshes are rebuilt only when a ghost changes. */
 public final class GhostRenderer {
-    private record Baked(int version, VertexBuffer vbo, AABB box) {}
+    private record Baked(int version, int clipY, VertexBuffer vbo, AABB box) {}
 
     private static final Map<String, Baked> BAKED = new HashMap<>();
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("mcmcp-ghost");
+    private static final Set<net.minecraft.world.level.block.Block> FAILED = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /** Draw ghosts over the world: terrain can't hide them, but they still hide their own back faces. */
     public static volatile boolean xray;
     /** Full opacity and no tint, for screenshots that should show the design itself. */
     public static volatile boolean solid;
+    /** Cutaway: blocks above this world y are not drawn (Integer.MAX_VALUE = off), to look into rooms from above. */
+    public static volatile int clipY = Integer.MAX_VALUE;
 
     private GhostRenderer() {}
 
@@ -72,25 +76,31 @@ public final class GhostRenderer {
             live.add(g.id);
             if (!g.visible || !dim.equals(g.dimension)) continue;
             Baked baked = BAKED.get(g.id);
-            if (baked == null || baked.version != g.version) {
+            if (baked == null || baked.version != g.version || baked.clipY != clipY) {
                 if (baked != null && baked.vbo != null) baked.vbo.close();
                 baked = bake(g);
                 BAKED.put(g.id, baked);
             }
             if (baked.vbo == null) continue;
             BlockPos o = g.origin;
-            Matrix4f mv = new Matrix4f(e.getModelViewMatrix())
-                    .translate((float) (o.getX() - cam.x), (float) (o.getY() - cam.y), (float) (o.getZ() - cam.z));
             RenderType rt = RenderType.translucent();
             rt.setupRenderState();
             if (solid) RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             else RenderSystem.setShaderColor(0.85f, 0.95f, 1f, g.alpha);
+            // The camera offset goes in ChunkOffset, like chunk sections: the shader computes fog from
+            // Position + ChunkOffset, so a translated model-view would fog ghosts by their distance from their own
+            // origin (a ghost set in world coordinates with origin 0,0,0 came out as flat fog-white shapes).
+            ShaderInstance sh = GameRenderer.getRendertypeTranslucentShader();
+            if (sh.CHUNK_OFFSET != null)
+                sh.CHUNK_OFFSET.set((float) (o.getX() - cam.x), (float) (o.getY() - cam.y), (float) (o.getZ() - cam.z));
             baked.vbo.bind();
-            baked.vbo.drawWithShader(mv, e.getProjectionMatrix(), GameRenderer.getRendertypeTranslucentShader());
+            baked.vbo.drawWithShader(e.getModelViewMatrix(), e.getProjectionMatrix(), sh);
             VertexBuffer.unbind();
+            if (sh.CHUNK_OFFSET != null) sh.CHUNK_OFFSET.set(0f, 0f, 0f);
             RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             rt.clearRenderState();
 
+            if (mc.options.hideGui) continue; // HUD off (F1 / ghost_show hud=false): clean shots, no outline box
             MultiBufferSource.BufferSource buf = mc.renderBuffers().bufferSource();
             VertexConsumer lines = buf.getBuffer(RenderType.lines());
             // RenderSystem's model-view stack already holds the camera rotation in 1.21; an identity pose is right here.
@@ -107,6 +117,7 @@ public final class GhostRenderer {
     }
 
     private static Baked bake(Ghost g) {
+        int clip = clipY;
         Long2ObjectMap<BlockState> blocks;
         int version;
         int[] b;
@@ -115,7 +126,11 @@ public final class GhostRenderer {
             version = g.version;
             b = g.bounds();
         }
-        if (b == null) return new Baked(version, null, new AABB(0, 0, 0, 1, 1, 1));
+        if (clip != Integer.MAX_VALUE) { // drop blocks above the cut, also from the cull level so cut faces are drawn
+            int localMax = clip - g.origin.getY();
+            blocks.long2ObjectEntrySet().removeIf(en -> BlockPos.getY(en.getLongKey()) > localMax);
+        }
+        if (b == null) return new Baked(version, clip, null, new AABB(0, 0, 0, 1, 1, 1));
         AABB box = new AABB(b[0], b[1], b[2], b[3] + 1, b[4] + 1, b[5] + 1);
         Minecraft mc = Minecraft.getInstance();
         BlockRenderDispatcher dispatcher = mc.getBlockRenderer();
@@ -125,6 +140,7 @@ public final class GhostRenderer {
         try (ByteBufferBuilder bytes = new ByteBufferBuilder(Math.max(1 << 16, blocks.size() * 512))) {
             BufferBuilder bb = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            VertexRecorder rec = new VertexRecorder();
             for (var en : blocks.long2ObjectEntrySet()) {
                 BlockState st = en.getValue();
                 if (st.getRenderShape() != RenderShape.MODEL) continue;
@@ -132,20 +148,23 @@ public final class GhostRenderer {
                 ps.pushPose();
                 ps.translate(pos.getX(), pos.getY(), pos.getZ());
                 rand.setSeed(st.getSeed(pos));
+                rec.reset();
                 try {
-                    dispatcher.renderBatched(st, pos, level, ps, bb, true, rand, ModelData.EMPTY, null);
+                    dispatcher.renderBatched(st, pos, level, ps, rec, true, rand, ModelData.EMPTY, null);
+                    rec.flushTo(bb); // only whole, finished blocks reach the mesh
                 } catch (RuntimeException ex) {
                     // Some modded models expect real block entity data; skip them rather than break the ghost.
+                    if (FAILED.add(st.getBlock())) LOG.warn("ghost {}: skipping {} ({})", g.id, st, ex.toString());
                 }
                 ps.popPose();
             }
             MeshData mesh = bb.build();
-            if (mesh == null) return new Baked(version, null, box);
+            if (mesh == null) return new Baked(version, clip, null, box);
             VertexBuffer vbo = new VertexBuffer(VertexBuffer.Usage.STATIC);
             vbo.bind();
             vbo.upload(mesh);
             VertexBuffer.unbind();
-            return new Baked(version, vbo, box);
+            return new Baked(version, clip, vbo, box);
         }
     }
 

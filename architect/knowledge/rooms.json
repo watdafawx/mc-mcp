@@ -1,0 +1,326 @@
+{
+  "_readme": [
+    "Room/area archetypes. Sizes are INTERIOR clear sizes in blocks: w = x extent, d = z extent, h = floor-to-ceiling clear height (y). Shell adds 1 block each side.",
+    "Pick odd w/d so the room has a center line (door and focal point align on it). Ranges = [min, comfortable_max].",
+    "Doors: 1 wide x 2 tall is the minimum; main connecting openings should be 3 wide x 3-4 tall. Corridor-to-room openings are centered unless stated.",
+    "Coordinates in rules: floor layer y=0, interior y=1..h, ceiling layer y=h+1. Wall faces named N(-z) S(+z) W(-x) E(+x).",
+    "Every room needs: one focal point, one light plan that hides its sources, one floor pattern (border or inlay), and at least 3 wall-depth devices (see principles.md D-rules)."
+  ],
+  "archetypes": [
+    {
+      "id": "entrance_hall",
+      "name": "Entrance Hall / Foyer",
+      "size": {"w": [9, 15], "d": [9, 17], "h": [6, 9]},
+      "purpose": "First impression. Orients the visitor, announces the theme, leads the eye along a main axis.",
+      "layout_rules": [
+        "Single strong axis from the door to the focal point on the far wall; everything symmetric around it.",
+        "Doorway 3 wide x 4 tall with an arch or lintel frame (trim) and a 1-block deeper reveal; step up 1 onto the floor (stair/slab).",
+        "Floor: bordered rug or inlay on the axis (carpet runner or contrasting strip 3 wide), 1-block border band along walls.",
+        "Ceiling higher than neighbouring rooms by 2+; beams or coffers every 3-4 blocks.",
+        "Place pillars or half-columns in pairs flanking the axis (2 or 4), at 1/4 and 3/4 depth."
+      ],
+      "required_features": [
+        "A focal point on the far wall (feature wall, machine glimpse, banner, statue or big window)",
+        "A visible hint of the main machine room through glass or an arch",
+        "Light ring or chandelier centered on the axis",
+        "Side alcoves or benches so the room is not an empty box"
+      ],
+      "connects": {
+        "to": ["corridor", "multiblock_showcase_hall", "atrium", "stairwell"],
+        "how": "Outside door on one short wall; main arch to the showcase hall opposite; side doors 1-wide to corridors at the midpoints of the long walls."
+      },
+      "avoid": ["Empty center with only lights in the ceiling", "Doors off-axis without a reason", "Ceiling the same height as a corridor"]
+    },
+    {
+      "id": "storage_room",
+      "name": "Storage Room",
+      "size": {"w": [9, 21], "d": [7, 15], "h": [4, 7]},
+      "purpose": "Chests, barrels, AE2 drives or sorted item storage. Must look ordered and be reachable.",
+      "layout_rules": [
+        "Aisles 3 wide (1 for player, 2 for access) between shelf rows that are 2 deep x 2-3 high.",
+        "Shelf rows perpendicular to the entry axis; leave a 3-wide cross aisle in the center.",
+        "End walls get feature shelving (barrels, drives) to close the aisle view.",
+        "Ceiling beams every 3 blocks over aisles; a lantern/light at every second beam crossing.",
+        "Floor: contrasting strip down each aisle center (carpet, different planks)."
+      ],
+      "required_features": [
+        "Labels: item frame or sign above each shelf bay",
+        "A staging table or crafting corner near the door",
+        "Ladders or step stools if shelving is 3+ high",
+        "At least one decorative cluster (barrel stack, sack pile) breaking the grid"
+      ],
+      "connects": {
+        "to": ["corridor", "crafting_processing_line", "server_room"],
+        "how": "Door at one end of the main aisle (3 wide opening), second exit at the far end; do not exit mid-row."
+      },
+      "avoid": ["Chests flat against a bare wall in a line", "Aisles 1 wide", "Uniform ceiling lights directly above every chest"]
+    },
+    {
+      "id": "crafting_processing_line",
+      "name": "Crafting / Processing Line",
+      "size": {"w": [15, 31], "d": [7, 11], "h": [5, 8]},
+      "purpose": "A row of machines (assemblers, presses, inscribers, Create mixers) that visibly flows left to right.",
+      "layout_rules": [
+        "Linear flow along x: input end on W, output on E; show it with a floor lane (3 wide) of a contrasting block and arrow-like chevrons or lights.",
+        "Machines in bays of 3 wide x 3 deep with 1-block pillars between; every bay has identical frame, different machine inside.",
+        "Pipes/cables run overhead on one side only (cable tray 1 block below ceiling), never across the walking lane.",
+        "Raise the machine bays 1 block (slab step) above the walking lane.",
+        "Break the monotony every 3rd bay with a taller or wider bay (junction/buffer)."
+      ],
+      "required_features": [
+        "Walking lane 3 wide down the full length",
+        "Per-bay light above machine + one lane light every 4 blocks",
+        "Input and output end markers (hopper/chest cluster at start, vault or drive at end)",
+        "Glass viewing windows in at least one long wall"
+      ],
+      "connects": {
+        "to": ["storage_room", "server_room", "multiblock_showcase_hall", "corridor"],
+        "how": "Both short ends open into rooms (3x4 openings); long walls may have windows to a parallel corridor."
+      },
+      "avoid": ["Machines directly against the wall with no frame", "Cables on the floor", "Lane too narrow (<3)"]
+    },
+    {
+      "id": "server_room",
+      "name": "Server Room (racks)",
+      "size": {"w": [11, 21], "d": [9, 17], "h": [5, 7]},
+      "purpose": "Rows of drives/interfaces/pattern providers as racks, with hot/cold aisle feel.",
+      "layout_rules": [
+        "Racks in rows: each rack 2 wide x 1 deep x 3 high; rows face a shared 3-wide aisle; leave 1 gap block between rack pairs for cables.",
+        "Aisle floor: dark with a light strip (cold aisle) down the center; raised-floor vents (copper_grate) every 4th tile.",
+        "Ceiling tray 1 block below ceiling over every aisle; chains down to the racks.",
+        "End wall as a status wall: glass + lamps in a grid.",
+        "Rack row count odd (3 or 5) so there is a center aisle."
+      ],
+      "required_features": [
+        "Aisles between racks 3 wide",
+        "Per-rack indicator lights (lamps/glass panes on top or front)",
+        "Floor light strip hidden under glass",
+        "A control desk or terminal nook at the entry"
+      ],
+      "connects": {
+        "to": ["corridor", "storage_room", "crafting_processing_line", "multiblock_showcase_hall"],
+        "how": "Entry through a short airlock-style vestibule (2x3 with doors both ends) on one short wall; second service door opposite."
+      },
+      "avoid": ["Racks flush wall-to-wall with no aisle", "Same rack height everywhere (vary with a taller cabinet every 4th)", "Bright white everywhere (needs darkness for glow to read)"]
+    },
+    {
+      "id": "multiblock_showcase_hall",
+      "name": "Multiblock Showcase Hall",
+      "size": {"w": [15, 25], "d": [15, 25], "h": [9, 14]},
+      "purpose": "Display a large machine (7x7x7 controller/quantum cube/assembler matrix) as a trophy.",
+      "layout_rules": [
+        "Machine centered on a pedestal/dais; clear space = at least 3 blocks on every side, 4+ on the viewing side, and 2 above (ceiling >= machine height + 4).",
+        "Room width/depth = machine size + 2*(3..6) + walls; for a 7-wide machine use 15-19 interior.",
+        "Dais: 1-2 steps (stairs) in a square or octagon, 1 larger than the machine on every side, with a contrasting border and a ring of inlay.",
+        "Approach axis from the entrance, view from 8-12 blocks away; place a gallery or balcony above for a second view.",
+        "Four or eight pillars or buttresses around, framing the machine, taller than it, not hiding it."
+      ],
+      "required_features": [
+        "Focus lighting: 4 hidden up-lights on the dais edge or spot lanterns above; avoid lights touching the machine face",
+        "Cable/conduit routes in a floor trench or overhead tray, symmetric, ending at the machine ports",
+        "Windows or a glass wall so the machine can be seen from the entrance and corridors",
+        "Plaque, banner or sign at the dais"
+      ],
+      "connects": {
+        "to": ["entrance_hall", "corridor", "atrium", "balcony", "server_room"],
+        "how": "Grand 5 wide x 5 tall arch from the entrance on the axis; service doors 1-wide at the back; gallery stair at one side."
+      },
+      "avoid": ["Machine against a wall", "Ceiling below machine top + 3", "Lights directly adjacent to machine blocks (hides texture)"]
+    },
+    {
+      "id": "corridor",
+      "name": "Corridor / Hallway",
+      "size": {"w": [3, 5], "d": [7, 41], "h": [4, 6]},
+      "purpose": "Connect rooms, build rhythm, give pacing (compress-then-release).",
+      "layout_rules": [
+        "Width 3 minimum (1 blocking pillar leaves 2 usable), 5 for main routes; ceiling 4-5.",
+        "Rhythm: repeat a pattern every 4 blocks (pillar, lamp, window); end with a larger opening or a turn, not a blank wall.",
+        "Center strip in the floor in a contrasting block; lights recessed in the ceiling strip, not on the floor.",
+        "Doors off the corridor: recessed 1 block with a lintel so the wall has depth.",
+        "Add a kink or step down/up every 12-16 blocks to avoid a tube look."
+      ],
+      "required_features": [
+        "Wall depth devices (pillars, inset panels)",
+        "Lighting every 4 blocks",
+        "At least one window or opening to something interesting (room, machine, outdoors)"
+      ],
+      "connects": {
+        "to": ["entrance_hall", "storage_room", "server_room", "stairwell", "atrium"],
+        "how": "Join rooms at their side centers; T-junctions get a small widened hall (5x5) with a dome/lantern."
+      },
+      "avoid": ["Long straight 1-block-wide tube", "Identical doors with no variation", "Ceiling flat and plain"]
+    },
+    {
+      "id": "stairwell",
+      "name": "Stairwell",
+      "size": {"w": [5, 9], "d": [5, 9], "h": [6, 14]},
+      "purpose": "Vertical connection between floors, doubles as a feature.",
+      "layout_rules": [
+        "Stairs 3 wide (2 for tight); each flight 4-6 steps with a landing 3x3 after.",
+        "Prefer spiral or switchback; landing every ~3 blocks of rise.",
+        "Open a window or glass strip on every landing; place a chandelier hanging in the well.",
+        "Handrail: fence/walls/iron_bars on the open side; newel post (log or pillar) at turns.",
+        "Headroom: min 3 blocks above every step; use ceiling slabs to keep height."
+      ],
+      "required_features": ["Handrail on every open edge", "Light every landing", "Trim line following the stair run (stripe of other block on stringer)"],
+      "connects": {
+        "to": ["corridor", "atrium", "balcony", "entrance_hall"],
+        "how": "Enter on the bottom landing side; exit onto each floor at corridor level with a 3-wide opening."
+      },
+      "avoid": ["1-wide stairs with no rail", "No landings on a 10+ block rise", "Stairs against bare plain walls"]
+    },
+    {
+      "id": "atrium",
+      "name": "Atrium",
+      "size": {"w": [11, 21], "d": [11, 21], "h": [10, 20]},
+      "purpose": "Tall central space tying floors and rooms together; light and view source.",
+      "layout_rules": [
+        "Open from floor to roof; galleries on 2-4 sides at every floor, 3 wide with railings.",
+        "Roof: skylight (glass/pane lattice) or dome with ribs every 3 blocks; light wells.",
+        "Center feature: tree, fountain, hanging chandelier, or machine.",
+        "Colonnade on the ground floor at 4-block spacing, taller than normal columns.",
+        "Floor: radial or concentric pattern around the centre."
+      ],
+      "required_features": ["Skylight or high windows", "Railings on all gallery edges", "Center feature", "Stairs or lift between levels"],
+      "connects": {
+        "to": ["entrance_hall", "multiblock_showcase_hall", "stairwell", "balcony", "corridor"],
+        "how": "Ground-floor arches 3x4 on all four sides; upper gallery doors every 8-10 blocks."
+      },
+      "avoid": ["Big empty cube", "Flat glass lid without ribs", "Light only from above (no wall sconces)"]
+    },
+    {
+      "id": "balcony",
+      "name": "Balcony / Gallery / Mezzanine",
+      "size": {"w": [3, 7], "d": [5, 25], "h": [4, 5]},
+      "purpose": "Elevated viewing platform onto a machine, hall or garden.",
+      "layout_rules": [
+        "Floor 3 wide minimum; rail height 1 block (fence/wall/iron_bars) plus a cap slab if desired.",
+        "Corbels (stairs upside down) under the edge or posts below; overhang 1 block gives a shadow line.",
+        "Rail posts every 3-4 blocks (taller pillar) with infill; leave a 2-wide gap at the stair/door.",
+        "Match the room's trim blocks on the edge fascia.",
+        "Place benches or lanterns on posts to use it as a stop-and-look spot."
+      ],
+      "required_features": ["Safe rail", "Unobstructed view line to the focal point", "Underside detail (beams or corbels)"],
+      "connects": {
+        "to": ["multiblock_showcase_hall", "atrium", "stairwell", "garden"],
+        "how": "Access via a stair or door at one end; ends at a window or corner bay, not a dead wall."
+      },
+      "avoid": ["Floating slab with no support look", "Rail missing at stair gaps", "Narrow 1-block ledge"]
+    },
+    {
+      "id": "garden",
+      "name": "Garden / Courtyard",
+      "size": {"w": [9, 31], "d": [9, 31], "h": [0, 0]},
+      "purpose": "Open area outside or in a courtyard; softens hard architecture.",
+      "layout_rules": [
+        "Paths 2-3 wide curving in a loose S or looping; border with slabs/stairs and a contrasting block.",
+        "Plant in clusters of odd numbers (3, 5, 7) with 3 height layers: ground cover, mid plants, trees/shrubs.",
+        "Terrain gently stepped, mix of grass, moss, coarse dirt, path blocks, gravel.",
+        "A water or lighting feature at path junctions (pond, fountain, lantern post).",
+        "Boundary: hedges (leaves), walls or fences with gaps, not a hard rectangle."
+      ],
+      "required_features": ["At least one focal tree or feature", "Path with border", "Lights spaced every 6-8 blocks along paths", "Seating spot"],
+      "connects": {
+        "to": ["balcony", "entrance_hall", "corridor"],
+        "how": "Gate or arch (3 wide) on the building; the path starts at the door and aims at the focal feature."
+      },
+      "avoid": ["Flat grass rectangle", "Single block trees", "Straight rows of flowers"]
+    },
+    {
+      "id": "control_room",
+      "name": "Control Room / Terminal Nook",
+      "size": {"w": [7, 13], "d": [5, 9], "h": [4, 6]},
+      "purpose": "Where the operator stands: terminals, monitors, overview of a machine.",
+      "layout_rules": [
+        "Raised 1-3 blocks above the machine floor, with a large window wall facing the machine.",
+        "Curved or angled desk (slab and stair) in front of the window, 1 block gap behind it for the operator.",
+        "Screens (glass panes + lamps) in a bank above desk height; dimmer lighting than the machine room.",
+        "Chair/stool positions marked (stairs or carpets).",
+        "Cable run visible under glass floor strip."
+      ],
+      "required_features": ["Window facing the focal machine", "Desk with 3+ terminals", "Soft ceiling light with a glow strip", "Door on the back wall"],
+      "connects": {
+        "to": ["multiblock_showcase_hall", "server_room", "corridor"],
+        "how": "Back door to a corridor; window faces the hall; side stair to the hall floor."
+      },
+      "avoid": ["Windowless closet", "Desk against a blank wall", "Overhead lights glaring on screens"]
+    },
+    {
+      "id": "vault",
+      "name": "Vault / Secure Annex",
+      "size": {"w": [7, 15], "d": [7, 15], "h": [5, 8]},
+      "purpose": "Small, dramatic, heavy-walled room for high-value storage or the controller core.",
+      "layout_rules": [
+        "Thick walls shown by deep door reveal (3 deep) and a heavy door frame (iron).",
+        "Low entrance corridor then a taller chamber: compress then release.",
+        "Spotlit central pedestal; dark surrounds; lights from the floor edge and a ceiling oculus.",
+        "Lining: alternating dark panels with 1-block metal strips each 3 blocks.",
+        "Safe-deposit style shelves in recesses on 2-3 walls."
+      ],
+      "required_features": ["Vault door", "Pedestal or display", "Light pools (not even lighting)", "Single entry"],
+      "connects": {
+        "to": ["corridor", "server_room", "multiblock_showcase_hall"],
+        "how": "Single door through a 3-deep corridor segment; no windows."
+      },
+      "avoid": ["Even bright lighting", "Thin 1-block walls and a normal door", "Multiple entrances"]
+    },
+    {
+      "id": "airlock_vestibule",
+      "name": "Airlock / Vestibule",
+      "size": {"w": [3, 5], "d": [3, 5], "h": [3, 4]},
+      "purpose": "Small transition cell between contrasting zones (clean/dirty, hot/cold, public/secure).",
+      "layout_rules": [
+        "Door at each end, offset or at least 3 blocks apart; walls in a different material from both sides.",
+        "Hazard stripe or contrasting floor, lamp above each door, small window if useful.",
+        "Place a bench/rack/console on one side wall."
+      ],
+      "required_features": ["Two doors", "Light", "Zone-change material"],
+      "connects": {
+        "to": ["server_room", "vault", "corridor", "crafting_processing_line"],
+        "how": "Inline between two rooms; doors on the same axis."
+      },
+      "avoid": ["Door directly opening into the next door", "Same palette as both neighbours"]
+    },
+    {
+      "id": "machine_bay_row",
+      "name": "Machine Bays (alcove row)",
+      "size": {"w": [9, 25], "d": [3, 5], "h": [4, 6]},
+      "purpose": "A wall of repeated 3-wide alcoves each holding one machine; used for AE2 assemblers, Create units, interfaces.",
+      "layout_rules": [
+        "Alcove 3 wide x 3 high x 2 deep, pillar 1 wide between; machine in the back, lamp above, trim arch on the front.",
+        "Every 3rd bay differs (taller, glass front, different accent) to break monotony.",
+        "Floor in front: lane strip. Back wall: 1 block recess so shadows read."
+      ],
+      "required_features": ["Pillars between bays", "One light per bay", "Header beam running the full row"],
+      "connects": {
+        "to": ["crafting_processing_line", "server_room", "storage_room"],
+        "how": "Built as the long wall of another room, not a standalone room."
+      },
+      "avoid": ["Machines flush with the wall", "Same bay pattern repeated 8+ times unbroken"]
+    },
+    {
+      "id": "reactor_core_chamber",
+      "name": "Reactor / Power Chamber",
+      "size": {"w": [17, 31], "d": [17, 31], "h": [12, 24]},
+      "purpose": "Huge round/square chamber with a central energy structure and catwalks.",
+      "layout_rules": [
+        "Central core 5-9 wide; 3-5 blocks clearance ring; outer wall 8-12 blocks from the core centre.",
+        "Catwalks at 2-3 heights, 3 wide, connected by stairs/ladders; rails everywhere open.",
+        "Floor: radial pattern with hazard ring and glow lines to the core.",
+        "Ceiling: truss or dome with oculus above the core.",
+        "Piping bundles hugging the walls; lighting from the core itself and rim lamps."
+      ],
+      "required_features": ["Central glowing core", "Two or more catwalk levels", "Hazard marking", "Massive ceiling structure"],
+      "connects": {
+        "to": ["corridor", "control_room", "stairwell"],
+        "how": "Two or four large doors on cardinal axes at ground level; control room windows at mid height."
+      },
+      "avoid": ["Core touching walls", "One catwalk only", "Flat black ceiling"]
+    }
+  ],
+  "adjacency_hints": {
+    "flow_example_ae2_base": ["entrance_hall", "atrium", "multiblock_showcase_hall", "control_room", "server_room", "storage_room", "crafting_processing_line", "corridor loops between"],
+    "pacing": "Alternate tall/short and wide/narrow: corridor (3x4) -> hall (15x9) -> corridor -> small vault. Compression makes the next room feel larger.",
+    "transitions": "Between two themes use an airlock_vestibule or a 3-deep door reveal; change floor material at the threshold."
+  }
+}

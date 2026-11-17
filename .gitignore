@@ -35,8 +35,22 @@ __pycache__/
 Thumbs.db
 
 # Claude Code
-.claude/worktrees/
-.claude/settings.local.json
+.claude/
 
 # Eclipse (Gradle import)
 .eclipse/
+
+architect/.env
+architect/.venv/
+architect/venv/
+architect/sessions/
+architect/exports/
+architect/img3d/
+architect/__pycache__/
+# Third-party reference screenshots (other creators' builds) and data generated from other mods' jars
+architect/knowledge/style_refs/
+architect/knowledge/blocklib.json
+architect/knowledge/_tex.json
+architect/knowledge/_why.json
+architect/knowledge/_blockers.txt
+

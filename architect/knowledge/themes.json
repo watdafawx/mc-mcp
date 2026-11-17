@@ -1,0 +1,539 @@
+{
+  "_readme": [
+    "Themes for ghost builds. Each palette role is an ARRAY of block ids; first entry = dominant use, later entries = variation/texture blocks of the same family.",
+    "Use ratio ~60% primary / 30% secondary / 10% accent. trim = frame lines (corners, beams, floor/ceiling edge). detail = small props. light = emitters (hide them, see principles.md L-rules).",
+    "'shapes' lists the stairs/slab/wall that match primary or secondary, so you can add depth. Any vanilla full block can usually take _stairs/_slab/_wall suffix, check availability first.",
+    "Ids with [state] = write exactly like that in the ghost. Plain id = default state.",
+    "AE2 CABLES, TERMINALS, BUSES AND MONITORS ARE PARTS ON ae2:cable_bus, NOT BLOCKS. Do not put them in ghosts. Use placeholders (see multiblocks.md)."
+  ],
+  "themes": [
+    {
+      "id": "server_room",
+      "name": "AE2 Server Room",
+      "tech": true,
+      "mood": "cold, clean, humming; long rows of lit racks, blue-cyan glow on dark floor",
+      "palette": {
+        "primary": ["minecraft:polished_deepslate", "minecraft:deepslate_tiles", "minecraft:deepslate_bricks"],
+        "secondary": ["ae2:smooth_sky_stone_block", "minecraft:gray_concrete", "minecraft:black_concrete"],
+        "accent": ["minecraft:cyan_concrete", "minecraft:light_blue_stained_glass", "minecraft:lime_stained_glass"],
+        "trim": ["minecraft:iron_block", "ae2:quartz_pillar[axis=y]", "minecraft:smooth_quartz"],
+        "glass": ["ae2:quartz_glass", "minecraft:cyan_stained_glass_pane", "minecraft:tinted_glass"],
+        "light": ["minecraft:sea_lantern", "ae2:quartz_fixture[facing=down,odd=false]", "minecraft:redstone_lamp[lit=true]"],
+        "floor": ["minecraft:polished_deepslate", "minecraft:black_concrete", "minecraft:copper_grate", "minecraft:cyan_concrete"],
+        "detail": ["ae2:drive[facing=north]", "ae2:interface", "ae2:pattern_provider", "minecraft:iron_bars", "minecraft:iron_trapdoor[facing=north,half=top,open=true]", "minecraft:chain[axis=y]", "minecraft:lightning_rod[facing=up]", "minecraft:copper_bulb[lit=true]"]
+      },
+      "shapes": {"stairs": "minecraft:polished_deepslate_stairs", "slab": "minecraft:polished_deepslate_slab", "wall": "minecraft:polished_deepslate_wall"},
+      "features": [
+        "Rack aisles: pairs of 2-wide x 3-tall racks of ae2:drive facing the aisle, 3-wide aisle between, iron_trapdoor 'doors' on alternate racks.",
+        "Cold-aisle floor strip: 1-wide line of sea_lantern under cyan_stained_glass set flush in the floor down the aisle center.",
+        "Ceiling cable trays: iron_bars strip 1 block below ceiling with chain drops and lime/cyan glass pane 'LEDs' on the rack tops.",
+        "Raised floor: copper_grate vents every 4th tile along aisle edges.",
+        "Glass-walled control booth at one end with ae2:interface and ae2:pattern_provider blocks as a status wall."
+      ]
+    },
+    {
+      "id": "crafting_core",
+      "name": "AE2 Crafting Core Hall",
+      "tech": true,
+      "mood": "dramatic, purple-fluix glow, a heart machine under a high vault",
+      "palette": {
+        "primary": ["minecraft:polished_blackstone_bricks", "minecraft:polished_blackstone", "minecraft:blackstone"],
+        "secondary": ["ae2:sky_stone_brick", "ae2:smooth_sky_stone_block", "minecraft:deepslate_tiles"],
+        "accent": ["ae2:fluix_block", "minecraft:purple_stained_glass", "minecraft:amethyst_block"],
+        "trim": ["ae2:quartz_pillar[axis=y]", "minecraft:chiseled_polished_blackstone", "ae2:chiseled_quartz_block"],
+        "glass": ["ae2:quartz_vibrant_glass", "minecraft:purple_stained_glass_pane", "ae2:quartz_glass"],
+        "light": ["minecraft:sea_lantern", "ae2:quartz_fixture[facing=down,odd=false]", "minecraft:amethyst_cluster[facing=up]", "minecraft:end_rod[facing=up]"],
+        "floor": ["minecraft:polished_blackstone", "minecraft:gilded_blackstone", "minecraft:purple_concrete", "minecraft:smooth_basalt"],
+        "detail": ["ae2:crafting_accelerator", "ae2:crafting_monitor[facing=north,formed=false]", "ae2:molecular_assembler", "ae2:pattern_provider", "ae2:energy_cell[fullness=4]", "minecraft:chain[axis=y]", "minecraft:iron_bars"]
+      },
+      "shapes": {"stairs": "minecraft:polished_blackstone_brick_stairs", "slab": "minecraft:polished_blackstone_brick_slab", "wall": "minecraft:polished_blackstone_brick_wall"},
+      "features": [
+        "Central dais: 2 steps up (polished_blackstone_brick_stairs ring), the crafting CPU / quantum cube sits on it with 3+ blocks clear on every side.",
+        "Four sky_stone_brick pillars with quartz_pillar caps and a fluix_block ring beam above; ceiling 8-10 high.",
+        "Wall alcoves 3 wide x 3 tall, each holding a molecular_assembler behind quartz_glass; pattern_provider rows underneath.",
+        "Energy cells in a symmetrical row along one side, with end_rod columns between.",
+        "Floor inlay: concentric squares, purple_concrete ring in blackstone, centered on the machine."
+      ]
+    },
+    {
+      "id": "quantum_lab",
+      "name": "Quantum Lab (AdvancedAE)",
+      "tech": true,
+      "mood": "sterile white-violet, floating, humming with field energy",
+      "palette": {
+        "primary": ["minecraft:white_concrete", "minecraft:smooth_quartz", "minecraft:calcite"],
+        "secondary": ["advanced_ae:quantum_alloy_block", "minecraft:polished_deepslate", "minecraft:black_concrete"],
+        "accent": ["minecraft:purple_stained_glass", "minecraft:amethyst_block", "minecraft:crying_obsidian"],
+        "trim": ["minecraft:quartz_pillar[axis=y]", "minecraft:chiseled_quartz_block", "minecraft:polished_blackstone"],
+        "glass": ["minecraft:tinted_glass", "minecraft:purple_stained_glass_pane", "ae2:quartz_vibrant_glass"],
+        "light": ["minecraft:sea_lantern", "minecraft:end_rod[facing=up]", "minecraft:amethyst_cluster[facing=up]", "minecraft:light[level=15]"],
+        "floor": ["minecraft:black_concrete", "minecraft:polished_blackstone", "minecraft:purple_concrete", "minecraft:white_concrete"],
+        "detail": ["advanced_ae:quantum_unit", "advanced_ae:quantum_structure", "minecraft:lightning_rod[facing=up]", "minecraft:end_rod[facing=north]", "minecraft:conduit", "minecraft:iron_bars", "minecraft:chain[axis=y]"]
+      },
+      "shapes": {"stairs": "minecraft:quartz_stairs", "slab": "minecraft:quartz_slab", "wall": "minecraft:polished_blackstone_wall"},
+      "features": [
+        "Containment ring: circular/octagonal glass tube wall around the main machine, tinted_glass with end_rod verticals every 2nd block.",
+        "Ceiling oculus: ring of amethyst_cluster and end_rod above the machine, 10+ high.",
+        "Floor: black_concrete with a thin purple_concrete circle and a white_concrete cross pointing to the machine.",
+        "Side lab benches: quartz_slab tops on polished_blackstone_wall legs with cauldrons/glass jars.",
+        "Gantry walkway on iron_bars at upper level looking down on the machine."
+      ]
+    },
+    {
+      "id": "data_vault",
+      "name": "Data Vault",
+      "tech": true,
+      "mood": "heavy, secure, quiet; spot-lit shelves in dark stone, gold-copper accents",
+      "palette": {
+        "primary": ["minecraft:deepslate_tiles", "minecraft:polished_deepslate", "minecraft:deepslate_bricks"],
+        "secondary": ["minecraft:blackstone", "ae2:smooth_sky_stone_block", "minecraft:polished_blackstone_bricks"],
+        "accent": ["minecraft:cut_copper", "minecraft:gold_block", "minecraft:red_stained_glass"],
+        "trim": ["minecraft:iron_block", "minecraft:chiseled_deepslate", "minecraft:polished_blackstone"],
+        "glass": ["minecraft:tinted_glass", "minecraft:red_stained_glass_pane", "minecraft:iron_bars"],
+        "light": ["minecraft:soul_lantern[hanging=true]", "minecraft:sea_lantern", "minecraft:copper_bulb[lit=true]", "minecraft:shroomlight"],
+        "floor": ["minecraft:polished_blackstone", "minecraft:deepslate_tiles", "minecraft:polished_deepslate", "minecraft:gilded_blackstone"],
+        "detail": ["ae2:drive[facing=north]", "ae2:sky_stone_chest", "minecraft:vault[facing=north]", "minecraft:iron_door[facing=north,half=lower]", "minecraft:iron_bars", "minecraft:chain[axis=y]", "minecraft:lectern[facing=north]"]
+      },
+      "shapes": {"stairs": "minecraft:deepslate_tile_stairs", "slab": "minecraft:deepslate_tile_slab", "wall": "minecraft:deepslate_tile_wall"},
+      "features": [
+        "Vault door: 3 wide x 3 tall iron_block frame, iron_door inset, flanked by gold_block studs.",
+        "Safe-deposit walls: grids of ae2:drive / sky_stone_chest in 1-block recesses with iron_bars grilles.",
+        "Narrow 3-wide security corridor leading in; low ceiling (4) opening into a tall 8-high vault chamber.",
+        "Single spot-lit pedestal (polished_blackstone + soul_lantern above) holding the key machine.",
+        "Red stained glass pane 'laser grid' slits along the corridor ceiling edge."
+      ]
+    },
+    {
+      "id": "reactor_hall",
+      "name": "Reactor / Power Hall",
+      "tech": true,
+      "mood": "huge, industrial, hazard-striped; glowing core seen from catwalks",
+      "palette": {
+        "primary": ["minecraft:gray_concrete", "minecraft:light_gray_concrete", "minecraft:smooth_stone"],
+        "secondary": ["minecraft:polished_andesite", "minecraft:stone_bricks", "minecraft:black_concrete"],
+        "accent": ["minecraft:orange_concrete", "minecraft:yellow_concrete", "minecraft:lime_stained_glass"],
+        "trim": ["minecraft:iron_block", "minecraft:black_concrete", "minecraft:copper_block"],
+        "glass": ["minecraft:cyan_stained_glass", "minecraft:light_blue_stained_glass_pane", "minecraft:glass_pane"],
+        "light": ["minecraft:sea_lantern", "minecraft:redstone_lamp[lit=true]", "minecraft:glowstone", "minecraft:lantern[hanging=true]"],
+        "floor": ["minecraft:smooth_stone", "minecraft:polished_andesite", "minecraft:yellow_concrete", "minecraft:black_concrete"],
+        "detail": ["minecraft:iron_bars", "minecraft:chain[axis=y]", "minecraft:ladder[facing=north]", "minecraft:iron_trapdoor[facing=north,half=top,open=false]", "minecraft:lightning_rod[facing=up]", "minecraft:copper_block", "ae2:energy_cell[fullness=4]", "ae2:dense_energy_cell[fullness=4]"]
+      },
+      "shapes": {"stairs": "minecraft:stone_brick_stairs", "slab": "minecraft:smooth_stone_slab", "wall": "minecraft:stone_brick_wall"},
+      "features": [
+        "Core: 7x7 glowing column (lime/cyan stained glass over sea_lantern), 3-block gap to the wall, glass tube all the way to the roof.",
+        "Two catwalk rings at y+4 and y+9, iron_bars railing, hazard floor stripes (yellow/black concrete 1-wide diagonal or edge).",
+        "Cooling pipes: 1-wide copper_block runs with iron_block clamps every 4 blocks, chain hangers.",
+        "Roof truss: iron_block beams every 4 blocks across, lantern drops.",
+        "Control gallery: glass wall at one side, 2 floors up, with energy cells as readout wall."
+      ]
+    },
+    {
+      "id": "processing_lab",
+      "name": "AE2 Processing Lab",
+      "tech": true,
+      "mood": "bright, clinical, benches and presses under white light",
+      "palette": {
+        "primary": ["minecraft:white_concrete", "minecraft:smooth_quartz", "minecraft:light_gray_concrete"],
+        "secondary": ["ae2:quartz_block", "minecraft:polished_andesite", "minecraft:gray_concrete"],
+        "accent": ["ae2:fluix_block", "minecraft:light_blue_concrete", "minecraft:cyan_terracotta"],
+        "trim": ["ae2:quartz_pillar[axis=y]", "minecraft:iron_block", "minecraft:smooth_quartz_slab"],
+        "glass": ["ae2:quartz_glass", "minecraft:glass_pane", "minecraft:light_blue_stained_glass_pane"],
+        "light": ["minecraft:sea_lantern", "ae2:quartz_fixture[facing=down,odd=false]", "minecraft:light[level=15]"],
+        "floor": ["minecraft:smooth_quartz", "minecraft:light_gray_concrete", "minecraft:polished_andesite", "minecraft:white_concrete"],
+        "detail": ["ae2:inscriber[facing=north]", "ae2:charger", "ae2:molecular_assembler", "ae2:condenser", "ae2:interface", "minecraft:iron_trapdoor[facing=north,half=top,open=true]", "minecraft:iron_bars", "minecraft:cauldron"]
+      },
+      "shapes": {"stairs": "minecraft:smooth_quartz_stairs", "slab": "minecraft:smooth_quartz_slab", "wall": "minecraft:andesite_wall"},
+      "features": [
+        "Machine bays: each machine in a 3x3 white bay with quartz_pillar posts, label via item frame above.",
+        "Workbench rows: quartz_slab[type=top] counters with iron_trapdoor shelves under.",
+        "Gloss floor with a 1-wide cyan/light-blue concrete walking lane toward the exit.",
+        "Wall-mounted ae2:quartz_fixture strips on the ceiling edge; no exposed torches.",
+        "Large window wall onto the next room (quartz_glass, 3 tall)."
+      ]
+    },
+    {
+      "id": "medieval_hall",
+      "name": "Medieval Great Hall",
+      "tech": false,
+      "mood": "warm timber-and-stone, firelit, banners and long tables",
+      "palette": {
+        "primary": ["minecraft:stone_bricks", "minecraft:cobblestone", "minecraft:mossy_stone_bricks"],
+        "secondary": ["minecraft:dark_oak_planks", "minecraft:spruce_planks", "minecraft:stripped_dark_oak_log"],
+        "accent": ["minecraft:red_carpet", "minecraft:red_banner[rotation=0]", "minecraft:white_wool"],
+        "trim": ["minecraft:dark_oak_log[axis=y]", "minecraft:dark_oak_log[axis=x]", "minecraft:stripped_spruce_log[axis=y]"],
+        "glass": ["minecraft:glass_pane", "minecraft:dark_oak_trapdoor[facing=north,half=top,open=true]", "minecraft:iron_bars"],
+        "light": ["minecraft:lantern[hanging=true]", "minecraft:campfire[lit=true]", "minecraft:candle[candles=3,lit=true]", "minecraft:wall_torch[facing=north]"],
+        "floor": ["minecraft:stone_bricks", "minecraft:cracked_stone_bricks", "minecraft:mossy_stone_bricks", "minecraft:spruce_planks", "minecraft:red_carpet"],
+        "detail": ["minecraft:chain[axis=y]", "minecraft:barrel[facing=up]", "minecraft:spruce_fence", "minecraft:lectern[facing=north]", "minecraft:grindstone", "supplementaries:rope_chandelier", "supplementaries:sconce"]
+      },
+      "shapes": {"stairs": "minecraft:stone_brick_stairs", "slab": "minecraft:stone_brick_slab", "wall": "minecraft:stone_brick_wall"},
+      "features": [
+        "Open timber roof: dark_oak_log beams every 4 blocks across, spruce_stairs inverted as braces in the corners.",
+        "Hearth wall: 3-wide fireplace in stone_bricks with campfire/ chimney stack, banners either side.",
+        "Long dining tables: spruce_slab top on fence legs with trapdoor benches; red_carpet runner down the center.",
+        "Half-timber walls: dark_oak_log frame every 4 blocks, stone_brick infill, 1-block inset windows.",
+        "Wrought-iron chandeliers: chain + lanterns in a ring at 2/3 height."
+      ]
+    },
+    {
+      "id": "japanese",
+      "name": "Japanese Pavilion",
+      "tech": false,
+      "mood": "calm, airy, wood and white plaster, gentle roof curves",
+      "palette": {
+        "primary": ["minecraft:white_concrete", "minecraft:calcite", "minecraft:birch_planks"],
+        "secondary": ["minecraft:dark_oak_planks", "minecraft:spruce_planks", "minecraft:stripped_dark_oak_log"],
+        "accent": ["minecraft:red_concrete", "minecraft:crimson_planks", "minecraft:cherry_planks"],
+        "trim": ["minecraft:dark_oak_log[axis=y]", "minecraft:stripped_dark_oak_log[axis=x]", "minecraft:dark_oak_fence"],
+        "glass": ["minecraft:white_stained_glass_pane", "minecraft:oak_trapdoor[facing=north,half=top,open=true]", "minecraft:bamboo_trapdoor[facing=north,half=top,open=true]"],
+        "light": ["minecraft:lantern[hanging=true]", "minecraft:candle[candles=2,lit=true]", "minecraft:shroomlight", "minecraft:white_stained_glass"],
+        "floor": ["minecraft:bamboo_mosaic", "minecraft:smooth_stone", "minecraft:green_carpet", "minecraft:gravel"],
+        "detail": ["minecraft:bamboo", "minecraft:bell[attachment=ceiling,facing=north]", "minecraft:cherry_leaves[persistent=true]", "minecraft:stone_brick_wall", "minecraft:potted_bamboo", "minecraft:cherry_fence_gate[facing=north]"]
+      },
+      "shapes": {"stairs": "minecraft:dark_oak_stairs", "slab": "minecraft:dark_oak_slab", "wall": "minecraft:stone_brick_wall"},
+      "features": [
+        "Hip/gable roof in deepslate_tile_stairs or dark_oak_stairs, 1-2 block eaves, ends flicked upward with a stair-on-slab-on-stair step.",
+        "Shoji walls: white_stained_glass_pane panels in a dark_oak_log grid (3x3 cells), sliding gaps of 1.",
+        "Engawa veranda: dark_oak_slab porch 2 wide around the building, fence rail, 1 step up.",
+        "Genkan entry step down: floor lowered 1 inside the door with a stone slab step.",
+        "Garden court: gravel raked with stone_brick_wall rocks, cherry tree, bamboo, small pond."
+      ]
+    },
+    {
+      "id": "create_industrial",
+      "name": "Create Industrial Workshop",
+      "tech": false,
+      "mood": "clanking, honest, brass and andesite, visible machinery",
+      "palette": {
+        "primary": ["create:cut_andesite_bricks", "create:cut_andesite", "minecraft:stone_bricks"],
+        "secondary": ["create:industrial_iron_block", "minecraft:polished_andesite", "create:cut_deepslate_bricks"],
+        "accent": ["create:brass_casing", "create:copper_casing", "create:brass_block"],
+        "trim": ["create:andesite_pillar[axis=y]", "create:metal_girder", "minecraft:dark_oak_log[axis=x]"],
+        "glass": ["create:framed_glass", "create:industrial_iron_window", "minecraft:glass_pane"],
+        "light": ["minecraft:lantern[hanging=true]", "minecraft:redstone_lamp[lit=true]", "create:rose_quartz_lamp", "minecraft:shroomlight"],
+        "floor": ["create:cut_andesite", "minecraft:polished_andesite", "create:cut_deepslate_bricks", "minecraft:dark_oak_planks"],
+        "detail": ["create:shaft[axis=x]", "create:cogwheel[axis=y]", "create:large_cogwheel[axis=y]", "create:fluid_tank", "create:fluid_pipe", "create:andesite_scaffolding", "create:andesite_bars", "create:metal_bracket", "create:andesite_casing", "create:copper_scaffolding"]
+      },
+      "shapes": {"stairs": "create:cut_andesite_brick_stairs", "slab": "create:cut_andesite_brick_slab", "wall": "create:cut_andesite_brick_wall"},
+      "features": [
+        "Shaft line along the ceiling (create:shaft[axis=x]) with cogwheel hand-offs; girders with brackets carry it.",
+        "Fluid tank 'boilers' 3x3 with copper_casing bands and fluid_pipe runs.",
+        "Glass-framed machine bays: 1-block andesite_pillar posts, framed_glass between, machines visible.",
+        "Scaffolding walkways (andesite_scaffolding) along the upper wall with andesite_bars rails.",
+        "Brass accents on doors/crates (brass_casing) against grey andesite walls."
+      ]
+    },
+    {
+      "id": "cozy_storage",
+      "name": "Cozy Storage Cellar",
+      "tech": false,
+      "mood": "warm, cluttered but ordered, lantern-lit, smells of wood",
+      "palette": {
+        "primary": ["minecraft:spruce_planks", "minecraft:oak_planks", "minecraft:stripped_spruce_log"],
+        "secondary": ["minecraft:stone_bricks", "minecraft:cobblestone", "minecraft:dark_oak_planks"],
+        "accent": ["minecraft:red_carpet", "minecraft:white_wool", "minecraft:barrel[facing=up]"],
+        "trim": ["minecraft:dark_oak_log[axis=y]", "minecraft:dark_oak_log[axis=x]", "minecraft:stripped_dark_oak_log[axis=z]"],
+        "glass": ["minecraft:glass_pane", "minecraft:spruce_trapdoor[facing=north,half=top,open=true]"],
+        "light": ["minecraft:lantern[hanging=true]", "minecraft:candle[candles=3,lit=true]", "minecraft:campfire[lit=true]", "supplementaries:sconce"],
+        "floor": ["minecraft:spruce_planks", "minecraft:dark_oak_planks", "minecraft:brown_carpet", "minecraft:stone_bricks"],
+        "detail": ["minecraft:barrel[facing=up]", "minecraft:barrel[facing=north]", "minecraft:chest[facing=north,type=single]", "minecraft:hay_block[axis=y]", "minecraft:composter", "minecraft:flower_pot", "supplementaries:sack", "supplementaries:jar", "supplementaries:item_shelf", "handcrafted:oak_shelf[facing=north]"]
+      },
+      "shapes": {"stairs": "minecraft:spruce_stairs", "slab": "minecraft:spruce_slab", "wall": "minecraft:cobblestone_wall"},
+      "features": [
+        "Stacked barrel walls: barrels in 2-high stacks with trapdoor 'labels', alternating facing for variety.",
+        "Rope + lantern hang points; hanging hay/herb props from ceiling beams.",
+        "Plank mezzanine 1/3 depth with ladder; slab shelves under it.",
+        "Brick-and-timber cellar walls: 1 block log pillars every 3, cobble infill.",
+        "Warm carpet runner and a round rug (circle of carpets) at the center."
+      ]
+    },
+    {
+      "id": "greenhouse",
+      "name": "Glass Greenhouse",
+      "tech": false,
+      "mood": "bright, humid, green; light through patinated copper and glass",
+      "palette": {
+        "primary": ["minecraft:glass", "minecraft:mossy_stone_bricks", "minecraft:stone_bricks"],
+        "secondary": ["minecraft:oxidized_cut_copper", "minecraft:weathered_cut_copper", "minecraft:waxed_oxidized_cut_copper"],
+        "accent": ["minecraft:flowering_azalea_leaves[persistent=true]", "minecraft:azalea_leaves[persistent=true]", "minecraft:moss_block"],
+        "trim": ["minecraft:oxidized_cut_copper", "minecraft:white_concrete", "minecraft:stripped_birch_log[axis=y]"],
+        "glass": ["minecraft:glass", "minecraft:glass_pane", "minecraft:white_stained_glass_pane"],
+        "light": ["minecraft:lantern[hanging=true]", "minecraft:glowstone", "minecraft:shroomlight", "minecraft:sea_lantern"],
+        "floor": ["minecraft:moss_block", "minecraft:dirt_path", "minecraft:stone_bricks", "minecraft:coarse_dirt"],
+        "detail": ["minecraft:flower_pot", "minecraft:big_dripleaf[facing=north]", "minecraft:hanging_roots", "minecraft:vine[south=true]", "minecraft:composter", "minecraft:cauldron", "minecraft:fern", "supplementaries:planter"]
+      },
+      "shapes": {"stairs": "minecraft:oxidized_cut_copper_stairs", "slab": "minecraft:oxidized_cut_copper_slab", "wall": "minecraft:mossy_stone_brick_wall"},
+      "features": [
+        "Glass vault roof: glass blocks in a barrel/gable profile held by a copper-frame rib every 3 blocks.",
+        "Raised beds: stone_brick_slab rims with moss_block/farmland inside, dirt_path aisles between.",
+        "Hanging gardens: chain-hung flower pots and hanging_roots under the ribs.",
+        "Central water feature: 3x3 pool with lily pads and a stone fountain.",
+        "Potting bench: oak_slab + cauldron + composter by the door."
+      ]
+    },
+    {
+      "id": "nether_forge",
+      "name": "Nether Forge",
+      "tech": false,
+      "mood": "oppressive, hot, red glow, soot and chains",
+      "palette": {
+        "primary": ["minecraft:nether_bricks", "minecraft:red_nether_bricks", "minecraft:cracked_nether_bricks"],
+        "secondary": ["minecraft:blackstone", "minecraft:polished_blackstone_bricks", "minecraft:basalt[axis=y]"],
+        "accent": ["minecraft:magma_block", "minecraft:crimson_planks", "minecraft:crying_obsidian"],
+        "trim": ["minecraft:chiseled_nether_bricks", "minecraft:chiseled_polished_blackstone", "minecraft:crimson_stem[axis=y]"],
+        "glass": ["minecraft:iron_bars", "minecraft:orange_stained_glass_pane", "minecraft:chain[axis=y]"],
+        "light": ["minecraft:shroomlight", "minecraft:glowstone", "minecraft:soul_lantern[hanging=true]", "minecraft:lava"],
+        "floor": ["minecraft:polished_blackstone_bricks", "minecraft:smooth_basalt", "minecraft:blackstone", "minecraft:nether_bricks"],
+        "detail": ["minecraft:chain[axis=y]", "minecraft:anvil[facing=north]", "minecraft:blast_furnace[facing=north,lit=true]", "minecraft:grindstone", "minecraft:lava_cauldron", "minecraft:iron_bars", "minecraft:nether_brick_fence", "minecraft:soul_campfire[lit=true]"]
+      },
+      "shapes": {"stairs": "minecraft:nether_brick_stairs", "slab": "minecraft:nether_brick_slab", "wall": "minecraft:nether_brick_wall"},
+      "features": [
+        "Lava channel (1-wide) in the floor with iron_bars lid sections and magma_block edges, glow from below.",
+        "Forge hearth: blast_furnaces in a nether_brick arch, chimney with chains and shroomlight.",
+        "Hanging chains with soul_lanterns at uneven lengths from a blackstone ceiling.",
+        "Bridges over the lava on polished_blackstone_brick_slab with chain railings.",
+        "Crying_obsidian veins in blackstone walls (use sparingly, <5%)."
+      ]
+    },
+    {
+      "id": "end_void",
+      "name": "End / Void Sanctum",
+      "tech": false,
+      "mood": "cosmic, silent, black with pale gold and violet points of light",
+      "palette": {
+        "primary": ["minecraft:end_stone_bricks", "minecraft:purpur_block", "minecraft:end_stone"],
+        "secondary": ["minecraft:obsidian", "minecraft:black_concrete", "minecraft:polished_blackstone"],
+        "accent": ["minecraft:purple_stained_glass", "minecraft:magenta_glazed_terracotta[facing=north]", "minecraft:crying_obsidian"],
+        "trim": ["minecraft:purpur_pillar[axis=y]", "minecraft:chiseled_polished_blackstone", "minecraft:quartz_pillar[axis=y]"],
+        "glass": ["minecraft:purple_stained_glass_pane", "minecraft:tinted_glass", "minecraft:black_stained_glass"],
+        "light": ["minecraft:end_rod[facing=up]", "minecraft:sea_lantern", "minecraft:crying_obsidian", "minecraft:amethyst_cluster[facing=up]"],
+        "floor": ["minecraft:end_stone_bricks", "minecraft:obsidian", "minecraft:black_concrete", "minecraft:purpur_block"],
+        "detail": ["minecraft:end_portal_frame[eye=false,facing=north]", "minecraft:dragon_egg", "minecraft:chorus_flower[age=5]", "minecraft:chorus_plant", "minecraft:end_rod[facing=north]", "minecraft:beacon", "minecraft:lodestone"]
+      },
+      "shapes": {"stairs": "minecraft:purpur_stairs", "slab": "minecraft:purpur_slab", "wall": "minecraft:end_stone_brick_wall"},
+      "features": [
+        "Floating platforms: round obsidian discs with end_stone_brick rim, no walls, gaps between.",
+        "Purpur pillars with end_rod tops marking a ring around the center.",
+        "Single focal beam: beacon (no pyramid needed in ghost) or end_rod column under a dark dome.",
+        "Dark glass bridge (black_stained_glass slabs/panes) between platforms.",
+        "Sparse chorus plants and amethyst clusters as organic contrast."
+      ]
+    },
+    {
+      "id": "library",
+      "name": "Wizard Library",
+      "tech": false,
+      "mood": "hushed, warm candle glow, towering shelves, ladders",
+      "palette": {
+        "primary": ["minecraft:dark_oak_planks", "minecraft:spruce_planks", "minecraft:stripped_dark_oak_log"],
+        "secondary": ["minecraft:bookshelf", "minecraft:chiseled_bookshelf[facing=north]", "minecraft:stone_bricks"],
+        "accent": ["minecraft:red_carpet", "minecraft:enchanting_table", "minecraft:purple_carpet"],
+        "trim": ["minecraft:dark_oak_log[axis=y]", "minecraft:stripped_spruce_log[axis=x]", "minecraft:dark_oak_fence"],
+        "glass": ["minecraft:glass_pane", "minecraft:orange_stained_glass_pane", "minecraft:dark_oak_trapdoor[facing=north,half=top,open=true]"],
+        "light": ["minecraft:lantern[hanging=true]", "minecraft:candle[candles=4,lit=true]", "minecraft:chain[axis=y]", "minecraft:soul_lantern[hanging=true]"],
+        "floor": ["minecraft:dark_oak_planks", "minecraft:spruce_planks", "minecraft:red_carpet", "minecraft:stripped_dark_oak_log[axis=x]"],
+        "detail": ["minecraft:lectern[facing=north]", "minecraft:ladder[facing=north]", "minecraft:cartography_table", "minecraft:flower_pot", "minecraft:oak_sign[rotation=0]", "supplementaries:book_pile", "supplementaries:globe", "handcrafted:oak_desk[facing=north]"]
+      },
+      "shapes": {"stairs": "minecraft:dark_oak_stairs", "slab": "minecraft:dark_oak_slab", "wall": "minecraft:stone_brick_wall"},
+      "features": [
+        "Two-tier gallery: bookshelf walls 6+ high with a slab walkway + fence rail at mid-height and ladders.",
+        "Reading nooks: 3-wide alcoves with lectern, candles, a carpet and a window.",
+        "Aisles of freestanding shelf stacks (bookshelf, 2 thick) with 3-wide aisles; arches (stairs) at the ends.",
+        "Central reading table (long slab + trapdoor chairs) under a chain-lantern chandelier.",
+        "Checkered floor of dark_oak/spruce planks with a carpet runner."
+      ]
+    },
+    {
+      "id": "steampunk_brass",
+      "name": "Steampunk Brass Works",
+      "tech": false,
+      "mood": "polished brass and copper, warm amber light, pipes and pressure gauges",
+      "palette": {
+        "primary": ["create:brass_casing", "minecraft:cut_copper", "minecraft:dark_oak_planks"],
+        "secondary": ["create:copper_casing", "minecraft:waxed_cut_copper", "minecraft:polished_andesite"],
+        "accent": ["create:brass_block", "minecraft:waxed_exposed_cut_copper", "minecraft:orange_stained_glass"],
+        "trim": ["minecraft:copper_block", "create:brass_bars", "minecraft:stripped_dark_oak_log[axis=y]"],
+        "glass": ["minecraft:orange_stained_glass_pane", "create:framed_glass", "minecraft:glass_pane"],
+        "light": ["minecraft:lantern[hanging=true]", "minecraft:copper_bulb[lit=true]", "minecraft:shroomlight", "minecraft:redstone_lamp[lit=true]"],
+        "floor": ["minecraft:dark_oak_planks", "minecraft:polished_andesite", "minecraft:cut_copper", "minecraft:stripped_dark_oak_log[axis=x]"],
+        "detail": ["create:cogwheel[axis=y]", "create:fluid_pipe", "create:brass_bars", "create:steam_whistle", "create:peculiar_bell", "create:desk_bell", "create:fluid_tank", "minecraft:chain[axis=y]", "minecraft:copper_door[facing=north,half=lower]"]
+      },
+      "shapes": {"stairs": "minecraft:cut_copper_stairs", "slab": "minecraft:cut_copper_slab", "wall": "minecraft:andesite_wall"},
+      "features": [
+        "Riveted ceilings: dark_oak beam grid with copper_block corner plates.",
+        "Pipe galleries: fluid_pipe runs along wall tops with brass_bars catwalk rails.",
+        "Gauge walls: round copper_bulb arrays and desk_bell/ steam_whistle props.",
+        "Brass-framed round windows (cut out a circle in the wall, frame with brass_casing).",
+        "Spiral staircase in dark_oak with copper rails."
+      ]
+    },
+    {
+      "id": "ancient_ruins",
+      "name": "Ancient Ruins / Crypt",
+      "tech": false,
+      "mood": "overgrown, cracked, eerie, light shafts and moss",
+      "palette": {
+        "primary": ["minecraft:mossy_stone_bricks", "minecraft:cracked_stone_bricks", "minecraft:stone_bricks"],
+        "secondary": ["minecraft:mossy_cobblestone", "minecraft:deepslate_bricks", "minecraft:cracked_deepslate_bricks"],
+        "accent": ["minecraft:moss_block", "minecraft:chiseled_stone_bricks", "minecraft:gold_block"],
+        "trim": ["minecraft:chiseled_stone_bricks", "minecraft:stone_brick_wall", "minecraft:polished_andesite"],
+        "glass": ["minecraft:iron_bars", "minecraft:glass_pane"],
+        "light": ["minecraft:soul_lantern[hanging=true]", "minecraft:candle[candles=2,lit=true]", "minecraft:glow_lichen[south=true]", "minecraft:shroomlight"],
+        "floor": ["minecraft:mossy_stone_bricks", "minecraft:cracked_stone_bricks", "minecraft:moss_block", "minecraft:gravel"],
+        "detail": ["minecraft:vine[south=true]", "minecraft:moss_carpet", "minecraft:cobweb", "minecraft:chain[axis=y]", "minecraft:skeleton_skull[rotation=0]", "minecraft:pointed_dripstone[vertical_direction=down,thickness=tip]", "minecraft:iron_bars"]
+      },
+      "shapes": {"stairs": "minecraft:mossy_stone_brick_stairs", "slab": "minecraft:mossy_stone_brick_slab", "wall": "minecraft:mossy_stone_brick_wall"},
+      "features": [
+        "Broken wall tops: random 1-3 block height variation, stair stubs at the break.",
+        "Collapsed ceiling hole with a light shaft and vines/ moss falling through.",
+        "Carved pillars (chiseled_stone_bricks cap, wall shaft) half-fallen.",
+        "Sarcophagus niches in side walls, iron_bars gated.",
+        "Roots and moss growing from cracks: hanging_roots, moss_carpet, vines."
+      ]
+    },
+    {
+      "id": "modern_loft",
+      "name": "Modern Loft",
+      "tech": false,
+      "mood": "minimal, bright, big glass, black-white-wood",
+      "palette": {
+        "primary": ["minecraft:white_concrete", "minecraft:light_gray_concrete", "minecraft:smooth_quartz"],
+        "secondary": ["minecraft:birch_planks", "minecraft:stripped_birch_log", "minecraft:oak_planks"],
+        "accent": ["minecraft:black_concrete", "minecraft:orange_concrete", "minecraft:green_concrete"],
+        "trim": ["minecraft:black_concrete", "minecraft:iron_block", "minecraft:smooth_stone"],
+        "glass": ["minecraft:glass", "minecraft:glass_pane", "minecraft:light_gray_stained_glass"],
+        "light": ["minecraft:sea_lantern", "minecraft:light[level=15]", "minecraft:end_rod[facing=down]", "minecraft:shroomlight"],
+        "floor": ["minecraft:birch_planks", "minecraft:smooth_stone", "minecraft:light_gray_concrete", "minecraft:white_carpet"],
+        "detail": ["minecraft:potted_fern", "minecraft:white_bed[facing=north,part=foot]", "minecraft:iron_trapdoor[facing=north,half=top,open=true]", "minecraft:flower_pot", "handcrafted:birch_couch[facing=north]", "handcrafted:birch_table", "minecraft:black_banner[rotation=0]"]
+      },
+      "shapes": {"stairs": "minecraft:smooth_quartz_stairs", "slab": "minecraft:smooth_quartz_slab", "wall": "minecraft:andesite_wall"},
+      "features": [
+        "Floor-to-ceiling glass walls, 1-block black frame every 4.",
+        "Cantilevered flat roof slab with 2-3 block overhang.",
+        "Double-height living area with open mezzanine and glass railing.",
+        "Warm wood accent wall in a field of white.",
+        "Recessed ceiling strips of light (sea_lantern behind a slab edge)."
+      ]
+    },
+    {
+      "id": "rustic_cabin",
+      "name": "Rustic Log Cabin",
+      "tech": false,
+      "mood": "woodsy, snug, smoke and pine",
+      "palette": {
+        "primary": ["minecraft:spruce_log[axis=y]", "minecraft:stripped_spruce_log[axis=y]", "minecraft:spruce_planks"],
+        "secondary": ["minecraft:cobblestone", "minecraft:mossy_cobblestone", "minecraft:stone_bricks"],
+        "accent": ["minecraft:red_wool", "minecraft:campfire[lit=true]", "minecraft:white_carpet"],
+        "trim": ["minecraft:stripped_spruce_log[axis=x]", "minecraft:dark_oak_log[axis=y]", "minecraft:spruce_fence"],
+        "glass": ["minecraft:glass_pane", "minecraft:spruce_trapdoor[facing=north,half=top,open=true]"],
+        "light": ["minecraft:lantern[hanging=false]", "minecraft:campfire[lit=true]", "minecraft:candle[candles=2,lit=true]", "minecraft:wall_torch[facing=north]"],
+        "floor": ["minecraft:spruce_planks", "minecraft:dark_oak_planks", "minecraft:brown_carpet", "minecraft:cobblestone"],
+        "detail": ["minecraft:barrel[facing=up]", "minecraft:crafting_table", "minecraft:smoker[facing=north]", "minecraft:flower_pot", "minecraft:hay_block[axis=y]", "minecraft:chain[axis=y]", "supplementaries:sack"]
+      },
+      "shapes": {"stairs": "minecraft:spruce_stairs", "slab": "minecraft:spruce_slab", "wall": "minecraft:cobblestone_wall"},
+      "features": [
+        "Cobblestone base 2 high, log walls above with corner log overlaps (logs poke out 1).",
+        "Steep spruce stair roof with 1-block eaves and a stone chimney.",
+        "Front porch: slab floor, 2 log posts, fence rail, bench.",
+        "Interior stone fireplace with hanging pot (cauldron+chain).",
+        "Windows 2x2 with trapdoor shutters."
+      ]
+    },
+    {
+      "id": "ocean_lab",
+      "name": "Ocean Research Lab",
+      "tech": false,
+      "mood": "teal, wet, glowing, large windows to water",
+      "palette": {
+        "primary": ["minecraft:prismarine_bricks", "minecraft:dark_prismarine", "minecraft:prismarine"],
+        "secondary": ["minecraft:oxidized_cut_copper", "minecraft:warped_planks", "minecraft:stripped_warped_stem[axis=y]"],
+        "accent": ["minecraft:sea_lantern", "minecraft:cyan_terracotta", "minecraft:light_blue_concrete"],
+        "trim": ["minecraft:dark_prismarine", "minecraft:waxed_oxidized_cut_copper", "minecraft:iron_block"],
+        "glass": ["minecraft:light_blue_stained_glass", "minecraft:glass", "minecraft:cyan_stained_glass_pane"],
+        "light": ["minecraft:sea_lantern", "minecraft:glowstone", "minecraft:conduit"],
+        "floor": ["minecraft:dark_prismarine", "minecraft:prismarine_bricks", "minecraft:warped_planks", "minecraft:cyan_terracotta"],
+        "detail": ["minecraft:conduit", "minecraft:iron_bars", "minecraft:kelp_plant", "minecraft:sea_pickle[pickles=4,waterlogged=true]", "minecraft:tube_coral_block", "minecraft:brain_coral", "minecraft:chain[axis=y]"]
+      },
+      "shapes": {"stairs": "minecraft:prismarine_brick_stairs", "slab": "minecraft:prismarine_brick_slab", "wall": "minecraft:prismarine_wall"},
+      "features": [
+        "Round porthole windows (circle 3 diameter) framed in oxidized copper.",
+        "Airlock door: 2-block iron_door with 1-block chamber.",
+        "Aquarium wall: floor to ceiling glass with sea_lantern base and coral.",
+        "Conduit as the centerpiece in a 3x3 prismarine frame.",
+        "Corrugated ceiling of prismarine_brick_slabs."
+      ]
+    },
+    {
+      "id": "mage_tower",
+      "name": "Arcane Mage Tower",
+      "tech": false,
+      "mood": "purple glow, runes, candle clutter, crystals",
+      "palette": {
+        "primary": ["minecraft:deepslate_bricks", "minecraft:polished_deepslate", "minecraft:stone_bricks"],
+        "secondary": ["minecraft:purple_concrete", "minecraft:dark_oak_planks", "minecraft:amethyst_block"],
+        "accent": ["minecraft:crying_obsidian", "minecraft:purple_stained_glass", "minecraft:gold_block"],
+        "trim": ["minecraft:chiseled_deepslate", "minecraft:dark_oak_log[axis=y]", "minecraft:polished_blackstone"],
+        "glass": ["minecraft:purple_stained_glass_pane", "minecraft:magenta_stained_glass_pane", "minecraft:glass_pane"],
+        "light": ["minecraft:candle[candles=4,lit=true]", "minecraft:amethyst_cluster[facing=up]", "minecraft:soul_lantern[hanging=true]", "minecraft:end_rod[facing=up]"],
+        "floor": ["minecraft:polished_deepslate", "minecraft:purple_carpet", "minecraft:dark_oak_planks", "minecraft:blackstone"],
+        "detail": ["minecraft:enchanting_table", "minecraft:brewing_stand", "minecraft:lectern[facing=north]", "minecraft:bookshelf", "minecraft:cauldron", "minecraft:chain[axis=y]", "minecraft:large_amethyst_bud[facing=up]", "supplementaries:candle_holder"]
+      },
+      "shapes": {"stairs": "minecraft:deepslate_brick_stairs", "slab": "minecraft:deepslate_brick_slab", "wall": "minecraft:deepslate_brick_wall"},
+      "features": [
+        "Tapering round tower with a steep purple stair-roof (concrete or prismarine alt).",
+        "Spiral staircase around a central column with bookshelves in the ring wall.",
+        "Floating crystal: amethyst cluster cluster on a chain at the room center.",
+        "Alchemy corner: brewing stands, cauldrons, jars, candles on a long table.",
+        "Stained-glass rose window in the top story."
+      ]
+    },
+    {
+      "id": "desert_palace",
+      "name": "Desert Palace",
+      "tech": false,
+      "mood": "sunlit sand, blue and gold, arches and water",
+      "palette": {
+        "primary": ["minecraft:smooth_sandstone", "minecraft:cut_sandstone", "minecraft:sandstone"],
+        "secondary": ["minecraft:chiseled_sandstone", "minecraft:orange_terracotta", "minecraft:terracotta"],
+        "accent": ["minecraft:blue_terracotta", "minecraft:lapis_block", "minecraft:gold_block"],
+        "trim": ["minecraft:cut_sandstone", "minecraft:smooth_sandstone_slab", "minecraft:chiseled_sandstone"],
+        "glass": ["minecraft:orange_stained_glass_pane", "minecraft:glass_pane", "minecraft:jungle_trapdoor[facing=north,half=top,open=true]"],
+        "light": ["minecraft:lantern[hanging=true]", "minecraft:campfire[lit=true]", "minecraft:glowstone", "minecraft:candle[candles=3,lit=true]"],
+        "floor": ["minecraft:smooth_sandstone", "minecraft:cut_sandstone", "minecraft:blue_terracotta", "minecraft:orange_terracotta"],
+        "detail": ["minecraft:orange_banner[rotation=0]", "minecraft:blue_carpet", "minecraft:jungle_fence", "minecraft:cactus", "minecraft:dead_bush", "minecraft:potted_cactus", "minecraft:cauldron"]
+      },
+      "shapes": {"stairs": "minecraft:smooth_sandstone_stairs", "slab": "minecraft:smooth_sandstone_slab", "wall": "minecraft:sandstone_wall"},
+      "features": [
+        "Horseshoe arches (stair-and-slab) every 5 blocks along a colonnade.",
+        "Central courtyard with a 5x5 pool, lapis_block border, palms/cactus.",
+        "Onion-dome roof: stacked slab/stair rings narrowing to a gold_block finial.",
+        "Latticed screen walls using trapdoors and iron_bars.",
+        "Blue-and-gold floor mosaic with a central medallion."
+      ]
+    },
+    {
+      "id": "cyber_neon",
+      "name": "Cyber Neon",
+      "tech": true,
+      "mood": "night city, wet black surfaces, magenta and cyan neon lines",
+      "palette": {
+        "primary": ["minecraft:black_concrete", "minecraft:gray_concrete", "minecraft:blackstone"],
+        "secondary": ["minecraft:polished_blackstone", "minecraft:deepslate_tiles", "minecraft:iron_block"],
+        "accent": ["minecraft:magenta_stained_glass", "minecraft:cyan_stained_glass", "minecraft:purple_concrete"],
+        "trim": ["minecraft:iron_block", "minecraft:smooth_stone", "minecraft:polished_blackstone"],
+        "glass": ["minecraft:tinted_glass", "minecraft:magenta_stained_glass_pane", "minecraft:cyan_stained_glass_pane"],
+        "light": ["minecraft:sea_lantern", "minecraft:redstone_lamp[lit=true]", "minecraft:shroomlight", "minecraft:end_rod[facing=up]"],
+        "floor": ["minecraft:black_concrete", "minecraft:polished_blackstone", "minecraft:gray_concrete", "minecraft:tinted_glass"],
+        "detail": ["minecraft:iron_bars", "minecraft:chain[axis=y]", "minecraft:iron_trapdoor[facing=north,half=top,open=true]", "minecraft:lightning_rod[facing=up]", "minecraft:crying_obsidian", "minecraft:copper_grate", "minecraft:observer[facing=north]"]
+      },
+      "shapes": {"stairs": "minecraft:polished_blackstone_stairs", "slab": "minecraft:polished_blackstone_slab", "wall": "minecraft:polished_blackstone_wall"},
+      "features": [
+        "Neon lines: 1-wide stained glass strips lit from behind by sea_lantern, along wall edges and ceilings.",
+        "Dark glossy floor with an inlaid glowing line leading to the focal machine.",
+        "Hanging signage blocks (banners/trapdoors) and iron_bars cages.",
+        "Layered grating ceilings (iron_bars over black) with light bleeding through.",
+        "Rain-slick feel: alternating black concrete and tinted_glass floor tiles over sea_lantern."
+      ]
+    }
+  ]
+}

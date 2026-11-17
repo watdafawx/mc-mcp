@@ -65,16 +65,52 @@ claude mcp add --transport http minecraft-server http://<server-ip>:47870/mcp --
 | `hotbar` | client, action | select hotbar slot 0–8 |
 | `chunk_rebuild` | client, action | rebuild all chunk meshes (F3+A) |
 | `ghost_set` | client | create or edit a ghost build (see-through blocks drawn only on this client, never placed): palette, boxes, blocks; replace or merge |
-| `ghost_list` / `ghost_info` | client | all ghosts, or one ghost's bounds and palette counts |
+| `ghost_list` / `ghost_info` | client | all ghosts, or one ghost's bounds, palette counts and `block_list` `[{x,y,z,state}]` (local, full state syntax; `blocks=false` omits it, `limit` default 5000, `block_list_truncated`) |
+| `ghost_import` | client | load a `.schem` (Sponge v2/v3) or vanilla `.nbt` as a ghost. `path_or_name` = path, or a bare name searched (extension optional, first match wins) in `config/shapewright/schematics`, `schematics`, `config/worldedit/schematics`, `world/generated/minecraft/structures`. `id` default file stem; `x`,`y`,`z` default player feet |
 | `ghost_move` | client | move, shift or rotate a ghost (stairs, logs etc. turn with it) |
 | `ghost_show` | client | show/hide and opacity per ghost; global `xray` (draw over terrain), `solid` (full colour), `hud` |
 | `ghost_clear` | client | delete one ghost, a `prefix/`, or all |
+| `ghost_generate` | client | start the LLM architect (async, returns a job id): `style` steampunk/hextech/gothic/station_white/solarpunk, optional `x`,`z` (default: player), `kit`, `layout`. One job at a time, cost-capped. Needs `architect/.env` + a python venv on the machine running the client (see `architect/README.md`) |
+| `ghost_generate_status` | client | job state `running`/`done`/`failed`, ghost ids, API cost so far, last log lines |
+| `run_client_command` | client, `devClientCommands` | dev/test: run a client command (`/ghost list`) via the client dispatcher on the game thread; `suggest=true` returns tab completions. Off by default |
 | `ghost_export` | client | save ghosts as `.litematic` (Litematica), `.schem` or `.nbt` under `<gameDir>/schematics/` |
 | `registry_blocks` / `block_describe` | client | blocks that exist in this pack (by mod id or substring, optional state properties), or one block in detail |
+
+### Client commands (`/ghost`)
+
+Client-side, ghosts exist only in this client's memory. Tab completion for ids and styles.
+
+| Command | Does |
+|---|---|
+| `/ghost hide [id]` / `/ghost show [id]` | hide or show one ghost, or all (same code as `ghost_show`) |
+| `/ghost list` | ghosts in chat: id, block count, origin, `[hidden]` |
+| `/ghost import <name> [x y z]` | same as `ghost_import`; tab completion lists schematics found in the search folders |
+| `/ghost clear [id]` | delete one ghost, a `prefix/`, or all (same code as `ghost_clear`) |
+| `/ghost generate <style> [x z] [kit] [layout]` | same as `ghost_generate`; chat reports started / done / failed + API cost |
+
+Config (`config/mcmcp-common.toml`, section `ghostGenerate`): `python` (empty = `architect/.venv/Scripts/python.exe`, then `python`), `architectDir` (empty = `architect` next to the game's `run` folder), `costCapUsd` (default 0.15, passed to the architect as `--max-cost`).
 
 \* on a client these need a singleplayer world (they use the integrated server).
 
 A typical A/B test: `spot_save` → `measure` → `config_set` or `video_set` → `teleport` back → `measure`.
+
+## How ghosts and the architect work
+
+Ghosts are see-through block builds drawn only on your client. They are never placed in the world and never sent to a
+server. `/ghost hide|show|list|clear|generate|import` and the `ghost_*` tools manage them; `ghost_export` saves them
+as `.litematic`, `.schem` or `.nbt`. `ghost_import` loads a schematic as a ghost, and other mods can use the
+in-process `GhostApi`.
+
+`ghost_generate` / `/ghost generate <style>` runs an optional LLM architect (`architect/`, Claude Haiku on **your own**
+API key in `architect/.env`, about $0.03 to $0.07 per build). It uses tools `campus`, `multiblock`, `shapes`, `view`,
+`bill`, `export` plus a procedural layer: site layouts spine, radial, cloister, linear and terraces; building kits
+for steampunk, hextech, gothic, station_white and solarpunk; and a guard against floating parts. The architect is not in
+the jar. Multiblock formation in-world is not verified.
+
+![steampunk build](docs/images/steampunk_v14.jpg)
+
+*Steampunk campus (spine layout). Hextech, gothic, station_white and solarpunk galleries, before/after, setup and
+safety notes: [docs/ARCHITECT.md](docs/ARCHITECT.md).*
 
 ## Chat bridge and waking Claude
 
@@ -96,7 +132,7 @@ Without channels, Claude can hold a conversation by calling `chat_wait` in a loo
 ## Config (`config/mcmcp-common.toml`)
 
 `[client]` enabled / bind / port / token · `[server]` enabled / bind / port / token / allowlist ·
-`[features]` spark / mixins / chatBridge / chatPrefix / actions / actionsCommands.
+`[features]` spark / mixins / chatBridge / chatPrefix / actions / actionsCommands / devClientCommands (run_client_command, default false).
 `chatBridge = false` also skips the chat capture mixin (read at startup).
 
 ## Build
@@ -118,3 +154,10 @@ Dev runs: `gradlew runServer`, `gradlew runClient -PquickPlay=<world>`.
 - Game state is read on the game thread (`GameThread.call`, 10–20 s timeout) so tools never block
   rendering; blocking tools (`chat_wait`, `measure`, `spark_stop`) wait on the HTTP worker thread.
 - No native dialogs anywhere.
+
+### In-process API for other mods (`GhostApi`)
+
+`dev.watdafawx.mcmcp.ghost.GhostApi` (no dependency on any other mod): `static boolean isAvailable()` (client only) and
+`static void set(String id, Map<BlockPos, BlockState> blocks, BlockPos origin)`. `blocks` are relative to `origin`
+(world position of local 0,0,0; null keeps the ghost's origin or uses the player's feet). Safe from any thread: the
+work is queued onto the client main thread. Replaces a ghost with the same id, like `ghost_import`.

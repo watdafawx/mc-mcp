@@ -67,6 +67,7 @@ public final class ClientMcp {
         NeoForge.EVENT_BUS.addListener((RenderFrameEvent.Pre e) -> FrameStats.onFrame());
         NeoForge.EVENT_BUS.addListener(ClientMcp::onChatSend);
         dev.watdafawx.mcmcp.ghost.GhostRenderer.init();
+        dev.watdafawx.mcmcp.ghost.GhostCommands.init();
         modBus.addListener((FMLClientSetupEvent e) -> start());
     }
 

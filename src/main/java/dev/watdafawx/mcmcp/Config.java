@@ -33,6 +33,13 @@ public final class Config {
     public static final ModConfigSpec.BooleanValue ACTIONS;
     public static final ModConfigSpec.BooleanValue ACTIONS_COMMANDS;
 
+    public static final ModConfigSpec.BooleanValue DEV_CLIENT_COMMANDS;
+
+    // --- ghost generator ---
+    public static final ModConfigSpec.ConfigValue<String> GEN_PYTHON;
+    public static final ModConfigSpec.ConfigValue<String> GEN_ARCHITECT_DIR;
+    public static final ModConfigSpec.DoubleValue GEN_COST_CAP;
+
     static {
         B.comment("MCP server inside the game client (also serves singleplayer's integrated server).").push("client");
         CLIENT_ENABLED = B.define("enabled", true);
@@ -69,6 +76,20 @@ public final class Config {
                 .define("actions", false);
         ACTIONS_COMMANDS = B.comment("Also allow run_command (any command, op level). Needs 'actions' too.")
                 .define("actionsCommands", false);
+        DEV_CLIENT_COMMANDS = B.comment("Dev/test: run_client_command tool runs client-side commands (/ghost ...) as if typed in chat.",
+                        "Never reaches a server. Off by default.")
+                .define("devClientCommands", false);
+        B.pop();
+
+        B.comment("/ghost generate and the ghost_generate tool: run the LLM architect (architect/architect.py) on this machine.",
+                        "Needs a python venv with the architect's packages and architect/.env (ANTHROPIC_API_KEY) on THIS machine.")
+                .push("ghostGenerate");
+        GEN_PYTHON = B.comment("Python executable. Empty = <architectDir>/.venv/Scripts/python.exe (or venv/), else 'python' on PATH.")
+                .define("python", "");
+        GEN_ARCHITECT_DIR = B.comment("Folder holding architect.py and .env. Empty = 'architect' next to the game's run folder (the project dir).")
+                .define("architectDir", "");
+        GEN_COST_CAP = B.comment("Stop a generate job once its API cost reaches this many USD (passed as --max-cost).")
+                .defineInRange("costCapUsd", 0.15, 0.01, 50.0);
         B.pop();
     }
 

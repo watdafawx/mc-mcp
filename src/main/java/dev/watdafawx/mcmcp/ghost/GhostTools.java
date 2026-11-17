@@ -46,7 +46,37 @@ public final class GhostTools {
             blocks [[x,y,z,key]]. Coordinates are local to the ghost origin. A key may also be a block id directly. \
             A palette value of minecraft:air erases. Boxes apply first, then blocks, in order (later wins).""";
 
+    /**
+     * Shared by the ghost_show tool and the /ghost hide|show commands. id: one ghost, '*' (or null) for all.
+     * visible/alpha null = leave unchanged. Returns how many ghosts were touched; throws ToolError for an unknown id.
+     */
+    public static int setShown(String id, Boolean visible, Double alpha) {
+        List<Ghost> gs = id == null || id.equals("*") ? GhostStore.all() : List.of(GhostStore.get(id));
+        for (Ghost g : gs) {
+            synchronized (GhostStore.LOCK) {
+                if (visible != null) g.visible = visible;
+                if (alpha != null) g.alpha = (float) Math.max(0.1, Math.min(1, alpha));
+            }
+            GhostStore.save(g);
+        }
+        return gs.size();
+    }
+
+    /** Shared by ghost_clear and /ghost clear. id: one ghost, a prefix ending in '/', or '*' (or null) for all. */
+    public static List<String> clearGhosts(String id) {
+        List<String> gone = new ArrayList<>();
+        for (Ghost g : GhostStore.all())
+            if (id == null || id.equals("*") || g.id.equals(id) || (id.endsWith("/") && g.id.startsWith(id)))
+                if (GhostStore.remove(g.id)) gone.add(g.id);
+        return gone;
+    }
+
+    public static Map<String, Object> ghostSummary(Ghost g) {
+        return summary(g);
+    }
+
     public static void register(McpServer mcp) {
+        GhostGenerate.registerTools(mcp);
         mcp.add(new Tool("ghost_set",
                 "Create or change a ghost build: see-through blocks drawn only on this client, never placed in the world. "
                         + "mode=replace (default) redraws the ghost from the spec; mode=merge edits it in place (use for iterations). "
@@ -106,16 +136,80 @@ public final class GhostTools {
                 }));
 
         mcp.add(new Tool("ghost_info",
-                "One ghost in detail: bounds (local and world), palette with counts per block state.",
-                J.Schema.of().str("id", "ghost id").required("id").build(), true, a -> {
+                "One ghost in detail: bounds (local and world), palette with counts per block state, and block_list "
+                        + "[{x,y,z,state}] (local to the ghost origin, full state syntax like minecraft:oak_stairs[facing=north,half=bottom]). "
+                        + "blocks=false leaves block_list out; limit caps it (default 5000, block_list_truncated=true when cut).",
+                J.Schema.of().str("id", "ghost id").bool("blocks", "include block_list (default true)")
+                        .integer("limit", "max block_list entries (default 5000)").required("id").build(), true, a -> {
                     Ghost g = GhostStore.get(J.req(a, "id"));
                     Map<String, Object> m = summary(g);
                     Map<String, Integer> counts = new TreeMap<>();
+                    List<Object> list = new ArrayList<>();
+                    int limit = Math.max(0, J.i(a, "limit", 5000));
+                    boolean want = J.b(a, "blocks", true);
+                    boolean truncated = false;
                     synchronized (GhostStore.LOCK) {
-                        for (BlockState s : g.blocks.values()) counts.merge(GhostStore.serialize(s), 1, Integer::sum);
+                        for (var e : g.blocks.long2ObjectEntrySet()) {
+                            String st = GhostStore.serialize(e.getValue());
+                            counts.merge(st, 1, Integer::sum);
+                            if (!want) continue;
+                            if (list.size() >= limit) { truncated = true; continue; }
+                            long k = e.getLongKey();
+                            list.add(J.obj("x", BlockPos.getX(k), "y", BlockPos.getY(k), "z", BlockPos.getZ(k), "state", st));
+                        }
                     }
                     m.put("palette", counts);
+                    if (want) {
+                        m.put("block_list", list);
+                        m.put("block_list_truncated", truncated);
+                    }
                     return m;
+                }));
+
+        mcp.add(new Tool("ghost_import",
+                "Load a schematic as a ghost: Sponge .schem (v2/v3) or vanilla structure .nbt. path_or_name: a file path, or a bare name "
+                        + "looked up (extension optional, first match wins) in <gameDir>/config/shapewright/schematics, schematics, "
+                        + "config/worldedit/schematics, world/generated/minecraft/structures. id default: the file name without extension. "
+                        + "x,y,z: world position of the schematic's min corner (default: the player's feet). Replaces a ghost with the same id. "
+                        + "Blocks missing from this pack are skipped and listed.",
+                J.Schema.of().str("path_or_name", "file path or bare schematic name").str("id", "ghost id (default file stem)")
+                        .integer("x", "world x").integer("y", "world y").integer("z", "world z").required("path_or_name").build(),
+                false, a -> {
+                    boolean any = a.has("x") || a.has("y") || a.has("z");
+                    if (any && !(a.has("x") && a.has("y") && a.has("z"))) throw new McpServer.ToolError("give x, y and z together, or none");
+                    BlockPos at = any ? new BlockPos(J.i(a, "x", 0), J.i(a, "y", 0), J.i(a, "z", 0)) : null;
+                    return GhostImport.importAs(J.req(a, "path_or_name"), J.str(a, "id", null), at);
+                }));
+
+        mcp.add(new Tool("run_client_command",
+                "[dev/test] Run a client-side command (e.g. '/ghost list') through the client command dispatcher on the game thread, as if typed in chat. "
+                        + "Only client commands (/ghost ...) are dispatched, never sent to a server. suggest=true returns tab-completion suggestions "
+                        + "for the text instead of running it. Off unless config features.devClientCommands = true.",
+                J.Schema.of().str("command", "command, with or without the leading /").bool("suggest", "return completions instead of running")
+                        .required("command").build(), false, a -> {
+                    if (!dev.watdafawx.mcmcp.Config.DEV_CLIENT_COMMANDS.get())
+                        throw new McpServer.ToolError("run_client_command is off: set features.devClientCommands = true in config/mcmcp-common.toml");
+                    String cmd = J.req(a, "command").stripLeading();
+                    if (cmd.startsWith("/")) cmd = cmd.substring(1);
+                    final String c = cmd;
+                    boolean suggest = J.b(a, "suggest", false);
+                    var mc = Minecraft.getInstance();
+                    if (suggest) {
+                        var fut = GameThread.call(mc, () -> {
+                            var d = net.neoforged.neoforge.client.ClientCommandHandler.getDispatcher();
+                            var parse = d.parse(c, net.neoforged.neoforge.client.ClientCommandHandler.getSource());
+                            return d.getCompletionSuggestions(parse, c.length());
+                        });
+                        com.mojang.brigadier.suggestion.Suggestions s;
+                        try {
+                            s = fut.get(5, java.util.concurrent.TimeUnit.SECONDS);
+                        } catch (Exception e) {
+                            throw new McpServer.ToolError("suggestions failed: " + e);
+                        }
+                        return J.obj("command", c, "suggestions", s.getList().stream().map(x -> x.getText()).toList());
+                    }
+                    boolean handled = GameThread.call(mc, () -> net.neoforged.neoforge.client.ClientCommandHandler.runCommand(c));
+                    return J.obj("command", c, "handled_as_client_command", handled);
                 }));
 
         mcp.add(new Tool("ghost_move",
@@ -142,35 +236,28 @@ public final class GhostTools {
         mcp.add(new Tool("ghost_show",
                 "Show or hide ghosts and set their opacity. id: one ghost, or '*' for all. "
                         + "Global view modes (all ghosts): xray=true draws ghosts over terrain so hills and trees can't hide them; "
-                        + "solid=true draws them fully opaque (good for screenshots).",
+                        + "solid=true draws them fully opaque (good for screenshots); clip_y=<world y> is a cutaway that hides every ghost "
+                        + "block above that y so rooms can be seen from above (clip_off=true removes it).",
                 J.Schema.of().str("id", "ghost id or *").bool("visible", "show (true) or hide").num("alpha", "0.1..1, default 0.55")
                         .bool("xray", "global: draw over terrain").bool("solid", "global: fully opaque")
                         .bool("hud", "global: false hides the HUD (like F1) for clean screenshots")
+                        .num("clip_y", "global cutaway: hide ghost blocks above this world y").bool("clip_off", "global: remove the cutaway")
                         .required("id").build(), false, a -> {
                     if (a.has("xray")) GhostRenderer.xray = J.b(a, "xray", false);
                     if (a.has("solid")) GhostRenderer.solid = J.b(a, "solid", false);
                     if (a.has("hud")) net.minecraft.client.Minecraft.getInstance().options.hideGui = !J.b(a, "hud", true);
-                    String id = J.req(a, "id");
-                    List<Ghost> gs = id.equals("*") ? GhostStore.all() : List.of(GhostStore.get(id));
-                    for (Ghost g : gs) {
-                        synchronized (GhostStore.LOCK) {
-                            if (a.has("visible")) g.visible = J.b(a, "visible", true);
-                            if (a.has("alpha")) g.alpha = (float) Math.max(0.1, Math.min(1, J.d(a, "alpha", 0.55)));
-                        }
-                        GhostStore.save(g);
-                    }
-                    return J.obj("changed", gs.size(), "xray", GhostRenderer.xray, "solid", GhostRenderer.solid);
+                    if (a.has("clip_y") && !a.get("clip_y").isJsonNull()) GhostRenderer.clipY = (int) Math.floor(J.d(a, "clip_y", 0));
+                    if (J.b(a, "clip_off", false)) GhostRenderer.clipY = Integer.MAX_VALUE;
+                    int changed = setShown(J.req(a, "id"), a.has("visible") ? J.b(a, "visible", true) : null,
+                            a.has("alpha") ? J.d(a, "alpha", 0.55) : null);
+                    return J.obj("changed", changed, "xray", GhostRenderer.xray, "solid", GhostRenderer.solid,
+                            "clip_y", GhostRenderer.clipY == Integer.MAX_VALUE ? null : GhostRenderer.clipY);
                 }));
 
         mcp.add(new Tool("ghost_clear",
                 "Delete ghosts. id: one ghost, a prefix ending in '/' (e.g. 'base/' removes all rooms of that area), or '*'.",
                 J.Schema.of().str("id", "ghost id, prefix/ or *").required("id").build(), false, a -> {
-                    String id = J.req(a, "id");
-                    List<String> gone = new ArrayList<>();
-                    for (Ghost g : GhostStore.all())
-                        if (id.equals("*") || g.id.equals(id) || (id.endsWith("/") && g.id.startsWith(id)))
-                            if (GhostStore.remove(g.id)) gone.add(g.id);
-                    return J.obj("removed", gone);
+                    return J.obj("removed", clearGhosts(J.req(a, "id")));
                 }));
 
         mcp.add(new Tool("ghost_export",

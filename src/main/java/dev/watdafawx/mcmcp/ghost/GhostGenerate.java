@@ -1,0 +1,302 @@
+package dev.watdafawx.mcmcp.ghost;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.neoforged.fml.loading.FMLPaths;
+
+import dev.watdafawx.mcmcp.Config;
+import dev.watdafawx.mcmcp.GameThread;
+import dev.watdafawx.mcmcp.McMcp;
+import dev.watdafawx.mcmcp.mcp.J;
+import dev.watdafawx.mcmcp.mcp.McpServer;
+import dev.watdafawx.mcmcp.mcp.McpServer.Tool;
+
+/**
+ * Runs the LLM architect (architect/architect.py) as a child process on the machine hosting this client. The architect
+ * talks back to this client's MCP server to place ghosts. One job at a time; never blocks the game thread. The
+ * Anthropic key lives in architect/.env and is read only by the architect itself: this class never opens, logs or
+ * forwards it.
+ */
+public final class GhostGenerate {
+    private GhostGenerate() {}
+
+    public static final List<String> STYLES = List.of("steampunk", "hextech", "gothic", "station_white", "solarpunk");
+    public static final List<String> KITS = List.of("steampunk", "hextech", "gothic", "station_white", "solarpunk",
+            "cyber_dark", "ae_sky", "rust_industrial");
+    public static final List<String> LAYOUTS = List.of("spine", "radial", "cloister", "linear", "terraces");
+
+    private static final Pattern COST = Pattern.compile("cost ~\\$([0-9]+(?:\\.[0-9]+)?)");
+    private static final int MAX_MINUTES = 30;
+    private static final AtomicInteger SEQ = new AtomicInteger();
+
+    /** One architect run. Fields are guarded by synchronized(this). */
+    public static final class Job {
+        public final String id;
+        public final String style;
+        public final int x, y, z;
+        final long startedMs = System.currentTimeMillis();
+        String status = "running"; // running | done | failed
+        String error;
+        double cost;
+        Process proc;
+        final Deque<String> log = new ArrayDeque<>();
+
+        Job(String id, String style, int x, int y, int z) {
+            this.id = id;
+            this.style = style;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        synchronized void line(String s) {
+            log.addLast(s);
+            while (log.size() > 40) log.removeFirst();
+            Matcher m = COST.matcher(s);
+            while (m.find()) cost = Math.max(cost, Double.parseDouble(m.group(1)));
+        }
+
+        public synchronized boolean running() {
+            return status.equals("running");
+        }
+
+        /** Ghost ids this job made (they all live under "<job id>/"). */
+        public List<String> ghostIds() {
+            List<String> ids = new ArrayList<>();
+            for (Ghost g : GhostStore.all()) if (g.id.startsWith(id + "/")) ids.add(g.id);
+            return ids;
+        }
+
+        public synchronized Map<String, Object> toMap(int tail) {
+            List<String> lines = new ArrayList<>(log);
+            if (lines.size() > tail) lines = lines.subList(lines.size() - tail, lines.size());
+            Map<String, Object> m = J.obj("job", id, "status", status, "style", style,
+                    "origin", List.of(x, y, z), "cost_usd", Math.round(cost * 10000) / 10000.0,
+                    "seconds", (System.currentTimeMillis() - startedMs) / 1000,
+                    "ghosts", ghostIds(), "log", lines);
+            if (error != null) m.put("error", error);
+            return m;
+        }
+    }
+
+    private static volatile Job current;
+    private static volatile Job last;
+
+    public static Job current() {
+        return current;
+    }
+
+    /** Latest job, running or finished (null if none yet). */
+    public static Job latest() {
+        Job c = current;
+        return c != null ? c : last;
+    }
+
+    public static Job byId(String id) {
+        Job c = current, l = last;
+        if (c != null && c.id.equals(id)) return c;
+        if (l != null && l.id.equals(id)) return l;
+        return null;
+    }
+
+    // ------------------------------------------------------------------ paths and preflight
+
+    static Path architectDir() {
+        String cfg = Config.GEN_ARCHITECT_DIR.get().trim();
+        if (!cfg.isEmpty()) return Path.of(cfg).toAbsolutePath().normalize();
+        return FMLPaths.GAMEDIR.get().toAbsolutePath().normalize().resolveSibling("architect");
+    }
+
+    static String python(Path dir) {
+        String cfg = Config.GEN_PYTHON.get().trim();
+        if (!cfg.isEmpty()) return cfg;
+        for (String rel : new String[] {".venv/Scripts/python.exe", "venv/Scripts/python.exe", ".venv/bin/python", "venv/bin/python"}) {
+            Path p = dir.resolve(rel);
+            if (Files.isRegularFile(p)) return p.toString();
+        }
+        return "python";
+    }
+
+    /** Returns a human-readable problem, or null when the architect can be started. Never reads .env's content. */
+    public static String preflight() {
+        Path dir = architectDir();
+        if (!Files.isRegularFile(dir.resolve("architect.py")))
+            return "architect.py not found in " + dir + ". Put the architect folder next to the mod project on this machine "
+                    + "or set ghostGenerate.architectDir in config/mcmcp-common.toml.";
+        if (!Files.isRegularFile(dir.resolve(".env")))
+            return "missing " + dir.resolve(".env") + ": create it with one line ANTHROPIC_API_KEY=... on this machine "
+                    + "(the key is never sent anywhere else).";
+        String py = python(dir);
+        if (!py.equals("python") && !Files.isRegularFile(Path.of(py)))
+            return "python not found: " + py + ". Create the venv: python -m venv " + dir.resolve(".venv")
+                    + " then pip install anthropic (see architect/README.md).";
+        return null;
+    }
+
+    // ------------------------------------------------------------------ start
+
+    /** Starts a job. Throws ToolError with a clear message when busy or not set up. Safe to call from any thread. */
+    public static Job start(String style, Integer x, Integer z, String kit, String layout) {
+        style = style == null ? "" : style.toLowerCase(Locale.ROOT).trim();
+        if (!STYLES.contains(style)) throw new McpServer.ToolError("unknown style '" + style + "'. Styles: " + String.join(", ", STYLES));
+        if (kit != null && !kit.isBlank() && !KITS.contains(kit.toLowerCase(Locale.ROOT)))
+            throw new McpServer.ToolError("unknown kit '" + kit + "'. Kits: " + String.join(", ", KITS));
+        if (layout != null && !layout.isBlank() && !LAYOUTS.contains(layout.toLowerCase(Locale.ROOT)))
+            throw new McpServer.ToolError("unknown layout '" + layout + "'. Layouts: " + String.join(", ", LAYOUTS));
+        String problem = preflight();
+        if (problem != null) throw new McpServer.ToolError(problem);
+
+        Minecraft mc = Minecraft.getInstance();
+        int[] at = GameThread.call(mc, () -> {
+            var p = mc.player;
+            if (p == null) throw new McpServer.ToolError("no player in a world");
+            return new int[] {p.blockPosition().getX(), p.blockPosition().getY(), p.blockPosition().getZ()};
+        });
+        int ox = x != null ? x : at[0];
+        int oz = z != null ? z : at[2];
+
+        String id = "gen_" + style + "_" + LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss")) + "_" + SEQ.incrementAndGet();
+        Job job = new Job(id, style, ox, at[1], oz);
+        synchronized (GhostGenerate.class) {
+            Job c = current;
+            if (c != null && c.running())
+                throw new McpServer.ToolError("a generate job is already running (" + c.id + ", " + c.style
+                        + "). Wait for it to finish; ghost_generate_status shows progress.");
+            current = job;
+        }
+
+        Path dir = architectDir();
+        List<String> cmd = new ArrayList<>(List.of(python(dir), "-u", "architect.py", "-s", id, "--generate", style,
+                "--x", String.valueOf(ox), "--y", String.valueOf(at[1]), "--z", String.valueOf(oz),
+                "--max-cost", String.valueOf(Config.GEN_COST_CAP.get())));
+        if (kit != null && !kit.isBlank()) cmd.addAll(List.of("--kit", kit.toLowerCase(Locale.ROOT)));
+        if (layout != null && !layout.isBlank()) cmd.addAll(List.of("--layout", layout.toLowerCase(Locale.ROOT)));
+        ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true);
+        String bind = Config.CLIENT_BIND.get();
+        String host = bind.equals("0.0.0.0") || bind.equals("::") ? "127.0.0.1" : bind;
+        pb.environment().put("MCMCP_URL", "http://" + host + ":" + Config.CLIENT_PORT.get() + "/mcp");
+        pb.environment().put("PYTHONIOENCODING", "utf-8");
+        String token = Config.CLIENT_TOKEN.get();
+        if (!token.isEmpty()) pb.environment().put("MCMCP_TOKEN", token);
+        try {
+            job.proc = pb.start();
+        } catch (IOException e) {
+            synchronized (job) {
+                job.status = "failed";
+                job.error = "could not start " + cmd.get(0) + ": " + e.getMessage();
+            }
+            finish(job);
+            throw new McpServer.ToolError(job.error);
+        }
+        Thread t = new Thread(() -> watch(job), "mcmcp-ghost-generate");
+        t.setDaemon(true);
+        t.start();
+        chat(ChatFormatting.AQUA, "generate " + style + " started at " + ox + " " + oz + " (job " + id + ", cap $"
+                + String.format(Locale.ROOT, "%.2f", Config.GEN_COST_CAP.get()) + ")");
+        return job;
+    }
+
+    private static void watch(Job job) {
+        Process p = job.proc;
+        Thread killer = new Thread(() -> {
+            try {
+                if (!p.waitFor(MAX_MINUTES, java.util.concurrent.TimeUnit.MINUTES)) {
+                    synchronized (job) { job.error = "timed out after " + MAX_MINUTES + " min"; }
+                    p.destroyForcibly();
+                }
+            } catch (InterruptedException ignored) {
+            }
+        }, "mcmcp-ghost-generate-timeout");
+        killer.setDaemon(true);
+        killer.start();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = r.readLine()) != null) job.line(line);
+        } catch (IOException ignored) {
+        }
+        int code;
+        try {
+            code = p.waitFor();
+        } catch (InterruptedException e) {
+            code = -1;
+        }
+        killer.interrupt();
+        synchronized (job) {
+            if (job.error == null && code != 0) job.error = "architect exited with code " + code;
+            job.status = job.error == null ? "done" : "failed";
+        }
+        finish(job);
+    }
+
+    private static void finish(Job job) {
+        synchronized (GhostGenerate.class) {
+            last = job;
+            if (current == job) current = null;
+        }
+        String cost = String.format(Locale.ROOT, "$%.4f", job.cost);
+        boolean ok;
+        String err;
+        synchronized (job) { ok = job.status.equals("done"); err = job.error; }
+        if (ok) chat(ChatFormatting.GREEN, "generate done: " + job.ghostIds().size() + " ghosts under " + job.id + "/, cost " + cost
+                + ". /ghost list, /ghost hide, /ghost clear " + job.id + "/");
+        else chat(ChatFormatting.RED, "generate failed: " + err + " (cost " + cost + "). ghost_generate_status job=" + job.id + " has the log.");
+        McMcp.LOG.info("ghost generate {} {} cost {}", job.id, ok ? "done" : "failed", cost);
+    }
+
+    /** Chat line in this client only. */
+    public static void chat(ChatFormatting color, String text) {
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> mc.gui.getChat().addMessage(Component.literal("[Ghost] ").withStyle(ChatFormatting.GOLD)
+                .append(Component.literal(text).withStyle(color))));
+    }
+
+    // ------------------------------------------------------------------ MCP tools
+
+    public static void registerTools(McpServer mcp) {
+        mcp.add(new Tool("ghost_generate",
+                "Start the LLM architect to design a themed base as ghosts (async: returns a job id at once; poll ghost_generate_status). "
+                        + "style: steampunk | hextech | gothic | station_white | solarpunk. x,z: site corner (default: the player's position). "
+                        + "kit: optional palette kit; layout: spine | radial | cloister | linear | terraces. Ghosts land under '<job>/'. "
+                        + "One job at a time. Costs real API money (capped per job by config ghostGenerate.costCapUsd, default $0.15). "
+                        + "Needs architect/.env and a python venv on the machine running this client.",
+                J.Schema.of().enumOf("style", "base style", STYLES.toArray(String[]::new)).integer("x", "site min x (default player x)")
+                        .integer("z", "site min z (default player z)").str("kit", "palette kit, default = style")
+                        .enumOf("layout", "campus layout, default per style", LAYOUTS.toArray(String[]::new)).required("style").build(),
+                false, a -> {
+                    Job j = start(J.str(a, "style", null), a.has("x") ? J.i(a, "x", 0) : null, a.has("z") ? J.i(a, "z", 0) : null,
+                            J.str(a, "kit", null), J.str(a, "layout", null));
+                    return J.obj("job", j.id, "status", "running", "style", j.style, "origin", List.of(j.x, j.y, j.z),
+                            "cost_cap_usd", Config.GEN_COST_CAP.get(), "hint", "poll ghost_generate_status with this job id");
+                }));
+        mcp.add(new Tool("ghost_generate_status",
+                "Status of a ghost_generate job: running | done | failed, ghost ids so far, API cost so far, last log lines. "
+                        + "job omitted = the latest job.",
+                J.Schema.of().str("job", "job id from ghost_generate").integer("lines", "log lines to return (default 12)").build(),
+                true, a -> {
+                    String id = J.str(a, "job", null);
+                    Job j = id == null ? latest() : byId(id);
+                    if (j == null) throw new McpServer.ToolError(id == null ? "no generate job yet" : "unknown job '" + id
+                            + "' (only the current and the last job are kept)");
+                    return j.toMap(Math.max(1, Math.min(40, J.i(a, "lines", 12))));
+                }));
+    }
+}

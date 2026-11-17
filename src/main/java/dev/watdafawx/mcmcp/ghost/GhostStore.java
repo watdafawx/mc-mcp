@@ -78,6 +78,32 @@ public final class GhostStore {
         }
     }
 
+    /**
+     * Replaces (or creates) a ghost with exactly these blocks (local positions). Shared by ghost_import and GhostApi.
+     * origin null = keep the ghost's origin, or the player's feet for a new one. Must run where the game thread can be
+     * reached (GameThread.call handles being on it already).
+     */
+    public static Ghost replaceBlocks(String id, Map<BlockPos, BlockState> blocks, BlockPos origin, Map<String, String> tags) {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        BlockPos start = origin != null ? origin : dev.watdafawx.mcmcp.GameThread.call(mc, () -> {
+            if (mc.player == null) throw new McpServer.ToolError("no player in a world; pass a position");
+            return mc.player.blockPosition();
+        });
+        String dim = dev.watdafawx.mcmcp.GameThread.call(mc, () -> mc.level != null
+                ? mc.level.dimension().location().toString() : "minecraft:overworld");
+        if (blocks.size() > MAX_BLOCKS) throw new McpServer.ToolError("ghost over " + MAX_BLOCKS + " blocks");
+        Ghost g = getOrCreate(id, start, dim);
+        synchronized (LOCK) {
+            if (origin != null) g.origin = origin;
+            g.blocks.clear();
+            for (var e : blocks.entrySet()) g.put(e.getKey().getX(), e.getKey().getY(), e.getKey().getZ(), e.getValue());
+            if (tags != null) g.tags.putAll(tags);
+            g.version++;
+        }
+        save(g);
+        return g;
+    }
+
     // ------------------------------------------------------------------ parsing
 
     /** Parses a block state like {@code minecraft:oak_stairs[facing=north]}; throws with a readable reason. */
