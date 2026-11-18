@@ -79,6 +79,8 @@ looks at them, gives feedback, and you change them until they like it; ghost_exp
 - y is up. North = -z, south = +z, east = +x, west = -x.
 - Each ghost has a world origin; its boxes/blocks use local coordinates from 0,0,0. Negative local coordinates
   are fine, and ghosts can go below the ground (foundations, cliffs, cellars): the terrain doesn't limit them.
+- Room ghosts inside a campus (storage room, autocraft room, ...): use the campus result's wing room_origins[].origin as the ghost
+  origin and LOCAL coordinates from 0,0,0 (never world coords together with an origin); anything off the campus is moved or rejected.
 - Name ghosts "<area>/<room>", e.g. "core/hall", "core/server_room". One ghost per room or feature, so each can
   be moved, redrawn or hidden alone. Rooms of one area share an origin system: keep their world origins in the plan.
 - Stairs: facing=<dir> is the side of the tall back. half=top flips them upside down (good for eaves and trims).
@@ -439,6 +441,9 @@ class Architect:
         """ghost_set without parts floating in the air: those are dropped and reported back."""
         args, floating = self.guard.check(a["id"], a)
         snapped = [p for p in floating if "snapped_down" in p]
+        rej = [p for p in floating if "rejected" in p]
+        if rej:
+            return json.dumps({"error": "nothing placed: " + rej[0]["rejected"]}), True
         floating = [p for p in floating if "snapped_down" not in p]
         if floating and not args.get("boxes") and not args.get("blocks"):
             return json.dumps({"error": "nothing placed: every part floats (touches no building block and is above "
@@ -510,12 +515,23 @@ class Architect:
                 res = self.mcp.json("ghost_set", {"id": f"{a['area']}/{g['id']}", "origin": o, "mode": "replace",
                                                   "blocks": g["blocks"]})
                 self.guard.record(f"{a['area']}/{g['id']}", {"origin": o, "blocks": g["blocks"]}, True)
+                self.guard.campus_ids.add(f"{a['area']}/{g['id']}")
                 xs = [b[0] for b in g["blocks"]]; ys = [b[1] for b in g["blocks"]]; zs = [b[2] for b in g["blocks"]]
                 item = {"id": f"{a['area']}/{g['id']}", "origin": o,
                         "size": [max(xs) - min(xs) + 1, max(ys) - min(ys) + 1, max(zs) - min(zs) + 1],
                         "world_min": [o[0] + min(xs), o[1] + min(ys), o[2] + min(zs)],
                         "world_max": [o[0] + max(xs), o[1] + max(ys), o[2] + max(zs)]}
                 m = g.get("meta") or {}
+                if not m and (g["id"].startswith("wing_") or g["id"] == "hub"):  # legacy (steam) path: no meta
+                    wn = g["id"][5:]
+                    wr = next((w.get("rooms") for w in (a.get("wings") or []) if str(w.get("name")) == wn), None)
+                    m = {"kind": "hub" if g["id"] == "hub" else "wing", "floor_y": campus.STEPS + 1, "rooms": wr}
+                if m.get("kind") in ("wing", "hub") and "floor_y" in m:
+                    self.guard.add_wing(item["id"], item["world_min"], item["world_max"], oy + m["floor_y"],
+                                        m.get("rooms") if m.get("kind") == "wing" else None, m["kind"])
+                    if m.get("kind") == "wing":
+                        item["room_origins"] = [{k: v for k, v in sl.items() if k != "wing"}
+                                                for sl in self.guard.room_slots(self.guard.wings[item["id"]])]
                 if m.get("kind") in ("wing", "hub", "tower"):  # world y of the floor and of the roof deck
                     item["floor_y"] = oy + m["floor_y"] if "floor_y" in m else None
                     if "deck_y" in m:
@@ -535,7 +551,7 @@ class Architect:
                                        "box; roof_deck_y = y of a wing's flat deck (a part at that y+1 sits on it); wall "
                                        "planes are the box faces (a part touching x=world_min.x-1 or world_max.x+1 or the "
                                        "z faces touches the wall). Ground = site_min.y+1. Covered halls ('halls'), tiers and "
-                                       "stairs are ghosts too. Attach extra details to these faces on the FIRST try: any part "
+                                       "stairs are ghosts too. ROOM GHOSTS (ae2_storage, ae2_autocraft, ...): use each wing's room_origins[].origin as the ghost origin with LOCAL coords from 0,0,0 inside max_size; never write world coords with a non-zero origin. Attach extra details to these faces on the FIRST try: any part "
                                        "that touches no ghost block and is above ground is dropped."})
         if name == "shapes":
             blocks, summary = shapes.build(a.get("parts") or [])

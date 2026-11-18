@@ -5,6 +5,8 @@ each other.
 """
 from __future__ import annotations
 
+import re
+
 AIR = {"minecraft:air", "air", "minecraft:cave_air", "minecraft:void_air"}
 BIG = 250_000  # boxes bigger than this are never expanded (treated as supported, never floating)
 N6 = ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1))
@@ -40,6 +42,87 @@ def entries(args: dict):
 class Guard:
     def __init__(self):
         self.cells: dict[str, set] = {}  # ghost id -> filled world cells
+        self.campus_ids: set[str] = set()  # ghosts the procedural campus generated (the site footprint)
+        self.last_reject: str | None = None
+        self.last_note: str | None = None  # v17: set when a stray ghost was translated into its campus room
+        self.origins: dict[str, list] = {}  # last explicit origin per ghost id
+        self.wings: dict[str, dict] = {}  # v17: campus wing/hub ghosts: {id, lo, hi, floor_y, rooms}
+
+    def add_wing(self, gid, lo, hi, floor_y, rooms=None, kind="wing"):
+        self.wings[gid] = {"id": gid, "lo": list(lo), "hi": list(hi), "floor_y": floor_y, "rooms": list(rooms or []), "kind": kind}
+
+    @staticmethod
+    def _label(r):
+        return str(r.get("name") or r.get("room") or r) if isinstance(r, dict) else str(r)
+
+    def room_slots(self, wing: dict) -> list[dict]:
+        """Interior split of a wing into one slot per listed room (along the longer axis)."""
+        lo, hi = wing["lo"], wing["hi"]
+        x0, x1, z0, z1 = lo[0] + 2, hi[0] - 2, lo[2] + 2, hi[2] - 2
+        rooms = wing["rooms"] or ["room"]
+        n = len(rooms)
+        out = []
+        along_x = (x1 - x0) >= (z1 - z0)
+        for k, r in enumerate(rooms):
+            if along_x:
+                a = x0 + (x1 - x0 + 1) * k // n
+                b = x0 + (x1 - x0 + 1) * (k + 1) // n - 2
+                bx0, bx1, bz0, bz1 = a, max(a, b), z0, z1
+            else:
+                a = z0 + (z1 - z0 + 1) * k // n
+                b = z0 + (z1 - z0 + 1) * (k + 1) // n - 2
+                bx0, bx1, bz0, bz1 = x0, x1, a, max(a, b)
+            out.append({"room": self._label(r), "origin": [bx0, wing["floor_y"], bz0],
+                        "max_size": [bx1 - bx0 + 1, 12, bz1 - bz0 + 1], "wing": wing["id"]})
+        return out
+
+    def _match_slot(self, gid: str):
+        """Best campus room slot for a model ghost id, by word overlap (ae2_storage -> 'ae2 storage room')."""
+        toks = [t for t in re.split(r"[^a-z0-9]+", gid.split("/", 1)[-1].lower()) if len(t) >= 3]
+        best, bs = None, 0
+        for w in self.wings.values():
+            if w["kind"] == "hub":
+                continue
+            wname = w["id"].split("/")[-1].lower()
+            for sl in self.room_slots(w):
+                lab = sl["room"].lower()
+                sc = sum(2 for t in toks if t in lab or any(len(u) >= 4 and u in t for u in re.split(r"[^a-z0-9]+", lab)))
+                sc += sum(1 for t in toks if t in wname)
+                if sc > bs:
+                    best, bs = sl, sc
+        return best if bs >= 2 else None
+
+    def retarget(self, gid: str, args: dict, allc: list, bbox):
+        """v17: a ghost the footprint guard would drop. Try (a) absolute coords + origin (double offset), (b) moving it into
+        the matching campus room. Returns (new_args | None, message)."""
+        bx0, bx1, bz0, bz1, by0 = bbox
+        ox, oy, oz = (int(v) for v in (args.get("origin") or (0, 0, 0)))
+        cb = self.site_bounds(campus_only=True)
+
+        def inside(x0, x1, z0, z1):
+            ix = max(0, min(x1, cb[1][0] + 8) - max(x0, cb[0][0] - 8) + 1)
+            iz = max(0, min(z1, cb[1][2] + 8) - max(z0, cb[0][2] - 8) + 1)
+            return ix * iz / max(1, (x1 - x0 + 1) * (z1 - z0 + 1))
+        if (ox or oz) and inside(bx0 - ox, bx1 - ox, bz0 - oz, bz1 - oz) >= 0.5:  # blocks were already world coords
+            out = dict(args, origin=[0, 0, 0])
+            return out, (f"ghost {gid}: your blocks were WORLD coordinates but you also set origin {[ox, oy, oz]}; origin forced to "
+                         f"[0,0,0] so it sits on the site. Use EITHER world coords with origin [0,0,0] OR local coords with the origin.")
+        sl = self._match_slot(gid)
+        sx, sz = bx1 - bx0 + 1, bz1 - bz0 + 1
+        if sl is None:
+            return None, (f"ghost {gid} rejected: its footprint ({bx0},{bz0})-({bx1},{bz1}) is off the campus "
+                          f"({cb[0][0]},{cb[0][2]})-({cb[1][0]},{cb[1][2]}). Use the origins the campus call gave: room origins "
+                          f"{[(w['id'], self.room_slots(w)[0]['origin']) for w in list(self.wings.values())[:6]]}; local coords from 0,0,0.")
+        mx, _, mz = sl["max_size"]
+        if sx > mx + 6 or sz > mz + 6:
+            return None, (f"ghost {gid} rejected: it is {sx}x{sz} blocks but room '{sl['room']}' in {sl['wing']} has an interior of "
+                          f"{mx}x{mz}. Retry with origin {sl['origin']} (world coords of the room's min corner, y = floor) and local "
+                          f"coords inside 0..{mx - 1} x 0..11 x 0..{mz - 1}; keep aisles clear.")
+        nx, ny, nz = sl["origin"]
+        out = dict(args, origin=[ox + nx - bx0, oy + ny - by0, oz + nz - bz0])
+        return out, (f"ghost {gid} was ~{abs(bx0 - nx) + abs(bz0 - nz)} blocks off the campus; MOVED into room '{sl['room']}' of "
+                     f"{sl['wing']}: new origin {out['origin']} (room min corner {sl['origin']}, interior {mx}x{mz}). "
+                     f"Next time use origin {sl['origin']} with local coords from 0,0,0.")
 
     def ground(self) -> int | None:
         ys = [c[1] for s in self.cells.values() for c in s]
@@ -51,10 +134,13 @@ class Guard:
             if cells:
                 s.update(cells)
         self.cells[gid] = s
+        if args.get("origin") is not None:
+            self.origins[gid] = list(args["origin"])
 
-    def site_bounds(self):
-        """Bounding box (lo, hi) of every recorded ghost cell, or None."""
-        cs = [c for s in self.cells.values() for c in s]
+    def site_bounds(self, campus_only: bool = False):
+        """Bounding box (lo, hi) of every recorded ghost cell (campus ghosts only when asked and any exist), or None."""
+        src = [s for k, s in self.cells.items() if k in self.campus_ids] if campus_only and self.campus_ids else list(self.cells.values())
+        cs = [c for s in src for c in s]
         if not cs:
             return None
         return [min(c[i] for c in cs) for i in range(3)], [max(c[i] for c in cs) for i in range(3)]
@@ -63,10 +149,34 @@ class Guard:
         """Stray-block guard: a model-written ghost_set sometimes lands near world origin (forgotten/wrong origin).
         Entries farther than `margin` blocks (x/z) from the site are dropped; if EVERY entry is far and the origin is
         missing/near 0,0,0 the whole call is translated onto the site's south-west corner instead. Logs a line."""
+        self.last_reject = None
+        self.last_note = None
+        if args.get("origin") is None and gid in self.origins and (args.get("blocks") or args.get("boxes")):
+            args = dict(args, origin=self.origins[gid])  # merge call that relies on the ghost's earlier origin
+            self.last_note = f"ghost {gid}: no origin given, reused its earlier origin {self.origins[gid]} (always pass origin)"
         sb = self.site_bounds()
         if not sb or not (args.get("blocks") or args.get("boxes")):
             return args
         lo, hi = sb
+        # v16 footprint rule: a model ghost whose x/z bounding box lies mostly outside the campus footprint is rejected whole
+        cb = self.site_bounds(campus_only=True)
+        allc = [c for _, _, cs in entries(args) if cs for c in cs]
+        if cb and allc:
+            pad = 8
+            bx0, bx1 = min(c[0] for c in allc), max(c[0] for c in allc)
+            bz0, bz1 = min(c[2] for c in allc), max(c[2] for c in allc)
+            ix = max(0, min(bx1, cb[1][0] + pad) - max(bx0, cb[0][0] - pad) + 1)
+            iz = max(0, min(bz1, cb[1][2] + pad) - max(bz0, cb[0][2] - pad) + 1)
+            frac = (ix * iz) / max(1, (bx1 - bx0 + 1) * (bz1 - bz0 + 1))
+            if frac < 0.5:
+                new, msg = self.retarget(gid, args, allc, (bx0, bx1, bz0, bz1, min(c[1] for c in allc)))
+                if new is not None:
+                    self.last_note = msg
+                    print(f"  [retarget] {msg}", flush=True)
+                    return new
+                self.last_reject = msg
+                print(f"  [footprint] {self.last_reject}", flush=True)
+                return dict(args, blocks=[], boxes=[])
 
         def far(c):
             return c[0] < lo[0] - margin or c[0] > hi[0] + margin or c[2] < lo[2] - margin or c[2] > hi[2] + margin
@@ -91,6 +201,8 @@ class Guard:
     def check(self, gid: str, args: dict) -> tuple[dict, list]:
         """Returns (args without floating entries, [floating part summaries])."""
         args = self.localize(gid, args)
+        if self.last_reject:
+            return args, [{"rejected": self.last_reject, "blocks": 0}]
         replace = args.get("mode", "replace") == "replace"
         others = set()
         for k, s in self.cells.items():

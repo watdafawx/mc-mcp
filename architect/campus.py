@@ -22,22 +22,27 @@ STEPS = 2  # platform height; buildings stand on y=STEPS
 # second roof shape per kit, used on every other wing so the skyline varies
 ALT_ROOF = {"steampunk": "flat", "gothic": "flat", "hextech": "flat", "solarpunk": "flat", "station_white": "dome",
             "cyber_dark": "crown"}
-ROOF_CYCLE = {"steampunk": ["sawtooth", "gable_low", "mansard", "barrel", "hip_low"],
-              "gothic": ["gable_steep", "hip", "gable", "mansard", "gable_low"],
-              "hextech": ["hip_low", "mansard", "gable_low", "flat", "gable"],
-              "solarpunk": ["garden", "barrel", "garden", "hip_low"],
-              "station_white": ["barrel", "gable_low", "flat", "dome", "hip_low"]}
+# v15: 7 distinct forms per kit (a campus has <= 6-7 wings), so neighbouring wings never share a roof form
+ROOF_CYCLE = {"steampunk": ["sawtooth", "gable_low", "mansard", "barrel", "hip_low", "flat", "gable_steep"],
+              "gothic": ["gable_steep", "hip", "gable", "mansard", "gable_low", "hip_steep", "flat"],
+              "hextech": ["hip_low", "mansard", "gable_low", "flat", "gable", "hip", "barrel"],
+              "solarpunk": ["garden", "barrel", "hip_low", "gable_low", "garden", "sawtooth", "dome"],
+              "station_white": ["barrel", "gable_low", "flat", "dome", "hip_low", "sawtooth", "gable"]}
 # roof material per wing (cycled): every wing gets its own roof colour, the tower keeps the kit roof
-ROOF_MATS = {"steampunk": ["minecraft:deepslate_tiles", "minecraft:weathered_cut_copper", "minecraft:polished_blackstone_bricks",
-                           "minecraft:deepslate_tiles", "minecraft:cut_copper"],
-             "gothic": ["minecraft:oxidized_cut_copper", "minecraft:deepslate_tiles", "minecraft:oxidized_cut_copper",
-                        "minecraft:tuff_bricks", "minecraft:deepslate_tiles"],
+# v16 steam: slate, oxidized teal, brick red, dark iron, then one copper-orange and two more cool/dark ones (was mostly copper)
+ROOF_MATS = {"steampunk": ["minecraft:deepslate_tiles", "minecraft:oxidized_cut_copper", "minecraft:bricks",
+                           "minecraft:cut_copper", "minecraft:polished_blackstone_bricks", "minecraft:red_nether_bricks",
+                           "minecraft:weathered_cut_copper"],
+             "gothic": ["minecraft:oxidized_cut_copper", "minecraft:deepslate_tiles", "minecraft:tuff_bricks",
+                        "minecraft:weathered_cut_copper", "minecraft:blackstone", "minecraft:mossy_stone_bricks",
+                        "minecraft:polished_deepslate"],
              "hextech": ["minecraft:deepslate_tiles", "minecraft:purple_terracotta", "minecraft:polished_blackstone_bricks",
-                         "minecraft:blackstone", "minecraft:deepslate_tiles"],
+                         "minecraft:blackstone", "minecraft:cyan_terracotta", "minecraft:purple_concrete", "minecraft:polished_deepslate"],
              "solarpunk": ["minecraft:moss_block", "create:cut_limestone_bricks", "minecraft:green_terracotta",
-                           "minecraft:moss_block"],
+                           "minecraft:mossy_cobblestone", "minecraft:moss_block", "minecraft:terracotta", "minecraft:lime_terracotta"],
              "station_white": ["minecraft:white_concrete", "minecraft:light_gray_concrete", "minecraft:smooth_quartz",
-                               "minecraft:white_concrete"]}
+                               "minecraft:orange_terracotta", "minecraft:gray_concrete", "minecraft:light_blue_concrete",
+                               "minecraft:calcite"]}
 TOWER_ROOF = {"steampunk": "mansard", "gothic": "mansard", "hextech": "crown", "solarpunk": "dome",
               "station_white": "dome", "cyber_dark": "crown"}
 
@@ -367,11 +372,16 @@ def _cog(out, a, cy, fixed, r, axis, sign, rim, teeth, spoke, hub, thick=2, spok
                 out.append([f, cy + dv, a + du, b] if axis == "x" else [a + du, cy + dv, f, b])
 
 
+PIPE = "minecraft:waxed_oxidized_copper"  # teal pipe: contrasts with the dark brick walls and the orange copper trim
+PIPE_FLANGE = "minecraft:copper_block"        # bright orange collars
+
+
 def _pipes(out, x0, z0, w, d, H, y, sides, K, i):
-    """Copper pipe runs along the wall faces of a wing: one horizontal run near the eaves, two risers to the
-    ground, flange rings (casing) every 6 blocks. Everything sits in the footprint-edge layer, against the wall."""
-    pipe, flange = "minecraft:copper_block", K["detail"]
-    ytop = y + max(4, H - 3 - (i % 2))
+    """Copper pipe runs along the wall faces of a wing: one horizontal run (2 blocks thick, teal oxidized copper) near
+    the eaves, risers to the ground, bright collars every 6 blocks with a lit joint. Everything sits in the
+    footprint-edge layer, against the wall."""
+    pipe, flange, lit = PIPE, PIPE_FLANGE, K["glow"]
+    ytop = y + max(4, H - 4 - (i % 2))
     ylow = y + 3 + (i % 2)
     for sd in sides:
         if sd in "ns":
@@ -381,10 +391,14 @@ def _pipes(out, x0, z0, w, d, H, y, sides, K, i):
             xx = x0 if sd == "w" else x0 + w - 1
             run = [(xx, z) for z in range(z0 + 1, z0 + d - 1)]
         for n, (px, pz) in enumerate(run):
-            out.append([px, ytop, pz, flange if n % 6 == 3 else pipe])
-            if n % 6 == 3:
-                out.append([px, ytop + 1, pz, flange])
+            col = n % 6 == 3
+            out.append([px, ytop, pz, flange if col else pipe])
+            out.append([px, ytop + 1, pz, flange if col else pipe])
+            if col:
+                out.append([px, ytop + 2, pz, flange])
                 out.append([px, ytop - 1, pz, flange])
+                if n % 12 == 3:
+                    out.append([px, ytop + 3, pz, lit])
         if sd == sides[0] or (i % 2 and sd == sides[-1]):
             for frac in (0.25, 0.75):
                 px, pz = run[int(len(run) * frac)]
@@ -393,6 +407,7 @@ def _pipes(out, x0, z0, w, d, H, y, sides, K, i):
         if len(run) > 20:  # a second, lower run on the long faces
             for n, (px, pz) in enumerate(run[3:-3]):
                 out.append([px, ylow, pz, flange if n % 8 == 4 else pipe])
+                out.append([px, ylow + 1, pz, flange if n % 8 == 4 else pipe])
 
 
 def _chimney(out, x, z, y0, h, K):
@@ -633,6 +648,9 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
         wing_roles.update(wing.get("roles") or {})
         wing_roles.setdefault("glass", "minecraft:" + ("cyan", "light_blue", "gray")[i % 3] + "_stained_glass")
         wing_roles.setdefault("wall2", (K["wall2"], K["base"], K["wall"])[i % 3])
+        _mats = ROOF_MATS.get(K_style)
+        if _mats and "roof" not in (wing.get("roles") or {}):  # v16: a model-wide roles.roof must not flatten every wing to one hue
+            wing_roles["roof"] = _mats[i % len(_mats)]
         blocks = massing.structure("rect", w=w_, d=d_, floor_hs=hs, program=prog, kit=kit, roles=wing_roles,
                                    entrances=["s" if side_ns == "n" else "n"], roof=roof, bay=4+i%3, windows=_windows(K_style, i),
                                    accent_floor=0, seed=seed + i, core="auto", rhythm=1 + i % 3, finial=1)
@@ -699,13 +717,19 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
 
     # signature features per style
     feat = []
+    solid = None
     if K_style in ("steampunk", "rust_industrial"):
         for i, (x0, z0, w_, d_, H, side, roof) in enumerate(foot):
             zc = z0 + 1 if side == "n" else z0 + d_ - 3  # far wall, away from the gallery
             for xc in (x0 + 2, x0 + w_ - 4):
                 _chimney(feat, xc, zc, y + H - 2, 6 + (i + xc) % 4, K)
             if K_style == "steampunk":  # copper pipe runs on the three wall faces that are not the door face
-                _pipes(feat, x0, z0, w_, d_, H, y, ("n", "e", "w") if side == "n" else ("s", "e", "w"), K, i)
+                if solid is None:
+                    solid = {(b[0] + g["origin"][0], b[1] + g["origin"][1], b[2] + g["origin"][2])
+                             for g in ghosts for b in g["blocks"]}
+                pl = []
+                _pipes(pl, x0, z0, w_, d_, H, y, ("n", "e", "w") if side == "n" else ("s", "e", "w"), K, i)
+                feat += [b for b in pl if (b[0], b[1], b[2]) not in solid]
         _gear(feat, hx0 + HUB // 2, y + 17, hz0 + HUB - 3, 5, K)  # big gear over the hub's front door
         for zz in (gz + 1, gz + GD - 2):  # pipe runs along the gallery roofs
             for x in range(margin + 1, W - margin - 1):
@@ -936,10 +960,35 @@ def _tower(K, kit, roles, seed, cx, cz, y):
                 trim.append([px, y + H1 + 6, pz, K["glow"]])
                 trim.append([px, y + H1 + 7, pz, K["antenna"]])
                 trim.append([px, y + H1 + 8, pz, K["antenna"]])
+        # v16: the halo posts used to float (radius 7 is outside the tower). Each post is now joined to the tower by a thin
+        # rod at the same height, stepping inwards until it touches a tower block; no contact -> the post is dropped.
+        solid = {}
+        for _gid, _o, _bl in parts:
+            for b_ in _bl:
+                if not str(b_[3]).split("[")[0].endswith("air"):
+                    solid[(_o[0] + b_[0], _o[1] + b_[1], _o[2] + b_[2])] = 1
+        hy = y + Htot
         for ang in range(0, 360, 45):  # gold ring halo under the glass crown
-            hx, hz = round(cx + 7 * math.cos(math.radians(ang))), round(cz + 7 * math.sin(math.radians(ang)))
-            trim.append([hx, y + Htot, hz, K["trim"]])
-            trim.append([hx, y + Htot + 1, hz, K["antenna"]])
+            ca, sa = math.cos(math.radians(ang)), math.sin(math.radians(ang))
+            rod, hit = [], False
+            for r_ in range(70, 20, -1):  # r_/10 from 7.0 down to 2.1
+                hx, hz = round(cx + r_ / 10 * ca), round(cz + r_ / 10 * sa)
+                if (hx, hz) in [(q[0], q[2]) for q in rod]:
+                    continue
+                if any((hx + d[0], hy + d[1], hz + d[2]) in solid for d in ((1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1), (0, -1, 0))):
+                    hit = True
+                    if (hx, hy, hz) not in solid:
+                        rod.append([hx, hy, hz])
+                    break
+                if (hx, hy, hz) in solid:
+                    hit = True
+                    break
+                rod.append([hx, hy, hz])
+            if not hit:
+                continue
+            for hx, _hy, hz in rod:
+                trim.append([hx, hy, hz, K["trim"]])
+            trim.append([rod[0][0], hy + 1, rod[0][2], K["antenna"]])
         parts.append(("tower_trim", [0, 0, 0], trim))
     if kit == "gothic":  # corner pinnacles on the first setback, a 30-high needle spire on the top stage
         trim = []
@@ -974,12 +1023,13 @@ def _tower(K, kit, roles, seed, cx, cz, y):
 
 
 def _porch(K):
-    """Gothic pointed-arch porch with a pediment and rose window. Local frame: u outward from the wing's edge layer
-    (u=0), v sideways (door centre = 0), y above the wing plinth (y=0). Returns {(u, v, y): block}."""
+    """Gothic pointed-arch porch with a pediment and rose window (v15: 9 wide x 9 high opening, lit tympanum, pinnacles,
+    entry step). Local frame: u outward from the wing's edge layer (u=0), v sideways (door centre = 0), y above the
+    wing plinth (y=0). Returns {(u, v, y): block}."""
     body = "minecraft:stone_bricks"
     trim = K.get("trim", "minecraft:smooth_stone")
     glass, glow = K["glass"], K["glow"]
-    hw = {1: 3, 2: 3, 3: 3, 4: 3, 5: 2, 6: 2, 7: 1, 8: 0}  # pointed arch opening half-width per row
+    hw = {1: 4, 2: 4, 3: 4, 4: 4, 5: 3, 6: 3, 7: 2, 8: 2, 9: 1, 10: 0}  # pointed arch opening half-width per row
     opening = {(v, y) for y, h in hw.items() for v in range(-h, h + 1)}
     ring = set()
     for (v, y) in opening:
@@ -989,35 +1039,45 @@ def _porch(K):
                 if c not in opening and c[1] >= 0:
                     ring.add(c)
     B = {}
-    for u in range(1, 5):
+    for u in range(1, 6):
         for (v, y) in ring:
-            front = u == 4 or u == 1
+            front = u == 5 or u == 1
             B[(u, v, y)] = trim if front and (abs(v) + y) % 2 == 0 else body
-        for v in range(-3, 4):
+        for v in range(-4, 5):
             B[(u, v, 0)] = "minecraft:smooth_stone"  # porch floor
-    B[(2, 0, 8)] = glow
-    for y in range(1, 6):  # gothic buttress-pier either side of the front arch
-        for v in (-5, 5):
-            B[(4, v, y)] = trim if y % 3 == 0 else body
+    for (v, y) in opening:  # lit stained tympanum at the back of the arch above the door (door stays open below y=5)
+        if y >= 5 and (v, y) not in ring:
+            B[(1, v, y)] = trim if (v == 0 or y == 5) else glass
+    B[(1, 0, 9)] = glow
+    for v in range(-4, 5):  # entry step
+        B[(6, v, 0)] = "minecraft:stone_brick_slab[type=bottom]"
+    for y in range(1, 10):  # buttress-pier either side of the front arch, topped with a pinnacle
+        for v in (-6, 6):
+            B[(5, v, y)] = trim if y % 3 == 0 else body
+            B[(4, v, y)] = body
+    for v in (-6, 6):
+        B[(5, v, 10)] = trim
+        B[(5, v, 11)] = trim
+        B[(5, v, 12)] = K.get("tip", "minecraft:lantern")
     # pediment on the front plane: stepped gable with a rose window
-    rows = {10: 4, 11: 4, 12: 3, 13: 2, 14: 1, 15: 0}
+    rows = {11: 5, 12: 5, 13: 4, 14: 3, 15: 2, 16: 1, 17: 0}
     for y, h in rows.items():
         for v in range(-h, h + 1):
             edge = abs(v) == h
-            B[(4, v, y)] = trim if edge or y == 10 else body
-    for v in range(-4, 5):
-        B[(4, v, 9)] = trim if abs(v) in (2, 4) else body  # springing course closes the gap under the pediment
-    for dv in range(-2, 3):
-        for dy in range(-2, 3):
+            B[(5, v, y)] = trim if edge or y == 11 else body
+    for v in range(-5, 6):
+        B[(5, v, 10)] = trim if abs(v) in (2, 4) else body  # springing course closes the gap under the pediment
+    for dv in range(-3, 4):
+        for dy in range(-3, 4):
             r2 = dv * dv + dy * dy
-            if r2 <= 2:
-                B[(4, dv, 12 + dy)] = glass
-            elif r2 <= 5:
-                B[(4, dv, 12 + dy)] = trim
-    B[(4, 0, 12)] = glow
+            if r2 <= 3:
+                B[(5, dv, 14 + dy)] = glass
+            elif r2 <= 7:
+                B[(5, dv, 14 + dy)] = trim
+    B[(5, 0, 14)] = glow
     for dy in (-1, 0, 1):
-        B[(4, 0, 12 + dy)] = B.get((4, 0, 12 + dy), trim) if dy else glow
-    B[(4, 0, 16)] = K.get("tip", "minecraft:lantern")
+        B[(5, 0, 14 + dy)] = B.get((5, 0, 14 + dy), trim) if dy else glow
+    B[(5, 0, 18)] = K.get("tip", "minecraft:lantern")
     return B
 
 
@@ -1136,6 +1196,7 @@ class _Site:
         self.obstacles = set()
         self.meta = {}
         self.bays = []
+        self.porch_cells = set()
 
     def add(self, gid, x, y, z, blocks, meta=None):
         self.ghosts.append({"id": gid, "origin": [x, y, z], "blocks": blocks, "meta": meta or {}})
@@ -1155,8 +1216,8 @@ class _Site:
             wr.setdefault("ridge", "minecraft:smooth_stone")
         wr.setdefault("wall2", [K["wall2"], K["wall"], K["base"]][i % 3])
         mats = ROOF_MATS.get(kit if isinstance(kit, str) else "")
-        if mats:
-            wr.setdefault("roof", mats[i % len(mats)])
+        if mats and "roof" not in (wing.get("roles") or {}):  # v16: per-wing hue wins over a model-wide roles.roof
+            wr["roof"] = mats[i % len(mats)]
         roof = _roof_for(wing, kit, i)
         hs = [int(wing.get("floor_h") or (8 + 2 * (i % 3)))] + [6] * (int(wing.get("floors") or 1) - 1)
         prog = [wing.get("rooms") or ["expansion"]] + [wing.get("upper") or ["expansion"]] * (len(hs) - 1)
@@ -1238,17 +1299,19 @@ class _Site:
         y_g = y + sum(TOWER_STAGES["hextech"][0][2][:3]) + 3  # fourth floor line
         L, V = 27, 15
 
-        def rect(side):
+        def rect(side, V=V):
             if side in "ew":
                 x0 = cx + hw if side == "e" else cx - hw - L
                 return _cells(x0, cz - V, L + 1, 2 * V + 1)
             if side == "s":
                 return _cells(cx - V, cz + hw + 1, 2 * V + 1, L + 1)
             return _cells(cx - V, cz - hw - L - 1, 2 * V + 1, L + 1)
-        taken = self.obstacles | self.occupied | self.blocked
-        side = next((sd for sd in "sewn" if not (rect(sd) & taken)), None)  # south first: visible from the front shot
+        # v15: test the deck footprint (+-14) against real obstacles only (not the soft padding), east/west first: they stay
+        # visible from the front shot (the hub is lower than the airship); north (behind the tower) is the last resort
+        taken = self.obstacles | self.blocked
+        side = next((sd for sd in "ewsn" if not (rect(sd, 14) & taken)), None)
         if side is None:
-            side = min("sewn", key=lambda sd: len(rect(sd) & taken))
+            side = min("ewsn", key=lambda sd: len(rect(sd, 14) & taken))
         B = _airdock(self.K, y_g, hw)
         out = []
         for (u, v, yy), b in B.items():
@@ -1263,6 +1326,7 @@ class _Site:
             out.append([x, yy, z, b])
         self.add("airdock", 0, 0, 0, out, {"kind": "airdock", "side": side})
         self.reserve(rect(side), pad=1)
+        self.obstacles |= rect(side)  # halls route round the dock
         self.meta["airdock"] = side
 
     def finish(self, extra_cells=None):
@@ -1294,11 +1358,171 @@ class _Site:
                 _buttresses(feat, x0, z0, w_, d_, H, y + ty, dict(K, wall="minecraft:stone_bricks", trim="minecraft:smooth_stone"), sides)
             elif kit == "solarpunk":
                 _greenwall(feat, x0, z0, w_, d_, H, y + ty, sides, self.seed + f["i"])
-        feat = [b for b in feat if (b[0], b[2]) not in allhall]
-        feat += self.bays
+        if kit == "station_white":
+            _radar(self)
+        elif kit == "solarpunk":
+            _roof_terraces(self, allhall)
+        feat = [b for b in feat if (b[0], b[2]) not in allhall and (b[0], b[1], b[2]) not in self.porch_cells]
+        feat += [b for b in self.bays if (b[0], b[1], b[2]) not in self.porch_cells]
         if feat:
             self.add("features", 0, 0, 0, feat, {"kind": "features"})
         return used, allhall
+
+
+def _radar(S):
+    """Sci feature: a radar dish on a mast from the hub dome's apex plus four antenna arrays standing on the dome.
+    Every part starts on a hub block (mast on the apex, arrays on the dome surface). Ghost id "radar"."""
+    hub = next((g for g in S.ghosts if g["id"] == "hub"), None)
+    if not hub:
+        return
+    ox, oy, oz = hub["origin"]
+    top = {}
+    for x, y, z, b in hub["blocks"]:
+        if top.get((x, z), -1) < y:
+            top[(x, z)] = y
+    c0 = 16  # hub 33x33 local centre
+    cand = [(c0 + a, c0 + c) for a in range(-3, 4) for c in range(-3, 4) if (c0 + a, c0 + c) in top]
+    if not cand:
+        return
+    ax, az = max(cand, key=lambda p_: (top[p_], -abs(p_[0] - c0) - abs(p_[1] - c0)))
+    base = top[(ax, az)]
+    out = []
+
+    def put(x, y, z, b):
+        out.append([ox + x, oy + y, oz + z, b])
+    white, grey, rim = "minecraft:white_concrete", "minecraft:light_gray_concrete", "minecraft:orange_concrete"
+    bar = "minecraft:iron_bars"
+    for dx in (-1, 0, 1):  # pedestal 3x3, 2 high, standing on the apex
+        for dz in (-1, 0, 1):
+            put(ax + dx, base + 1, az + dz, grey)
+            put(ax + dx, base + 2, az + dz, white)
+    for dy in range(3, 9):  # mast
+        put(ax, base + dy, az, grey if dy % 3 else rim)
+    y0 = base + 9
+    R = 7
+    for dx in range(-R, R + 1):  # parabolic bowl, white with an orange rim
+        for dz in range(-R, R + 1):
+            r = math.hypot(dx, dz)
+            if r <= R + 0.3:
+                h = int(r * r / 11)
+                b = rim if r >= R - 0.9 else (grey if int(r) % 3 == 0 and r > 1.5 else white)
+                put(ax + dx, y0 + h, az + dz, b)
+                if h > 0 and r >= 2.5:
+                    put(ax + dx, y0 + h - 1, az + dz, white)  # second layer so the bowl reads solid from the side
+    for dy in range(1, 7):  # feed horn
+        put(ax, y0 + dy, az, bar if dy < 6 else "minecraft:end_rod")
+    put(ax, y0 + 7, az, "minecraft:lightning_rod")
+    for sx, sz in ((1, 0), (-1, 0), (0, 1), (0, -1)):  # struts: rim -> feed horn, riding above the bowl surface
+        for k in range(1, 6):
+            rr = R - 1 - k
+            put(ax + sx * rr, y0 + int(rr * rr / 11) + k, az + sz * rr, bar)
+    # antenna arrays: lightning-rod masts with cross bars, standing on the dome surface
+    for sx, sz in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+        px, pz = ax + sx * 10, az + sz * 10
+        if (px, pz) not in top:
+            continue
+        b0 = top[(px, pz)]
+        for dy in range(1, 9):
+            put(px, b0 + dy, pz, bar if dy < 8 else "minecraft:lightning_rod")
+        for dv in (-2, -1, 1, 2):
+            put(px + dv, b0 + 5, pz, bar)
+        for dv in (-1, 1):
+            put(px, b0 + 3, pz + dv, bar)
+        put(px, b0 + 9, pz, "minecraft:end_rod")
+    S.add("radar", 0, 0, 0, out, {"kind": "radar"})
+
+
+def _roof_terraces(S, allhall):
+    """Solar feature: on up to two garden-roofed wings build a raised rooftop pond with a stepped planting terrace behind
+    it and a 3-wide waterfall down the wall face into a ground pool. Cells are cut out of the wing ghost first so nothing
+    z-fights; the waterfall column sits in the edge layer against the wall. Ghost id "roofgarden"."""
+    out, done = [], 0
+    for f in sorted(S.foot, key=lambda f_: f_["roof"] != "garden"):
+        if done >= 2 or f["roof"] not in ("garden", "flat"):
+            continue
+        x0, z0, w, d, H, door, ty = f["x"], f["z"], f["w"], f["d"], f["H"], f["door"], f["ty"]
+        wg = next((g for g in S.ghosts if g["meta"].get("kind") == "wing" and g["origin"][0] == x0 and g["origin"][2] == z0), None)
+        if not wg:
+            continue
+        D = wg["meta"]["deck_y"]
+        gy = STEPS + ty  # standing level
+        cxw, czw = x0 + w // 2, z0 + d // 2
+        chosen = None
+        for sd in [s_ for s_ in "snew" if s_ != door]:
+            def uv(u, v, sd=sd):
+                return {"n": (cxw + v, z0 + u), "s": (cxw + v, z0 + d - 1 - u), "w": (x0 + u, czw + v),
+                        "e": (x0 + w - 1 - u, czw + v)}[sd]
+            if (d if sd in "ns" else w) < 18:
+                continue
+            outside = {uv(u, v) for u in range(-5, 0) for v in range(-6, 7)}
+            if outside & (allhall | S.blocked):
+                continue
+            chosen = uv
+            break
+        if chosen is None:
+            continue
+        uv = chosen
+        cells = {}
+
+        def put(u, v, y, b):
+            cells[(uv(u, v), y)] = b
+        rim, water = S.K["base"], "minecraft:water"
+        # raised pond: rim 2 high around u 2..9, v -6..6; water inside
+        for u in range(2, 10):
+            for v in range(-6, 7):
+                if u in (2, 9) or abs(v) == 6:
+                    put(u, v, D + 1, rim)
+                    put(u, v, D + 2, rim if (u + v) % 3 else S.K["glow"])
+                else:
+                    put(u, v, D + 1, water)
+                    if (u * 5 + v * 3) % 7 == 0:
+                        put(u, v, D + 2, "minecraft:lily_pad")
+        for u in range(0, 3):  # spout channel through the rim and the roof edge
+            for v in (-1, 0, 1):
+                put(u, v, D + 1, water)
+                cells.pop((uv(u, v), D + 2), None)
+        for v in (-2, 2):
+            for u in range(0, 3):
+                put(u, v, D + 1, rim)
+                put(u, v, D + 2, rim)
+        # stepped planting terrace behind the pond: two raised moss steps with flowering bushes
+        for u in range(10, 17):
+            for v in range(-6, 7):
+                step = 1 if u < 13 else 2
+                for yy in range(1, step + 1):
+                    put(u, v, D + yy, "minecraft:moss_block" if yy == step else rim)
+                if (u + v) % 3 == 0:
+                    put(u, v, D + step + 1, BLOOM)
+                elif (u * 3 + v) % 5 == 0:
+                    put(u, v, D + step + 1, FLOWERS[(u + v) % len(FLOWERS)])
+        # waterfall: 3-wide column in the edge layer from the spout to the ground pool, stone cheeks either side
+        for v in (-1, 0, 1):  # water reads pale in a ghost: a light-blue core with white foam bands makes the fall visible
+            for yy in range(gy + 1, D + 1):
+                put(0, v, yy, "minecraft:white_concrete" if yy % 4 == 0 else ("minecraft:light_blue_concrete" if v == 0 else water))
+            put(0, v, gy, water)
+        for v in (-2, 2):
+            for yy in range(gy, D + 1):
+                put(0, v, yy, rim if yy % 4 else S.K["glow"])
+        # ground pool + rim
+        for u in range(-1, -4, -1):
+            for v in range(-4, 5):
+                put(u, v, gy, water)
+        for u in range(-1, -5, -1):
+            for v in range(-5, 6):
+                if u == -4 or abs(v) == 5:
+                    put(u, v, gy, rim)
+        for v in range(-4, 5):
+            if abs(v) >= 2:
+                put(0, v, gy, rim)
+        # cut the wing blocks under the new cells (roof plants, edge plinth) so the ghosts do not overlap
+        ox, oy, oz = wg["origin"]
+        cut = {(x, y, z) for (x, z), y in cells}
+        wg["blocks"] = [b for b in wg["blocks"] if (b[0] + ox, b[1] + oy, b[2] + oz) not in cut]
+        S.porch_cells |= cut  # also cuts the wall-greenery features ghost (filtered by porch_cells in finish)
+        out += [[x, y, z, b] for ((x, z), y), b in cells.items()]
+        done += 1
+    if out:
+        S.add("roofgarden", 0, 0, 0, out, {"kind": "roofgarden"})
 
 
 def _gothic_porch(S, f):
@@ -1316,6 +1540,10 @@ def _gothic_porch(S, f):
         else:
             x, z = x0 - u, z0 + d // 2 + v
         out.append([x, y + yy, z, b])
+    S.porch_cells |= {(x, yy, z) for x, yy, z, _ in out}
+    for g in S.ghosts:  # the promenade runs up to the door: cut its blocks where the porch stands, no overlap
+        if g["id"] == "halls":
+            g["blocks"] = [b for b in g["blocks"] if (b[0], b[1], b[2]) not in S.porch_cells]
     S.add("porch_" + str(f["i"]), 0, 0, 0, out, {"kind": "porch"})
 
 

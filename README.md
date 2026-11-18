@@ -107,7 +107,7 @@ API key in `architect/.env`, about $0.03 to $0.07 per build). It uses tools `cam
 for steampunk, hextech, gothic, station_white and solarpunk; and a guard against floating parts. The architect is not in
 the jar. Multiblock formation in-world is not verified.
 
-![steampunk build](docs/images/steampunk_v14.jpg)
+![steampunk build](docs/images/steampunk_v17.jpg)
 
 *Steampunk campus (spine layout). Hextech, gothic, station_white and solarpunk galleries, before/after, setup and
 safety notes: [docs/ARCHITECT.md](docs/ARCHITECT.md).*

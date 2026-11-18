@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Architect refresh (in the repo's `architect/` folder, not in the jar): per-wing facades and roofs in campus layouts, gothic porch and spire, hextech palette and airship dock, steampunk gears and pipes, station radar dish, solarpunk roof pond and waterfall, footprint guard and `room_origins` retargeting for room ghosts.
+- Docs: `docs/ARCHITECT.md` and the README gallery use the v17 judge sheets, with v6 vs v17 comparisons, what changed, and a list of what is not verified.
+- No mod behaviour change; no Java changes.
+
 ## 0.3.0
 
 - `ghost_import` tool and `/ghost import <name> [x y z]` command (tab completion lists schematics): load a `.schem` (Sponge v2/v3) or vanilla `.nbt` as a ghost; bare names are searched in `config/shapewright/schematics`, `schematics`, `config/worldedit/schematics`, `world/generated/minecraft/structures`.

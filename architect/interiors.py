@@ -86,6 +86,8 @@ def fit_room(kind: str, cells: set, fy: int, h: int, K: dict, keep: set, spine: 
     for (x, z) in cells:
         if x % 5 == 2 and z % 5 == 2:
             put(x, cy, z, K["glow"])
+            if kit == "hextech" and h >= 4:  # v17: visible lit fixture under the ceiling: chain + hanging lantern
+                put(x, cy - 1, z, "minecraft:lantern[hanging=true]")
 
     if kind == "living":
         seq = ["bed", "nightstand", "wardrobe", "drawer", "chest", "gap",

@@ -66,54 +66,80 @@ the result is consistent:
 ### Judging results
 
 During development each build was checked with a "judge sheet": a contact sheet of fixed camera views (two isometric
-views, front, top, hub and tower close-ups, wing facade, interior cut). The images below are those sheets.
-The sheet script is a development tool and is not part of this repo. The earlier, weaker builds (v6) are shown next
-to the current ones (v14).
+views, front, top, hub and tower close-ups, wing facade, interior cut), plus a "detail" strip of close-ups. The images
+below are those sheets (in-game shots only; the reference screenshots used while judging are third-party and not
+included). The sheet script is a development tool and is not part of this repo.
 
-## Results (build v14)
+Our own judge scored the v17 builds at about 38 to 40 out of 50 each. These are single Haiku runs, judged by a model,
+so the numbers are noisy: treat them as a rough guide, not a benchmark.
+
+### What changed from v10 to v17
+
+- **Campus layouts**: each style has its own layout, and each wing gets its own facade and roof instead of one repeated
+  box.
+- **Gothic**: porch and a taller spire.
+- **Hextech**: new palette, plus a dock with an airship.
+- **Steampunk**: gears and pipes on the facades and roofs.
+- **Station white**: radar dish on the roof.
+- **Solarpunk**: roof pond and waterfall.
+- **Footprint guard and `room_origins`**: ghosts for rooms inside a campus are retargeted to the wing's
+  `room_origins[].origin` (local coordinates from 0,0,0); anything off the campus is moved or rejected, and a call
+  where nothing can be placed returns an error. Floating-part guard unchanged otherwise.
+- **Judge tooling**: detail sheets and sturdier camera bounds (dev tool, not in the repo).
+
+## Results (build v17)
 
 Each sheet: two isometric views, front, top-down, hub and tower close-ups, wing facade, interior cut.
 
 ### Steampunk (spine layout)
 
-![steampunk v14 judge sheet](images/steampunk_v14.jpg)
-![steampunk detail](images/steampunk_detail.jpg)
+![steampunk v17 judge sheet](images/steampunk_v17.jpg)
+![steampunk detail](images/steampunk_v17_detail.jpg)
 
-*Brick-red hub with glass dome, clock tower and long factory halls with sawtooth roofs.*
+*Brick-red hub with glass dome, clock tower, factory halls with gears and pipes.*
 
 ### Hextech (radial layout)
 
-![hextech v14 judge sheet](images/hextech_v14.jpg)
-![hextech detail](images/hextech_detail.jpg)
+![hextech v17 judge sheet](images/hextech_v17.jpg)
+![hextech detail](images/hextech_v17_detail.jpg)
 
-*Blackstone and quartz with purple glass, radial wings around a crowned hub.*
+*Blackstone and quartz with purple glass, radial wings around a crowned hub, airship dock.*
 
 ### Gothic (cloister layout)
 
-![gothic v14 judge sheet](images/gothic_v14.jpg)
-![gothic detail](images/gothic_detail.jpg)
+![gothic v17 judge sheet](images/gothic_v17.jpg)
+![gothic detail](images/gothic_v17_detail.jpg)
 
-*Dark stone cathedral cluster around a cloister, steep roofs and a tall spire.*
+*Dark stone cathedral cluster around a cloister, porch, steep roofs and a tall spire.*
 
 ### Station white (linear layout)
 
-![station_white v14 judge sheet](images/station_white_v14.jpg)
+![station_white v17 judge sheet](images/station_white_v17.jpg)
+![station_white detail](images/station_white_v17_detail.jpg)
 
-*White and glass research station, wings in a line along a central spine.*
+*White and glass research station, wings in a line along a central spine, radar dish.*
 
 ### Solarpunk (terraces layout)
 
-![solarpunk v14 judge sheet](images/solarpunk_v14.jpg)
+![solarpunk v17 judge sheet](images/solarpunk_v17.jpg)
+![solarpunk detail](images/solarpunk_v17_detail.jpg)
 
-*Green terraced site with glass domes and planted roofs.*
+*Green terraced site with glass domes, planted roofs, a roof pond and waterfall.*
 
-### Before / after (steampunk)
+### Before / after (v6 left, v17 right)
 
-v6 (before):
+![steampunk v6 vs v17](images/steampunk_v6_vs_v17.jpg)
+![hextech v6 vs v17](images/hextech_v6_vs_v17.jpg)
+![gothic v6 vs v17](images/gothic_v6_vs_v17.jpg)
+![station_white v6 vs v17](images/station_white_v6_vs_v17.jpg)
+![solarpunk v6 vs v17](images/solarpunk_v6_vs_v17.jpg)
 
-![steampunk v6](images/steampunk_v6.jpg)
+### Known flaws in v17
 
-v14 (after): the steampunk sheet above.
+- Steampunk interior cut uses a fallback view in the sheet (not verified as a proper cut).
+- Flat steampunk roof pads look empty.
+- Solarpunk: neon-lime strip on the tower is a known cosmetic flaw.
+- Station white: the radar dish hangs on an arm.
 
 ## Cost
 
@@ -156,6 +182,6 @@ counterpart: any schematic that Shapewright (or WorldEdit) saved can be loaded a
 - Multiblock **formation in-world** (AE2, ExtendedAE, AdvancedAE) is not verified: the layouts follow the mod
   guides, but they were only viewed as ghosts, never built and formed in a world. See `architect/knowledge/sources.md`
   for the open points.
-- Quality varies per run; the screenshots show the best-judged builds (v14), not the average.
+- Quality varies per run; the screenshots show the best-judged builds (v17), not the average.
 - Only tested on MC 1.21.1 NeoForge in the ATM10 pack, with the Windows venv layout.
 - Reference images and block-library data used during development are not shipped (third-party content).
