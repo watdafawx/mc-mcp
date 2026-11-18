@@ -83,6 +83,7 @@ FLOWERS = ("minecraft:poppy", "minecraft:dandelion", "minecraft:allium", "minecr
            "minecraft:azure_bluet", "minecraft:lily_of_the_valley")
 HEDGE = "minecraft:azalea_leaves[persistent=true]"
 BLOOM = "minecraft:flowering_azalea_leaves[persistent=true]"
+LEAF = "minecraft:azalea_leaves[persistent=true]"
 # yard mix per kit: weights for farm, garden, machine yard, grove
 YARD_MIX = {"steampunk": (2, 1, 3, 1), "rust_industrial": (1, 1, 4, 1), "solarpunk": (3, 4, 0, 3),
             "gothic": (2, 3, 1, 2), "hextech": (1, 3, 2, 1), "station_white": (1, 2, 3, 1), "cyber_dark": (1, 1, 4, 1),
@@ -732,6 +733,8 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
                 feat += [b for b in pl if (b[0], b[1], b[2]) not in solid]
                 if roof in ("flat", "mansard"):
                     _roofworks(K, seed, ghosts, x0, z0, i, feat)
+                else:
+                    _slopeworks(K, seed, ghosts, x0, z0, i, feat)
         _gear(feat, hx0 + HUB // 2, y + 17, hz0 + HUB - 3, 5, K)  # big gear over the hub's front door
         for zz in (gz + 1, gz + GD - 2):  # pipe runs along the gallery roofs
             for x in range(margin + 1, W - margin - 1):
@@ -1180,6 +1183,8 @@ def _airdock(K, y_g, hwall):
 
 def _roof_for(wing, kit, i):
     cyc = ROOF_CYCLE.get(kit if isinstance(kit, str) else "", ["flat", "crown"])
+    if kit == "solarpunk" and i == 2:  # v19b: guarantee one flat wing so _solar_deck (pergola, planters) is built
+        return "flat"
     return wing.get("roof") or cyc[i % len(cyc)]
 
 
@@ -1357,11 +1362,15 @@ class _Site:
                     _pipes(feat, x0, z0, w_, d_, H, y + ty, sides, K, f["i"])
                     if f["roof"] in ("flat", "mansard"):
                         _roofworks(K, self.seed, self.ghosts, x0, z0, f["i"], feat)
+                    else:
+                        _slopeworks(K, self.seed, self.ghosts, x0, z0, f["i"], feat)
             elif kit == "gothic":
                 _gothic_porch(self, f)
                 _buttresses(feat, x0, z0, w_, d_, H, y + ty, dict(K, wall="minecraft:stone_bricks", trim="minecraft:smooth_stone"), sides)
             elif kit == "solarpunk":
                 _greenwall(feat, x0, z0, w_, d_, H, y + ty, sides, self.seed + f["i"])
+                if f["roof"] == "flat":
+                    _solar_deck(K, self.seed, self.ghosts, x0, z0, f["i"], feat)
         if kit == "station_white":
             _radar(self)
         elif kit == "solarpunk":
@@ -1449,6 +1458,150 @@ def _roofworks(K, seed, ghosts, x0, z0, i, feat):
             for a in (0, 1):
                 for c in (0, 1):
                     used.add((pt[0] + a, pt[1] + c))
+
+
+def _wing_tops(ghosts, x0, z0):
+    wg = next((g for g in ghosts if g["id"].startswith("wing_") and g["origin"][0] == x0 and g["origin"][2] == z0), None)
+    if not wg:
+        return None
+    top = {}
+    for bx, by, bz, _b in wg["blocks"]:
+        if top.get((bx, bz), -1) < by:
+            top[(bx, bz)] = by
+    return wg["origin"], top
+
+
+def _slopeworks(K, seed, ghosts, x0, z0, i, feat):
+    """Steam v19: structure on SLOPED roofs (hip/gable/barrel/sawtooth): copper seam bands across the slope, dormers on
+    the lower rows, a ridge line with lightning rods and two chimney stacks. Everything stands on the roof surface."""
+    r = _wing_tops(ghosts, x0, z0)
+    if not r:
+        return
+    (ox, oy, oz), top = r
+    eave = min(top.values())
+    R = {p: t for p, t in top.items() if t >= eave + 1}
+    if len(R) < 40:
+        return
+    xs, zs = [p[0] for p in R], [p[1] for p in R]
+    xa, xb, za, zb = min(xs), max(xs), min(zs), max(zs)
+    along_x = (xb - xa) >= (zb - za)
+    mx = max(R.values())
+
+    def U(p):
+        return p[0] - xa if along_x else p[1] - za
+
+    def nb(p, d):
+        return (p[0] + d, p[1]) if along_x else (p[0], p[1] + d)
+
+    def put(p, y, b):
+        feat.append([ox + p[0], oy + y, oz + p[1], b])
+    seam = "minecraft:waxed_weathered_cut_copper_slab[type=bottom]"
+    for p, t in R.items():  # panelling seams every 5 cells + ridge line
+        if U(p) % 5 == 0 and t < mx:
+            put(p, t + 1, seam)
+        if t == mx:
+            put(p, t + 1, "minecraft:copper_block" if U(p) % 2 else K["trim"])
+            if U(p) % 7 == 3:
+                put(p, t + 2, "minecraft:lightning_rod")
+    used = set()
+    for p, t in sorted(R.items(), key=lambda kv: (kv[0][1], kv[0][0])):  # dormers on the low rows, every 9 along the ridge
+        if t > eave + 2 or U(p) % 9 != 4 or p in used:
+            continue
+        tri = [nb(p, -1), p, nb(p, 1)]
+        if not all(c in R and R[c] == t for c in tri) or any(c in used for c in tri):
+            continue
+        for c in tri:
+            used.add(c)
+            put(c, t + 1, K["glass"] if c == p else K["trim"])
+            put(c, t + 2, K["trim"] if c == p else "minecraft:cut_copper_slab[type=bottom]")
+    cand = [p for p, t in R.items() if eave + 2 <= t < mx and all(R.get(q) == t for q in
+            ((p[0] + a, p[1] + c) for a in (0, 1) for c in (0, 1)))]
+    cand.sort()
+    rnd = random.Random(seed + i)
+    rnd.shuffle(cand)
+    placed = []
+    for p in cand:
+        if len(placed) >= 2:
+            break
+        if any(abs(p[0] - q[0]) + abs(p[1] - q[1]) < 12 for q in placed):
+            continue
+        _chimney(feat, ox + p[0], oz + p[1], oy + R[p] + 1, 4, K)
+        placed.append(p)
+
+
+def _solar_deck(K, seed, ghosts, x0, z0, i, feat):
+    """Solar v19: structure on a bare flat wing roof: hedge planters round the rim, a timber pergola over a seating bay,
+    raised garden beds with flowers and small trees, glass skylight strips. Cheap survival blocks, all on the deck."""
+    r = _wing_tops(ghosts, x0, z0)
+    if not r:
+        return
+    (ox, oy, oz), top = r
+    import collections as _c
+    my = _c.Counter(top.values()).most_common(1)[0][0]
+    plate = {p for p, v in top.items() if v == my}
+    ero = {p for p in plate if all((p[0] + a, p[1] + c) in plate for a in range(-2, 3) for c in range(-2, 3))}
+    if len(plate) < 60 or len(ero) < 20:
+        return
+    Y = oy + my + 1
+    rnd = random.Random(seed * 7 + i)
+    used = set()
+
+    def put(p, y, b):
+        feat.append([ox + p[0], y, oz + p[1], b])
+    xs, zs = [p[0] for p in ero], [p[1] for p in ero]
+    xa, xb, za, zb = min(xs), max(xs), min(zs), max(zs)
+    for p in plate:  # planter hedge boxes on the rim cells
+        if any((p[0] + a, p[1] + c) not in plate for a, c in ((1, 0), (-1, 0), (0, 1), (0, -1))) and (p[0] + p[1]) % 3:
+            put(p, Y, "minecraft:moss_block")
+            put(p, Y + 1, LEAF if (p[0] + p[1]) % 2 else BLOOM)
+    zm = (za + zb) // 2  # skylight strips down the middle, spruce log frame
+    for x in range(xa + 2, xb - 1):
+        for dz in (0, 1):
+            p = (x, zm + dz)
+            if p in ero:
+                put(p, Y, K["glass"])
+                used.add(p)
+        for dz in (-1, 2):
+            p = (x, zm + dz)
+            if p in ero and x % 2 == 0:
+                put(p, Y, "minecraft:stripped_spruce_log[axis=x]")
+                used.add(p)
+    cands = sorted(p for p in ero if p not in used and all((p[0] + a, p[1] + c) in ero and (p[0] + a, p[1] + c) not in used
+                                                          for a in range(7) for c in range(5)))
+    if cands:  # pergola 7x5: plank pad, fence posts at the corners, slat beams on top
+        p0 = cands[len(cands) // 3]
+        for a in range(7):
+            for c in range(5):
+                q = (p0[0] + a, p0[1] + c)
+                used.add(q)
+                put(q, Y, "minecraft:spruce_planks")
+                if a in (0, 6) and c in (0, 4):
+                    for dy in range(1, 4):
+                        put(q, Y + dy, "minecraft:spruce_fence")
+                if c in (0, 4) or a % 2 == 0:
+                    put(q, Y + 4, "minecraft:spruce_slab[type=bottom]")
+        put((p0[0] + 3, p0[1] + 2), Y + 1, "minecraft:spruce_stairs[facing=east]")
+    beds = 0  # garden beds 4x3 with flowers + a few small trees
+    for p in sorted(ero, key=lambda q: rnd.random()):
+        if beds >= 5:
+            break
+        cells = [(p[0] + a, p[1] + c) for a in range(4) for c in range(3)]
+        if not all(q in ero and all((q[0] + a, q[1] + c) not in used for a in (-1, 0, 1) for c in (-1, 0, 1)) for q in cells):
+            continue
+        for q in cells:
+            used.add(q)
+            edge = q[0] in (p[0], p[0] + 3) or q[1] in (p[1], p[1] + 2)
+            put(q, Y, K["trim"] if edge else "minecraft:dirt")
+            if not edge:
+                put(q, Y + 1, BLOOM if rnd.random() < 0.4 else FLOWERS[rnd.randrange(len(FLOWERS))])
+        if beds % 2 == 0:
+            c = (p[0] + 1, p[1] + 1)
+            for dy in range(1, 4):
+                put(c, Y + dy, "minecraft:oak_log")
+            for a in range(-1, 2):
+                for b in range(-1, 2):
+                    put((c[0] + a, c[1] + b), Y + 4, LEAF)
+        beds += 1
 
 
 def _radar(S):

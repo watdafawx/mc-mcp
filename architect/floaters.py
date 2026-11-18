@@ -130,6 +130,18 @@ class Guard:
 
     def record(self, gid: str, args: dict, replace: bool):
         s = set() if replace else self.cells.get(gid, set())
+        if not replace:  # v19b: a merge call's air boxes/blocks erase earlier cells (stale cells made later parts "supported")
+            ox, oy, oz = args.get("origin") or (0, 0, 0)
+            pal = args.get("palette") or {}
+            for b in args.get("boxes") or []:
+                if len(b) >= 7 and _state(b[6], pal).split("[")[0] in AIR:
+                    x1, x2 = sorted((int(b[0]), int(b[3]))); y1, y2 = sorted((int(b[1]), int(b[4]))); z1, z2 = sorted((int(b[2]), int(b[5])))
+                    if (x2 - x1 + 1) * (y2 - y1 + 1) * (z2 - z1 + 1) <= BIG:
+                        s.difference_update((ox + x, oy + y, oz + z) for x in range(x1, x2 + 1)
+                                            for y in range(y1, y2 + 1) for z in range(z1, z2 + 1))
+            for b in args.get("blocks") or []:
+                if len(b) >= 4 and _state(b[3], pal).split("[")[0] in AIR:
+                    s.discard((ox + int(b[0]), oy + int(b[1]), oz + int(b[2])))
         for _, _, cells in entries(args):
             if cells:
                 s.update(cells)

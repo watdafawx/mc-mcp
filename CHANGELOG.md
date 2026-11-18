@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Architect roof detail: steampunk slope roofs get copper seams, dormers, ridge with lightning rods and chimneys; solarpunk flat wings get a rooftop garden deck (planter hedge, skylight, pergola, beds). Fix: floater guard now forgets cells a merge-mode air box/block erased, so later parts no longer count phantom blocks as support and hang in the air. Offline test: `python architect/test_floaters.py`.
+
 ## 0.4.0
 
 - World-aware base generation. New `world_survey` tool: compact terrain survey of the loaded client world (heightmap grid in base-36 rows, flags for water/lava/trees/snow/unloaded, slope stats, biome, dominant ground block). Never loads chunks.
