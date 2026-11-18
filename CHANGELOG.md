@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Architect tooling only, no Java change. New mod registry (`architect/mods/`) with room kits for Mekanism, Powah, Extreme Reactors, Create and Industrial Foregoing, wired into `architect.py`, `blocklib.py` and `interiors.py` (+ offline `test_mods.py`, README section). Honest status: the mod rooms exist and place real mod blocks, but they do not read well yet in judged screenshots (small, low-contrast, multiblocks do not form in ghosts).
 - Architect tooling only (v22), no Java change. Gothic wings get light stone trim lines on the roof surface (eave row and every 4th height band), so roofs are grey-and-black instead of all black. Gothic hub gets a glazed lantern drum with stepped cap, spire and corner pinnacles; the tower gets a stepped spire with corner pinnacles (`_gothic_roof`, `_gothic_crowns` in `campus.py`). The tower crown is not yet checked in a screenshot.
 - Steampunk wall pipes are now thicker runs (3 high x 2 deep, with flange collars, valves, brackets and risers). Colour contrast is still pending: the pipes are teal on teal and barely stand out from the walls.
 - Judge tooling (`architect/judge/judge2.py`): new per-wing "massing front-on" close-ups on the detail sheet, and the interior camera sits further back (span*1.3+14, cap 72) so rooms are not clipped.

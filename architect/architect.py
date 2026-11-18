@@ -28,6 +28,7 @@ import anthropic
 import blocklib
 import campus
 import floaters
+import mods
 import multiblocks
 import refs as refs_mod
 import shapes
@@ -40,6 +41,7 @@ _sp = _ilu.spec_from_file_location("arch_site", HERE / "site.py")
 site = _ilu.module_from_spec(_sp)
 sys.modules["arch_site"] = site
 _sp.loader.exec_module(site)
+FEATURE_MODS: list[str] = []  # --feature-mod: registered mod rooms the brief asks for
 SITE: dict | None = None  # set from --survey: {survey, plan, near, force}; None = the old flat behaviour
 
 
@@ -306,7 +308,7 @@ LOCAL_TOOLS = [
      "kit profile. Recessed glass bays with varied spacing, wing colours, "
      "large yards/gardens, and optional landmark tower with elevator. Returns for every ghost its world_min/world_max, floor_y, roof_deck_y and door_side, plus site_min/site_max: use them to attach extra details. "
      "Wing: {name, rooms:[kinds], size:s|m|l, floors:1|2, floor_h, upper:[kinds], roof:flat|mansard|dome|crown|gable|gable_steep|hip|hip_steep|spire|barrel|sawtooth|garden, roles:{material overrides}}. "
-     "Rooms: mod_room:ae2|create|power|processing|magic|farming (or arbitrary theme), expansion, storage, workshop, living, lab, hall. "
+     "Rooms: mod_room:ae2|create|power|processing|magic|farming|mekanism|powah|bigreactors|industrialforegoing (or arbitrary theme; mekanism/powah/bigreactors/create/industrialforegoing are registered mods with real machines on every pad), expansion, storage, workshop, living, lab, hall. "
      "home=true adds a home wing. Personalise with attached details and multiblocks using returned world origins; keep aisles clear.",
      "input_schema": {"type": "object", "properties": {
          "layout": {"type": "string", "enum": ["spine", "radial", "cloister", "linear", "terraces"]},
@@ -403,10 +405,13 @@ LOCAL_TOOLS = [
      "3, gold 4, diamond 40); keep bulk blocks <= 3 and accents <= 6. shape: block | stairs | slab | wall | pillar | "
      "light | glass | window | roof | door | trapdoor | furniture | path | fence | pane | carpet. colour: hex or name "
      "(cream, gold, teal, navy, copper, brass, dark grey...). full=true for full cubes only. kw: words that must be in "
-     "the id (e.g. 'brick', 'oak table', 'tile'). ns: limit to mods (e.g. 'chipped,rechiseled').",
+     "the id (e.g. 'brick', 'oak table', 'tile'). ns: limit to mods (e.g. 'chipped,rechiseled'). "
+     "mod: a registered mod room theme (mekanism, powah, bigreactors, create, industrialforegoing): lists that mod's "
+     "whitelisted machine/casing blocks with NO cost filter (they have no recipe cost). Active automatically for the "
+     "mod rooms of your campus; everything else stays cheap survival blocks.",
      "input_schema": {"type": "object", "properties": {
          "shape": {"type": "string"}, "colour": {"type": "string"}, "max_cost": {"type": "number"},
-         "kw": {"type": "string"}, "ns": {"type": "string"}, "full": {"type": "boolean"},
+         "kw": {"type": "string"}, "ns": {"type": "string"}, "full": {"type": "boolean"}, "mod": {"type": "string"},
          "n": {"type": "integer", "description": "default 24, max 40"}}}},
     {"name": "bill", "description": "Material bill of ghosts: total cost in cobble units, the most expensive blocks, "
      "and blocks with no survival recipe. target: ghost id, prefix ending in '/', or '*'. Run before export and swap "
@@ -443,6 +448,7 @@ class Architect:
         self.guard = floaters.Guard()
         self.spectator = False
         self.cost = 0.0
+        self.active_mods: list[str] = list(FEATURE_MODS)  # registered mod room themes whose whitelist the blocks tool adds
 
     # ---- local tools
 
@@ -563,6 +569,10 @@ class Architect:
                 if bad:
                     item["bad"] = bad
                 rep.append(item)
+            themes = mods.themes_in(a.get("wings"))
+            for t in themes:
+                if t not in self.active_mods:
+                    self.active_mods.append(t)
             allmin = [min(r["world_min"][i] for r in rep) for i in range(3)]
             allmax = [max(r["world_max"][i] for r in rep) for i in range(3)]
             return json.dumps({"ghosts": rep, "floor_y": oy + campus.STEPS + 1, "site_min": allmin, "site_max": allmax,
@@ -570,6 +580,7 @@ class Architect:
                                    "site_note": "Placed on surveyed terrain at origin " + str(site_rep["origin"]) + ". " + site_rep["summary"]
                                                 + ". Mention the foundations (fill/cut) and the trees to clear in your summary; ghosts never remove blocks."}
                                   if site_rep else {}),
+                               **({"mod_rooms": [mods.prompt_note(t) for t in themes]} if themes else {}),
                                "note": "All coordinates are WORLD coordinates. world_min/world_max = each ghost's bounding "
                                        "box; roof_deck_y = y of a wing's flat deck (a part at that y+1 sits on it); wall "
                                        "planes are the box faces (a part touching x=world_min.x-1 or world_max.x+1 or the "
@@ -615,9 +626,20 @@ class Architect:
             return self.style_refs(a.get("kit", ""), int(a.get("n") or 2))
         if name == "blocks":
             n = max(1, min(40, int(a.get("n") or 24)))
-            hits = blocklib.find(a.get("shape"), a.get("colour"), float(a.get("max_cost") or 3),
-                                 [x.strip() for x in a["ns"].split(",")] if a.get("ns") else None, a.get("kw"), n,
-                                 full=bool(a.get("full")))
+            ns_l = [x.strip() for x in a["ns"].split(",")] if a.get("ns") else None
+            want_mods = [m for m in re.split(r"[ ,]+", a.get("mod") or "") if m in mods.REGISTRY]
+            want_mods += [t for t in self.active_mods if t not in want_mods and ns_l and
+                          set(ns_l) & set(mods.REGISTRY[t].namespaces)]
+            hits = []
+            if want_mods:  # registered mod room: its whitelist, no cost filter
+                hits = blocklib.find_listed(mods.whitelist(want_mods), a.get("shape"), a.get("colour"), a.get("kw"), n,
+                                            full=bool(a.get("full")))
+            if not a.get("mod") or not hits:
+                rest = blocklib.find(a.get("shape"), a.get("colour"), float(a.get("max_cost") or 3), ns_l,
+                                     a.get("kw"), n, full=bool(a.get("full")))
+                if want_mods:
+                    rest = [h for h in rest if h["id"] not in {x["id"] for x in hits}]
+                hits = (hits + rest)[:n]
             if not hits:
                 return "no blocks match; loosen shape/colour/kw or raise max_cost"
             path = blocklib.sheet([h["id"] for h in hits], str(self.dir / "blocks_sheet.jpg"), cols=6, px=48)
@@ -959,6 +981,12 @@ Check with view (iso, front, top) and fix the worst gaps. Summarise what you bui
 def generate_request(style: str, x: int, y: int, z: int, kit: str, layout: str, ident: str) -> str:
     brief = GEN_BRIEF.format(style=style, x=x, y=y, z=z, kit=kit or style,
                              layout=f", layout={layout}" if layout else "", id=ident)
+    for t in FEATURE_MODS:
+        r = mods.get(t)
+        brief += (f"\nFEATURE WING: the {r.name} mod. Give it its OWN large wing (size l, floors 1, floor_h 9, name \"{t}\", "
+                  f"rooms [\"mod_room:{t}\", \"mod_room:{t}\", \"expansion\"]) and make it the showpiece of the campus: the "
+                  f"room fit-out already puts real {r.name} machines on every pad; add more of them with ghost_set using "
+                  f"the whitelist, and look inside with view(angle=cut). Kit {r.style} fits it best. Keep the other wings few and plain: at most an AE2 wing and one more, size s or m, no extra mod rooms, so the budget goes into the {r.name} wing: its facade, its interior and the mod blocks you add with ghost_set (use the whitelist ids, place them as visible set pieces with aisles clear).\n" + mods.prompt_note(t))
     if SITE:  # survey summary only (never the raw grid): keeps the prompt cheap
         p = SITE["plan"]
         brief = brief.replace("(about 150-180 x 110-130 blocks)", f"(about {p['w']} x {p['d']} blocks, hard limit)")
@@ -981,12 +1009,15 @@ def main():
     ap.add_argument("--z", type=int, default=0)
     ap.add_argument("--kit")
     ap.add_argument("--layout")
+    ap.add_argument("--feature-mod", action="append", default=[], choices=sorted(mods.REGISTRY),
+                    help="registered mod room to feature as the showpiece wing of --generate (repeatable)")
     ap.add_argument("--survey", help="world_survey JSON (written by the mod): fit the campus to the terrain")
     ap.add_argument("--near", help="x,z the player aimed at (site picker prefers spots close to it)")
     ap.add_argument("--site-rect", help="x,z,w,d,rot of a previewed /ghost area: build exactly there")
     ap.add_argument("request", nargs="*")
     args = ap.parse_args()
     global MAX_COST, SITE
+    FEATURE_MODS[:] = args.feature_mod
     if args.max_cost is not None:
         MAX_COST = args.max_cost
     if args.survey:

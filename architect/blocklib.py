@@ -537,6 +537,29 @@ def find(shape: str | None = None, colour: str | None = None, max_cost: float = 
     return res
 
 
+def find_listed(ids: list[str], shape: str | None = None, colour: str | None = None, kw: str | None = None,
+                n: int = 24, full: bool = False) -> list[dict]:
+    """Explicitly whitelisted ids (mods/ registry), same filters as find() but NO cost filter: mod machines have no
+    recipe cost. Only ids in the library are returned; find() and its default cost cap are unchanged."""
+    L = lib()
+    want = _rgb(colour) if colour else None
+    kws = [k for k in re.split(r"[ ,]+", kw.lower()) if k] if kw else []
+    out = []
+    for b in ids:
+        v = L.get(b)
+        if not v or (shape and v["shape"] != shape) or (full and not v.get("full")):
+            continue
+        if kws and not all(k in b for k in kws):
+            continue
+        if want and not v["colour"]:
+            continue
+        out.append({"id": b, "cost": v["cost"], "src": v["src"], "colour": v["colour"],
+                    "d": round(_dist(want, _rgb(v["colour"]))) if want else 0})
+    if want:
+        out.sort(key=lambda e: e["d"])
+    return out[:n]
+
+
 def bill(counts: dict[str, int]) -> dict:
     """Material bill of a build: total cost and the most expensive blocks."""
     L = lib()

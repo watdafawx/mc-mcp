@@ -194,19 +194,23 @@ def fit_room(kind: str, cells: set, fy: int, h: int, K: dict, keep: set, spine: 
     elif kind == "mod_room":
         # one mod (or mod group) per room: big open floor, 5x5 machine pads on an 8-grid with 3-wide aisles,
         # a themed pad material, wall racks of barrels for that mod's buffers, cable tray over the spine
-        pad, mid = MOD_PADS.get(theme, (K["trim"], K["detail"]))
-        for (x, z) in centre:
-            if (x, z) in keep:
-                continue
-            gx, gz = x % 8, z % 8
-            if gx in range(5) and gz in range(5):
-                put(x, fy, z, mid if (gx, gz) == (2, 2) else pad)
-        for i, p in enumerate(edge):
-            if i % 6 in (0, 1):  # buffer racks along the walls, gaps between for wall-mounted machines
-                f = _face_in(p, cells)
-                for dy in (1, 2):
-                    if dy <= h:
-                        place(p, f"minecraft:barrel[facing={f}]", dy)
+        reg = _registered(theme)
+        if reg and reg.pieces:
+            _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, place, seed)
+        else:
+            pad, mid = MOD_PADS.get(theme, (K["trim"], K["detail"]))
+            for (x, z) in centre:
+                if (x, z) in keep:
+                    continue
+                gx, gz = x % 8, z % 8
+                if gx in range(5) and gz in range(5):
+                    put(x, fy, z, mid if (gx, gz) == (2, 2) else pad)
+            for i, p in enumerate(edge):
+                if i % 6 in (0, 1):  # buffer racks along the walls, gaps between for wall-mounted machines
+                    f = _face_in(p, cells)
+                    for dy in (1, 2):
+                        if dy <= h:
+                            place(p, f"minecraft:barrel[facing={f}]", dy)
         for (x, z) in spine & cells:
             if (x + z) % 2 == 0:
                 put(x, cy - 1, z, "create:metal_girder")
@@ -216,6 +220,68 @@ def fit_room(kind: str, cells: set, fy: int, h: int, K: dict, keep: set, spine: 
             if (x, z) not in keep and (x + z) % 4 == 0 and not _face_in((x, z), cells):
                 put(x, fy, z, K["wall2"])
     return used
+
+
+def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, place, seed):
+    """Registered mod room (mods/): 3x3 pads on a 6-grid (3-wide aisles between), a centrepiece on every pad (the mod's
+    `pieces`, cycled, offset per room), wall machines along the edges (`wall`, else the single pieces)."""
+    pad, mid = reg.pad
+    cset, pads = set(centre), []
+    for (x, z) in sorted(centre):
+        if (x, z) in keep:
+            continue
+        gx, gz = x % 6, z % 6
+        if gx < 3 and gz < 3:
+            put(x, fy, z, mid if (gx, gz) == (1, 1) else pad)
+            if (gx, gz) == (1, 1):
+                pads.append((x, z))
+    fp = lambda c: {(c[0] + dx, c[1] + dz) for dx in (-1, 0, 1) for dz in (-1, 0, 1)}
+    k = 0
+    for c in pads:
+        if fp(c) <= cset and not (fp(c) & keep):
+            _mod_piece(reg.pieces[(k + seed) % len(reg.pieces)], c[0], c[1], fy, h, put)
+            used |= fp(c)
+            k += 1
+    wall = reg.wall or tuple(p[1] for p in reg.pieces if p[0] == "single")
+    for i, p in enumerate(edge):
+        if wall and i % 3 != 2 and p not in used:
+            for dy in (1, 2 if h >= 3 else 1):
+                place(p, wall[(i // 3 + seed) % len(wall)], dy)
+
+
+def _registered(theme: str):
+    """The mods/ registry entry for a mod_room theme, or None (AE2 and unregistered themes keep the generic pads)."""
+    try:
+        import mods
+        return mods.get(theme)
+    except ImportError:
+        return None
+
+
+def _mod_piece(piece, cx, cz, fy, h, put):
+    """One registry centrepiece on a 5x5 pad, anchored on its centre (cx, cz); see mods/__init__.py for the kinds."""
+    kind = piece[0]
+    if kind == "single":
+        put(cx, fy + 1, cz, piece[1])
+    elif kind == "stack":
+        for dy in range(1, min(int(piece[2]), h) + 1):
+            put(cx, fy + dy, cz, piece[1])
+    else:  # cube (3 high, core mid-layer) / tower (n high, optional core column): casing shell, glass faces
+        casing, glass = piece[1], piece[2]
+        n = 3 if kind == "cube" else max(3, min(int(piece[3]), h))
+        core = piece[3] if kind == "cube" else (piece[4] if len(piece) > 4 else None)
+        for dy in range(1, n + 1):
+            for dx in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    side = abs(dx) + abs(dz)
+                    if side == 0:  # centre column
+                        if core and (dy == 2 if kind == "cube" else 1 < dy < n):
+                            put(cx, fy + dy, cz, core)
+                        elif dy in (1, n):
+                            put(cx, fy + dy, cz, casing)
+                        continue
+                    ring = dy in (1, n) or side == 2
+                    put(cx + dx, fy + dy, cz + dz, casing if ring else glass)
 
 
 def _opp(f):

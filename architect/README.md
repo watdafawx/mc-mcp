@@ -82,3 +82,22 @@ as `[x,y,z]`) and `site_note` for the model to mention. Ground above the platfor
 = y + 128 (`??` unknown; y is the top solid ground, water cells give the bed), `f` = `h` strings of `w` chars:
 `.` land, `w` water, `l` lava, `t` tree (log/leaves above ground), `s` snow, `?` unknown. Plus `ymin ymax ymed water_pct
 lava_pct tree_pct snow_pct unknown_pct slope{mean,p90,max} biome ground[] dominant_ground center radius dim`.
+
+## Mod room registry (mods/)
+
+`architect/mods/` has one small file per mod (`mekanism`, `powah`, `bigreactors` = Extreme Reactors, `create`,
+`industrialforegoing`), each defining a `ModRoom`: mod id and display name, an explicit whitelist of real block ids
+(all with a texture), a one-line room brief, the best-fit style, pad blocks, centrepiece `pieces`, wall machines and
+the ghost-rendering limits (multiblocks do not form in a ghost, so rooms show the unformed casing + glass look; animated
+blocks are static). Offline check: `python test_mods.py` (every id exists in the block library, has a texture, no
+duplicates; needs the git-ignored `knowledge/blocklib.json` built from the ATM10 instance).
+
+- **Room fit-out**: a campus room `mod_room:<theme>` with a registered theme gets 3x3 pads on a 6-grid with a centrepiece
+  on each pad and wall machines along the edges (`interiors._mod_room_registered`). `mod_room:ae2` and unregistered
+  themes keep the old generic pads.
+- **Agent**: when a campus call uses a registered `mod_room:<theme>`, that mod's whitelist is added to the `blocks` tool
+  (also `blocks(mod='<theme>')`) with the cost filter bypassed (mod machines have no recipe cost), and the campus result
+  carries the room brief. All other blocks still go through the cheap-survival cost filter. `architect.py --generate
+  <style> --feature-mod <theme>` asks for that mod as the showpiece wing.
+- **Dev client**: ghosts only render mod blocks whose mod is loaded in the client (the dev `run/mods` needs the mod jars).
+- Add a mod: copy a file in `mods/`, list its blocks, import it in `mods/__init__.py`, run `test_mods.py`.
