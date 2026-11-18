@@ -245,7 +245,7 @@ for arg in sys.argv[1:]:
     room = room_pick.pick_room({k: v for k, v in occ.items() if v[0] != "bbox"}, GLOW_WORDS) if occ else None
     if room:  # v20: a real built room (ceiling lights over a floor), not the densest-area guess
         call("ghost_show", {"id": "*", "clip_y": room["cut_y"]})
-        tiles.append(shot(room["aim"], min(room["span"] * 0.9 + 10, 40), -0.25, 1.35, 0.35,
+        tiles.append(shot(room["aim"], min(room["span"] * 1.3 + 14, 72), -0.25, 1.35, 0.35,
                           f"interior cut REAL ROOM {room['ghost'].split('/')[-1]} y={room['cut_y']} ({room['lights']} ceiling lights, {room['stuff']} furnishing blocks)"))
         call("ghost_show", {"id": "*", "clip_off": True})
     best_c = None
@@ -503,6 +503,23 @@ for arg in sys.argv[1:]:
                 break
     if not pipe_done:
         notes.append("pipes: ABSENT" if not runs else "pipes: runs found but no wall-backed face with a clear eye")
+    # v22: one close-up per wing massing: a wing facade from ~15 blocks, front-on (outer side first, any side with a clear eye)
+    for wk_ in sorted(k for k in by if k.startswith("wing_") and k != "wing_home"):
+        wl_, wh_ = bounds([by[wk_]])
+        wc_ = [(wl_[i] + wh_[i]) / 2 for i in range(3)]
+        hx_, hz_ = (wh_[0] - wl_[0]) / 2, (wh_[2] - wl_[2]) / 2
+        out_ = (wc_[0] - c[0], wc_[2] - c[2])
+        sides_ = sorted(((1, 0), (-1, 0), (0, 1), (0, -1)), key=lambda n_: -(n_[0] * out_[0] + n_[1] * out_[1]))
+        for nx_, nz_ in sides_:
+            L_ = (wh_[2] - wl_[2]) if nx_ else (wh_[0] - wl_[0])
+            if L_ < 17:
+                continue
+            tgt_ = [wc_[0] + nx_ * hx_, wl_[1] + max(5, (wh_[1] - wl_[1]) * 0.4), wc_[2] + nz_ * hz_]
+            im = eye_shot(tgt_, [(nx_, nz_)], (15, 18, 22), (5, 8, 11), f"wing massing {wk_[5:]} front-on", 3.0)
+            if im:
+                dtiles.append(im)
+                notes.append("massing " + wk_)
+                break
     print(gid, "detail:", "; ".join(notes))
     if dtiles:
         rows_d = (len(dtiles) + 1) // 2

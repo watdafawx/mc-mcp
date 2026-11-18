@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Architect tooling only (v22), no Java change. Gothic wings get light stone trim lines on the roof surface (eave row and every 4th height band), so roofs are grey-and-black instead of all black. Gothic hub gets a glazed lantern drum with stepped cap, spire and corner pinnacles; the tower gets a stepped spire with corner pinnacles (`_gothic_roof`, `_gothic_crowns` in `campus.py`). The tower crown is not yet checked in a screenshot.
+- Steampunk wall pipes are now thicker runs (3 high x 2 deep, with flange collars, valves, brackets and risers). Colour contrast is still pending: the pipes are teal on teal and barely stand out from the walls.
+- Judge tooling (`architect/judge/judge2.py`): new per-wing "massing front-on" close-ups on the detail sheet, and the interior camera sits further back (span*1.3+14, cap 72) so rooms are not clipped.
+
 ## 0.5.0
 
 - New `/ghost suggest [look|here|x z] [r=N] [nooverlay]` command and `ghost_suggest` / `ghost_suggest_status` tools: look at an area and get 3-6 short improvement suggestions (flat roof, unlit walls, one-block palette...) from one Claude Haiku call over a survey of the real blocks, plus an optional `suggest` ghost with the proposed additions (gable roof, lanterns, corner posts; cheap survival blocks, clear with `/ghost clear suggest`). Own cost cap `ghostGenerate.suggestCostCapUsd` (default $0.10), 5 min timeout. New `WorldSurvey.region` scan (palette counts, buildings, roof flatness, lights per wall, ores/water/lava), `architect/suggest.py` (+ offline `test_suggest.py`), `usage_cost()` hook in `architect.py`. Needs the same `architect/.env` and venv as `/ghost generate`.

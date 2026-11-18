@@ -378,37 +378,52 @@ PIPE_FLANGE = "minecraft:copper_block"        # bright orange collars
 
 
 def _pipes(out, x0, z0, w, d, H, y, sides, K, i):
-    """Copper pipe runs along the wall faces of a wing: one horizontal run (2 blocks thick, teal oxidized copper) near
-    the eaves, risers to the ground, bright collars every 6 blocks with a lit joint. Everything sits in the
-    footprint-edge layer, against the wall."""
+    """v22 thick pipe runs: a 3 high x 2 deep teal run (inner layer on the wall ring, outer layer one block off the wall)
+    near the eaves, 2 thick risers with elbows, bright copper flanges every 6, wall brackets under the run, valve blocks
+    with a lit lamp every 12. Everything touches the wall."""
     pipe, flange, lit = PIPE, PIPE_FLANGE, K["glow"]
-    ytop = y + max(4, H - 4 - (i % 2))
-    ylow = y + 3 + (i % 2)
+    bracket = "minecraft:polished_blackstone_wall"
+    ytop = y + max(5, H - 5 - (i % 2))
+    ylow = y + 4 + (i % 2)
     for sd in sides:
         if sd in "ns":
             zz = z0 if sd == "n" else z0 + d - 1
-            run = [(x, zz) for x in range(x0 + 1, x0 + w - 1)]
+            o = -1 if sd == "n" else 1
+            run = [(x, zz, 0, o) for x in range(x0 + 1, x0 + w - 1)]
         else:
             xx = x0 if sd == "w" else x0 + w - 1
-            run = [(xx, z) for z in range(z0 + 1, z0 + d - 1)]
-        for n, (px, pz) in enumerate(run):
-            col = n % 6 == 3
-            out.append([px, ytop, pz, flange if col else pipe])
-            out.append([px, ytop + 1, pz, flange if col else pipe])
-            if col:
-                out.append([px, ytop + 2, pz, flange])
-                out.append([px, ytop - 1, pz, flange])
-                if n % 12 == 3:
-                    out.append([px, ytop + 3, pz, lit])
+            o = -1 if sd == "w" else 1
+            run = [(xx, z, o, 0) for z in range(z0 + 1, z0 + d - 1)]
+
+        def lay(px, pz, ox_, oz_, yy, b_, both=True):
+            out.append([px, yy, pz, b_])
+            if both:
+                out.append([px + ox_, yy, pz + oz_, b_])
+
+        def horiz(rows, ymid, run_):
+            for n, (px, pz, ox_, oz_) in enumerate(run_):
+                col = n % 6 == 3
+                for dy in (-1, 0, 1):
+                    lay(px, pz, ox_, oz_, ymid + dy, flange if col or (dy == 0 and n % 12 == 9) else pipe)
+                if col:
+                    for dy in (-2, 2):
+                        lay(px, pz, ox_, oz_, ymid + dy, flange)
+                if n % 12 == 9:  # valve: lamp on top, wheel block on the outer face
+                    lay(px, pz, ox_, oz_, ymid + 2, lit, False)
+                    out.append([px + ox_ * 2, ymid, pz + oz_ * 2, flange])
+                if n % 4 == 1:  # bracket post under the run, down to the plinth
+                    for yy in range(max(y + 1, ymid - 4), ymid - 1):
+                        out.append([px, yy, pz, bracket])
+        horiz(2, ytop, run)
         if sd == sides[0] or (i % 2 and sd == sides[-1]):
-            for frac in (0.25, 0.75):
-                px, pz = run[int(len(run) * frac)]
-                for yy in range(y + 1, ytop):
-                    out.append([px, yy, pz, flange if (yy - y) % 6 == 0 else pipe])
+            for frac in (0.2, 0.5, 0.8):
+                px, pz, ox_, oz_ = run[int(len(run) * frac)]
+                for yy in range(y + 1, ytop - 1):
+                    lay(px, pz, ox_, oz_, yy, flange if (yy - y) % 6 == 0 else pipe)
+                # elbow: bright collar under the run where the riser joins it
+                lay(px, pz, ox_, oz_, ytop - 2, flange)
         if len(run) > 20:  # a second, lower run on the long faces
-            for n, (px, pz) in enumerate(run[3:-3]):
-                out.append([px, ylow, pz, flange if n % 8 == 4 else pipe])
-                out.append([px, ylow + 1, pz, flange if n % 8 == 4 else pipe])
+            horiz(1, ylow, run[3:-3])
 
 
 def _chimney(out, x, z, y0, h, K):
@@ -1527,6 +1542,8 @@ class _Site:
                 _greenwall(feat, x0, z0, w_, d_, H, y + ty, sides, self.seed + f["i"])
                 if f["roof"] == "flat":
                     _solar_deck(K, self.seed, self.ghosts, x0, z0, f["i"], feat)
+        if kit == "gothic":
+            _gothic_crowns(self.ghosts, feat)
         if kit == "station_white":
             _radar(self)
         elif kit == "solarpunk":
@@ -1553,6 +1570,21 @@ def _gothic_roof(ghosts, x0, z0, feat):
         return
     mx = max(top.values())
     ridge = sorted(p for p, v in top.items() if v == mx)
+    # v22: light stone trim lines IN the roof surface: every 4th height band and the eave row become stone bricks / slate
+    # (same cells, no new blocks); the ridge row is stone brick slab-free full block (smooth stone already), gable ends stay stone.
+    lo_ = min(top.values())
+    for bl in wg["blocks"]:
+        px_, py_, pz_ = bl[0], bl[1], bl[2]
+        if top.get((px_, pz_)) != py_ or py_ <= lo_ - 1 or ":" not in bl[3]:
+            continue
+        nm = bl[3].split("[")[0]
+        if nm in ("minecraft:deepslate_tiles", "minecraft:polished_blackstone_bricks", "minecraft:blackstone", "minecraft:polished_deepslate",
+                  "minecraft:deepslate_bricks", "minecraft:cobbled_deepslate"):
+            band = (mx - py_) % 4
+            if py_ == lo_ or band == 0 and py_ != mx:
+                bl[3] = "minecraft:stone_bricks" if (px_ + pz_) % 2 else "minecraft:andesite"
+            elif band == 2 and len(ridge) < len(top) * 0.6:
+                bl[3] = "minecraft:cobbled_deepslate"
     xs = [p[0] for p in top]
     zs = [p[1] for p in top]
     def put(x, y, z, b):
@@ -1575,6 +1607,86 @@ def _gothic_roof(ghosts, x0, z0, feat):
             if q in top and top[q] >= top[c] - 1:
                 spire(q[0], q[1], 4)
                 break
+
+
+def _gothic_crowns(ghosts, feat):
+    """v22: real forms for the gothic hub dome roof and the tower roof (light stone, cheap): hub = octagonal glazed lantern
+    drum + stepped cap + spire + 8 corner pinnacles; tower = stepped stone pyramid spire with light bands + corner pinnacles."""
+    def lay(g):
+        d = {}
+        for bx, by, bz, _b in g["blocks"]:
+            d.setdefault(by, set()).add((bx, bz))
+        return d
+    hub = next((g for g in ghosts if g["id"] == "hub"), None)
+    if hub:
+        ox, oy, oz = hub["origin"]
+        ly = lay(hub)
+        ty = max((y for y, c in ly.items() if len(c) >= 80), default=None)
+        if ty is not None:
+            hub["blocks"] = [b for b in hub["blocks"] if b[1] <= ty]  # drop the old chain / lantern finial
+            pl = ly[ty]
+            cx = round(sum(p[0] for p in pl) / len(pl))
+            cz = round(sum(p[1] for p in pl) / len(pl))
+            def put(x, y, z, b):
+                feat.append([ox + x, oy + y, oz + z, b])
+            def oct_(r, c):
+                return {(cx + a, cz + b_) for a in range(-r, r + 1) for b_ in range(-r, r + 1) if abs(a) + abs(b_) <= c}
+            Y = ty + 1
+            drum = oct_(4, 6)
+            ring = {p for p in drum if any(q not in drum for q in ((p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)))}
+            for dy in range(5):
+                for (x, z) in ring:
+                    corner = abs(x - cx) + abs(z - cz) == 6 or abs(x - cx) == 4 and abs(z - cz) <= 0 or abs(z - cz) == 4 and abs(x - cx) <= 0
+                    glass = 1 <= dy <= 3 and not corner and (x + z) % 2 == 0
+                    put(x, Y + dy, z, "minecraft:orange_stained_glass" if glass else ("minecraft:stone_bricks" if dy in (0, 4) or corner else "minecraft:smooth_stone"))
+            for (x, z) in drum - ring:
+                put(x, Y + 4, z, "minecraft:stone_bricks")
+            for lvl, (r, c, blk) in enumerate(((4, 6, "minecraft:stone_bricks"), (3, 4, "minecraft:deepslate_tiles"), (2, 3, "minecraft:stone_bricks"), (1, 2, "minecraft:deepslate_tiles"))):
+                for (x, z) in oct_(r, c):
+                    put(x, Y + 5 + lvl, z, blk)
+            for k in range(7):
+                put(cx, Y + 9 + k, cz, "minecraft:stone_brick_wall")
+            put(cx, Y + 16, cz, "minecraft:lightning_rod")
+            for ang in range(8):
+                import math as _m
+                dx_, dz_ = _m.cos(ang * _m.pi / 4), _m.sin(ang * _m.pi / 4)
+                p = max(pl, key=lambda q: (q[0] - cx) * dx_ + (q[1] - cz) * dz_)
+                for dy in range(2):
+                    put(p[0], Y + dy, p[1], "minecraft:stone_bricks")
+                for dy in range(2, 5):
+                    put(p[0], Y + dy, p[1], "minecraft:stone_brick_wall")
+                put(p[0], Y + 5, p[1], "minecraft:lightning_rod")
+    tw = next((g for g in ghosts if g["id"] == "tower_top"), None)
+    if tw:
+        ox, oy, oz = tw["origin"]
+        ly = lay(tw)
+        ty = max(ly)
+        pl = ly[ty]
+        xs = [p[0] for p in pl]
+        zs = [p[1] for p in pl]
+        if len(pl) >= 16 and max(xs) - min(xs) >= 4:
+            cx, cz = (min(xs) + max(xs)) // 2, (min(zs) + max(zs)) // 2
+            hw = (max(xs) - min(xs)) // 2
+            def put(x, y, z, b):
+                feat.append([ox + x, oy + y, oz + z, b])
+            Y = ty + 1
+            lvl = 0
+            for r in range(hw, 0, -1):
+                for step in range(2):
+                    mat = "minecraft:stone_bricks" if (lvl % 4 in (0, 1)) else "minecraft:deepslate_tiles"
+                    for a in range(-r, r + 1):
+                        for b_ in range(-r, r + 1):
+                            if max(abs(a), abs(b_)) == r or lvl == 0:
+                                put(cx + a, Y + lvl, cz + b_, mat if max(abs(a), abs(b_)) == r else "minecraft:deepslate_tiles")
+                    lvl += 1
+            for k in range(6):
+                put(cx, Y + lvl + k, cz, "minecraft:stone_brick_wall")
+            put(cx, Y + lvl + 6, cz, "minecraft:lightning_rod")
+            for sx in (-hw, hw):
+                for sz in (-hw, hw):
+                    for dy in range(3):
+                        put(cx + sx, Y + dy, cz + sz, "minecraft:stone_bricks" if dy < 2 else "minecraft:stone_brick_wall")
+                    put(cx + sx, Y + 3, cz + sz, "minecraft:lightning_rod")
 
 
 def _roofworks(K, seed, ghosts, x0, z0, i, feat):
