@@ -39,6 +39,7 @@ public final class Config {
     public static final ModConfigSpec.ConfigValue<String> GEN_PYTHON;
     public static final ModConfigSpec.ConfigValue<String> GEN_ARCHITECT_DIR;
     public static final ModConfigSpec.DoubleValue GEN_COST_CAP;
+    public static final ModConfigSpec.DoubleValue SUGGEST_COST_CAP;
 
     static {
         B.comment("MCP server inside the game client (also serves singleplayer's integrated server).").push("client");
@@ -90,6 +91,8 @@ public final class Config {
                 .define("architectDir", "");
         GEN_COST_CAP = B.comment("Stop a generate job once its API cost reaches this many USD (passed as --max-cost).")
                 .defineInRange("costCapUsd", 0.15, 0.01, 50.0);
+        SUGGEST_COST_CAP = B.comment("Stop a /ghost suggest job once its API cost reaches this many USD (passed as --max-cost).")
+                .defineInRange("suggestCostCapUsd", 0.10, 0.01, 50.0);
         B.pop();
     }
 

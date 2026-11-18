@@ -76,6 +76,13 @@ LOCAL = bool(BASE_URL)
 # Haiku 5.5 list prices per million tokens (cache reads ~10%, writes ~125%).
 PRICE_IN, PRICE_OUT = 0.10, 0.50
 
+
+def usage_cost(u) -> float:
+    """Estimated USD for one response's `usage` (cache reads ~10%, writes ~125%). Also used by suggest.py."""
+    cin = (u.input_tokens + (getattr(u, "cache_creation_input_tokens", 0) or 0) * 1.25
+           + (getattr(u, "cache_read_input_tokens", 0) or 0) * 0.1)
+    return (cin * PRICE_IN + u.output_tokens * PRICE_OUT) / 1e6
+
 FORWARD = ["status", "registry_blocks", "block_describe", "ghost_set", "ghost_list", "ghost_info", "ghost_move",
            "ghost_show", "ghost_clear", "ghost_export"]
 
@@ -859,9 +866,7 @@ class Architect:
             self.tokens_out = getattr(self, "tokens_out", 0) + u.output_tokens
             self.secs = getattr(self, "secs", 0.0) + time.time() - t0
             if not LOCAL:
-                cin = (u.input_tokens + (u.cache_creation_input_tokens or 0) * 1.25
-                       + (u.cache_read_input_tokens or 0) * 0.1)
-                self.cost += (cin * PRICE_IN + u.output_tokens * PRICE_OUT) / 1e6
+                self.cost += usage_cost(u)
             self.messages.append({"role": "assistant",
                                   "content": [b.model_dump(mode="json", exclude_none=True) for b in resp.content]})
             self.save()

@@ -79,6 +79,7 @@ public final class GhostTools {
         GhostGenerate.registerTools(mcp);
         WorldSurvey.registerTools(mcp);
         GhostArea.registerTools(mcp);
+        GhostSuggest.registerTools(mcp);
         mcp.add(new Tool("ghost_set",
                 "Create or change a ghost build: see-through blocks drawn only on this client, never placed in the world. "
                         + "mode=replace (default) redraws the ghost from the spec; mode=merge edits it in place (use for iterations). "

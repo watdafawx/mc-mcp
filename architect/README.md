@@ -27,6 +27,23 @@ The mod passes `ghostGenerate.costCapUsd` (default 0.15). Estimate is from token
 
     python architect.py -s mysession --generate steampunk --x 100 --y 66 --z 200 [--kit hextech] [--layout radial] [--max-cost 0.10]
 
+## Suggest mode (suggest.py)
+
+`/ghost suggest` / `ghost_suggest` start `python suggest.py -s <job> --survey <region.json> --out <result.json> [--max-cost 0.10] [--no-overlay]`
+in this folder. No Minecraft connection: the input is a survey file from `WorldSurvey.region()` (the normal survey format,
+step 1, with `y` = true ground under buildings, plus a `region` block: `built_blocks`, `bbox`, `palette` [[id, n]],
+`features`, `buildings` [bbox, size, palette, `roof` {top_y, distinct_top_heights, flat_pct, stair_slab_pct}, `lights`
+{n,s,e,w}, glass, doors], `bmap` grid). `summarize()` drops the grids, so the model sees about 1 KB of numbers.
+
+- Prompt and parsing live in `suggest.py`; the reply is JSON `{"suggestions": [{text, fix, building, material}]}`, parsed
+  tolerantly (code fences and prose are stripped, bad fixes dropped, max 6, one retry if the cap allows).
+- Fixes are deterministic: `gable_roof`, `lanterns`, `corner_posts` (survival materials only). Blocks are absolute world
+  coordinates, at most 3000, written to `--out` with the suggestions and the cost. The mod draws them as ghost `suggest`.
+- Cost: `architect.usage_cost()` (extracted from the agent loop, same prices) per response; stops at `--max-cost`. The key
+  comes from `architect/.env`, read by `architect.py` when `suggest.py` imports it for the model call; `suggest.py` itself
+  never touches the key. It loads `site.py` by path like `architect.py` (the name shadows the stdlib `site`).
+- Offline test (fake client, canned survey, no API): `python test_suggest.py`.
+
 ## World-aware sites (site.py)
 
 `ghost_generate` / `/ghost generate` survey the client world first (`world_survey`), write the JSON to a temp file and run

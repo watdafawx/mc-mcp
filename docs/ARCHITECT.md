@@ -13,7 +13,8 @@ the world, never sent to a server, and never saved to the world. You can export 
 ## Tools and commands
 
 MCP tools (served by the client, see the main README for arguments): `ghost_set`, `ghost_list`, `ghost_info`,
-`ghost_move`, `ghost_show`, `ghost_clear`, `ghost_export`, `ghost_import`, `ghost_generate`, `ghost_generate_status`.
+`ghost_move`, `ghost_show`, `ghost_clear`, `ghost_export`, `ghost_import`, `ghost_generate`, `ghost_generate_status`,
+`ghost_suggest`, `ghost_suggest_status`.
 
 In-game commands (same code as the tools):
 
@@ -24,6 +25,7 @@ In-game commands (same code as the tools):
 | `/ghost clear [id]` | delete one ghost, a `prefix/`, or all |
 | `/ghost import <name> [x y z]` | load a `.schem` (Sponge v2/v3) or vanilla `.nbt` as a ghost |
 | `/ghost generate <style> [x z] [kit] [layout]` | start the LLM architect (needs setup below) |
+| `/ghost suggest [look\|here\|x z] [r=N] [nooverlay]` | suggest improvements for the area you look at (see below) |
 
 `ghost_import` looks for bare names in `config/shapewright/schematics`, `schematics`, `config/worldedit/schematics`
 and `world/generated/minecraft/structures`.
@@ -185,3 +187,27 @@ counterpart: any schematic that Shapewright (or WorldEdit) saved can be loaded a
 - Quality varies per run; the screenshots show the best-judged builds (v17), not the average.
 - Only tested on MC 1.21.1 NeoForge in the ATM10 pack, with the Windows venv layout.
 - Reference images and block-library data used during development are not shipped (third-party content).
+
+## Suggesting improvements (`/ghost suggest`)
+
+Look at something you built and run `/ghost suggest` (or `ghost_suggest`). The mod reads the real blocks around the
+looked-at spot (default radius 24, `r=8..40`): block palette counts, a footprint per building (size, roof flatness,
+lights per wall, glass, doors), water, lava and ores near the surface. That survey (numbers only, no screenshots)
+goes to `architect/suggest.py`, which makes **one** Claude Haiku call and gets back 3 to 6 short tips, for example
+"roof is flat: add gables", "no light on the east wall: add lanterns", "palette has 1 block: mix in accents". They are
+printed in chat.
+
+With the overlay on (default) a tip can carry a fix that Python turns into blocks: `gable_roof` (stair rows and a
+slab ridge over a flat roof), `lanterns` (cobblestone wall post plus lantern, 1 block outside walls with no light) or
+`corner_posts` (log or stone posts on the four corners; these replace the wall blocks there). They show as the ghost
+`suggest`, in its own colours like area ghosts. Only plain survival blocks. `/ghost clear suggest` removes it,
+`/ghost suggest nooverlay` skips it. Nothing is placed in the world.
+
+Cost: one call is about $0.001-0.005. The job stops at `ghostGenerate.suggestCostCapUsd` (default $0.10) and is killed
+after 5 minutes. One suggest job at a time; `ghost_suggest_status` shows it. Same setup as `/ghost generate` (the
+architect folder, `architect/.env` and a venv on the machine running the client). The mod never reads the key.
+
+Limits: "built" means any block above the natural ground (dirt, stone, sand tags), so a house made of plain stone,
+andesite, granite or diorite reads as terrain; trunks without leaves above them count as built. Buildings are
+connected columns at least 3 high (up to 6 shown). The overlay only covers the three fixes above.
+Tested offline (`python architect/test_suggest.py`, fake model client). The in-game run is not verified yet.

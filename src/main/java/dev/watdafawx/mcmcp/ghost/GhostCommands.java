@@ -65,6 +65,14 @@ public final class GhostCommands {
         return SharedSuggestionProvider.suggest(all, w);
     };
 
+    /** Tail of /ghost suggest [look|here|x z] [r=N] [nooverlay]. */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_TAIL = (ctx, b) -> {
+        String rest = b.getRemaining();
+        int sp = rest.lastIndexOf(' ');
+        SuggestionsBuilder w = b.createOffset(b.getStart() + sp + 1);
+        return SharedSuggestionProvider.suggest(List.of("look", "here", "nooverlay", "r=16", "r=24", "r=32", "r=40"), w);
+    };
+
     private static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("ghost")
                 .then(Commands.literal("hide").executes(c -> show("*", false))
@@ -100,6 +108,9 @@ public final class GhostCommands {
                                 .then(Commands.argument("args", StringArgumentType.greedyString()).suggests(AREA_TAIL)
                                         .executes(c -> area(StringArgumentType.getString(c, "style"),
                                                 StringArgumentType.getString(c, "args"))))))
+                .then(Commands.literal("suggest").executes(c -> suggest(""))
+                        .then(Commands.argument("args", StringArgumentType.greedyString()).suggests(SUGGEST_TAIL)
+                                .executes(c -> suggest(StringArgumentType.getString(c, "args")))))
                 .then(Commands.literal("generate")
                         .then(Commands.literal("confirm").executes(c -> generateConfirm()))
                         .then(Commands.argument("style", StringArgumentType.word()).suggests(STYLES)
@@ -244,6 +255,38 @@ public final class GhostCommands {
             Integer fx = x, fz = z;
             String ft = target, fl = layout;
             GhostArea.async("preview", () -> GhostArea.preview(style, ft, fx, fz, fl));
+            return 1;
+        });
+    }
+
+    private static int suggest(String tail) {
+        return guard(() -> {
+            Integer x = null, z = null;
+            String target = null;
+            int radius = GhostSuggest.DEFAULT_RADIUS;
+            boolean overlay = true;
+            String[] t = tail.trim().isEmpty() ? new String[0] : tail.trim().split("\\s+");
+            int i = 0;
+            if (t.length >= 2 && isInt(t[0]) && isInt(t[1])) {
+                x = Integer.parseInt(t[0]);
+                z = Integer.parseInt(t[1]);
+                i = 2;
+            } else if (t.length >= 1 && isInt(t[0])) {
+                throw new McpServer.ToolError("give both x and z, or neither");
+            }
+            String usage = "Usage: /ghost suggest [look|here|x z] [r=8..40] [nooverlay]";
+            for (; i < t.length; i++) {
+                String w = t[i].toLowerCase(Locale.ROOT);
+                if (w.equals("here") || w.equals("look")) target = w;
+                else if (w.equals("nooverlay")) overlay = false;
+                else if (w.startsWith("r=") && isInt(w.substring(2))) radius = Integer.parseInt(w.substring(2));
+                else throw new McpServer.ToolError("unexpected '" + t[i] + "'. " + usage);
+            }
+            Integer fx = x, fz = z;
+            String ft = target;
+            int fr = radius;
+            boolean fo = overlay;
+            runAsync("suggest", () -> GhostSuggest.start(ft, fx, fz, fr, fo));
             return 1;
         });
     }
