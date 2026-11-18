@@ -51,6 +51,17 @@ public final class GhostCommands {
         SuggestionsBuilder w = b.createOffset(b.getStart() + sp + 1);
         List<String> all = new ArrayList<>(GhostGenerate.KITS);
         all.addAll(GhostGenerate.LAYOUTS);
+        all.addAll(List.of("look", "here", "nofit"));
+        return SharedSuggestionProvider.suggest(all, w);
+    };
+
+    /** Tail of /ghost area <style> [look|here|x z] [layout]. */
+    private static final SuggestionProvider<CommandSourceStack> AREA_TAIL = (ctx, b) -> {
+        String rest = b.getRemaining();
+        int sp = rest.lastIndexOf(' ');
+        SuggestionsBuilder w = b.createOffset(b.getStart() + sp + 1);
+        List<String> all = new ArrayList<>(List.of("look", "here"));
+        all.addAll(GhostGenerate.LAYOUTS);
         return SharedSuggestionProvider.suggest(all, w);
     };
 
@@ -76,7 +87,21 @@ public final class GhostCommands {
                                                                 new net.minecraft.core.BlockPos(IntegerArgumentType.getInteger(c, "x"),
                                                                         IntegerArgumentType.getInteger(c, "y"),
                                                                         IntegerArgumentType.getInteger(c, "z")))))))))
+                .then(Commands.literal("area")
+                        .then(Commands.literal("move")
+                                .then(Commands.argument("dx", IntegerArgumentType.integer())
+                                        .then(Commands.argument("dz", IntegerArgumentType.integer())
+                                                .executes(c -> areaMove(IntegerArgumentType.getInteger(c, "dx"),
+                                                        IntegerArgumentType.getInteger(c, "dz"), 0)))))
+                        .then(Commands.literal("rotate").executes(c -> areaMove(0, 0, 1)))
+                        .then(Commands.literal("clear").executes(c -> areaClear()))
+                        .then(Commands.argument("style", StringArgumentType.word()).suggests(STYLES)
+                                .executes(c -> area(StringArgumentType.getString(c, "style"), ""))
+                                .then(Commands.argument("args", StringArgumentType.greedyString()).suggests(AREA_TAIL)
+                                        .executes(c -> area(StringArgumentType.getString(c, "style"),
+                                                StringArgumentType.getString(c, "args"))))))
                 .then(Commands.literal("generate")
+                        .then(Commands.literal("confirm").executes(c -> generateConfirm()))
                         .then(Commands.argument("style", StringArgumentType.word()).suggests(STYLES)
                                 .executes(c -> generate(StringArgumentType.getString(c, "style"), ""))
                                 .then(Commands.argument("args", StringArgumentType.greedyString()).suggests(TAIL)
@@ -147,8 +172,9 @@ public final class GhostCommands {
     private static int generate(String style, String tail) {
         return guard(() -> {
             Integer x = null, z = null;
-            String kit = null, layout = null;
-            String[] t = tail.trim().isEmpty() ? new String[0] : tail.trim().split("\\s+");
+            String kit = null, layout = null, target = null;
+            boolean fit = true;
+            String[] t = tail.trim().isEmpty() ? new String[0] : tail.trim().split("\s+");
             int i = 0;
             if (t.length >= 2 && isInt(t[0]) && isInt(t[1])) {
                 x = Integer.parseInt(t[0]);
@@ -159,11 +185,79 @@ public final class GhostCommands {
             }
             for (; i < t.length; i++) {
                 String w = t[i].toLowerCase(Locale.ROOT);
-                if (GhostGenerate.LAYOUTS.contains(w) && layout == null) layout = w;
+                if (w.equals("here") || w.equals("look")) target = w;
+                else if (w.equals("nofit")) fit = false;
+                else if (GhostGenerate.LAYOUTS.contains(w) && layout == null) layout = w;
                 else if (kit == null) kit = w;
-                else throw new McpServer.ToolError("unexpected '" + t[i] + "'. Usage: /ghost generate <style> [x z] [kit] [layout]");
+                else throw new McpServer.ToolError("unexpected '" + t[i] + "'. Usage: /ghost generate <style> [look|here|x z] [kit] [layout] [nofit]");
             }
-            GhostGenerate.start(style, x, z, kit, layout);
+            // no placement words and an area preview is up: build in that area
+            boolean useArea = t.length == 0 && GhostArea.current() != null;
+            if (useArea) say(ChatFormatting.GRAY, "using the previewed area (/ghost area clear to drop it)");
+            Integer fx = x, fz = z;
+            String fk = kit, fl = layout, ft = target, fs = style;
+            boolean ff = fit, fu = useArea;
+            runAsync("generate", () -> GhostGenerate.start(fs, fx, fz, fk, fl, ft, ff, fu));
+            return 1;
+        });
+    }
+
+    private static int generateConfirm() {
+        return guard(() -> {
+            runAsync("generate", () -> GhostGenerate.start(null, null, null, null, null, null, true, true));
+            return 1;
+        });
+    }
+
+    /** The survey blocks on the game thread while waiting, so start() runs on a worker. */
+    private static void runAsync(String name, Supplier<Object> body) {
+        Thread t = new Thread(() -> {
+            try {
+                body.get();
+            } catch (RuntimeException e) {
+                say(ChatFormatting.RED, String.valueOf(e.getMessage()));
+            }
+        }, "mcmcp-ghost-" + name);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private static int area(String style, String tail) {
+        return guard(() -> {
+            Integer x = null, z = null;
+            String target = null, layout = null;
+            String[] t = tail.trim().isEmpty() ? new String[0] : tail.trim().split("\s+");
+            int i = 0;
+            if (t.length >= 2 && isInt(t[0]) && isInt(t[1])) {
+                x = Integer.parseInt(t[0]);
+                z = Integer.parseInt(t[1]);
+                i = 2;
+            } else if (t.length >= 1 && isInt(t[0])) {
+                throw new McpServer.ToolError("give both x and z, or neither");
+            }
+            for (; i < t.length; i++) {
+                String w = t[i].toLowerCase(Locale.ROOT);
+                if (w.equals("here") || w.equals("look")) target = w;
+                else if (GhostGenerate.LAYOUTS.contains(w) && layout == null) layout = w;
+                else throw new McpServer.ToolError("unexpected '" + t[i] + "'. Usage: /ghost area <style> [look|here|x z] [layout]");
+            }
+            Integer fx = x, fz = z;
+            String ft = target, fl = layout;
+            GhostArea.async("preview", () -> GhostArea.preview(style, ft, fx, fz, fl));
+            return 1;
+        });
+    }
+
+    private static int areaMove(int dx, int dz, int turns) {
+        return guard(() -> {
+            GhostArea.async("adjust", () -> GhostArea.adjust(dx, dz, turns));
+            return 1;
+        });
+    }
+
+    private static int areaClear() {
+        return guard(() -> {
+            say(ChatFormatting.GREEN, GhostArea.clear() ? "area cleared" : "no area");
             return 1;
         });
     }

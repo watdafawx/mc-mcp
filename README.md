@@ -70,7 +70,9 @@ claude mcp add --transport http minecraft-server http://<server-ip>:47870/mcp --
 | `ghost_move` | client | move, shift or rotate a ghost (stairs, logs etc. turn with it) |
 | `ghost_show` | client | show/hide and opacity per ghost; global `xray` (draw over terrain), `solid` (full colour), `hud` |
 | `ghost_clear` | client | delete one ghost, a `prefix/`, or all |
-| `ghost_generate` | client | start the LLM architect (async, returns a job id): `style` steampunk/hextech/gothic/station_white/solarpunk, optional `x`,`z` (default: player), `kit`, `layout`. One job at a time, cost-capped. Needs `architect/.env` + a python venv on the machine running the client (see `architect/README.md`) |
+| `ghost_generate` | client | start the LLM architect (async, returns a job id): `style` steampunk/hextech/gothic/station_white/solarpunk, `kit`, `layout`. **World-aware**: surveys the terrain around `target` (`look` = crosshair block, default; `here`; `x,z`; or explicit `x`,`z`), picks the best site (rotation, smaller layout when tight), adds foundations and lists trees to clear. `fit=false` = old flat build at `x`,`z` (min corner, default player); `use_area=true` builds in the `ghost_area` preview. One job at a time, cost-capped. Needs `architect/.env` + a python venv on the machine running the client (see `architect/README.md`) |
+| `world_survey` | client | read-only terrain survey of the loaded client world (never loads chunks): `x`,`z` (default the looked-at block, else player feet) or `target`, `radius` (default 48), `step` (default 2), `grid=false` for summary only. Returns a compact base-36 heightmap grid + per-cell flags (land/water/lava/tree/snow/unknown) and ymin/ymax/ymed, water/tree/unknown %, slope stats, biome, dominant ground block. Format in `architect/README.md` |
+| `ghost_area` | client | preview where a base would go **without the LLM (no API cost)**: surveys + scores the spot with `architect/site.py` and draws a thin outline ghost `area/preview` with corner posts: **lime** = fits, **yellow** = needs foundations/terracing, **red** = blocked/water. `action` preview (default, needs `style`) / move (`dx`,`dz`) / rotate / clear / status; `target`, `layout` |
 | `ghost_generate_status` | client | job state `running`/`done`/`failed`, ghost ids, API cost so far, last log lines |
 | `run_client_command` | client, `devClientCommands` | dev/test: run a client command (`/ghost list`) via the client dispatcher on the game thread; `suggest=true` returns tab completions. Off by default |
 | `ghost_export` | client | save ghosts as `.litematic` (Litematica), `.schem` or `.nbt` under `<gameDir>/schematics/` |
@@ -86,7 +88,16 @@ Client-side, ghosts exist only in this client's memory. Tab completion for ids a
 | `/ghost list` | ghosts in chat: id, block count, origin, `[hidden]` |
 | `/ghost import <name> [x y z]` | same as `ghost_import`; tab completion lists schematics found in the search folders |
 | `/ghost clear [id]` | delete one ghost, a `prefix/`, or all (same code as `ghost_clear`) |
-| `/ghost generate <style> [x z] [kit] [layout]` | same as `ghost_generate`; chat reports started / done / failed + API cost |
+| `/ghost generate <style> [look\|here\|x z] [kit] [layout] [nofit]` | same as `ghost_generate`: no coordinates = the block you look at, `here` = your feet; surveys and fits the terrain; `nofit` = old flat build. Right after `/ghost area`, with no extra words, it builds in the previewed area. Chat: started / site fit / done / failed + API cost |
+| `/ghost generate confirm` | build in the previewed area (same as `ghost_generate use_area=true`) |
+| `/ghost area <style> [look\|here\|x z] [layout]` | preview the site as a coloured outline (lime fits / yellow needs foundations / red blocked) plus one chat line: fit score, fill/cut, obstacles, layout. No LLM call, no cost |
+| `/ghost area move <dx> <dz>` / `rotate` / `clear` | nudge the previewed area (re-scored on the same survey), turn it 90 degrees, or drop it |
+
+Area preview outlines (`/ghost area hextech`): lime = fits, yellow = needs foundations, red = blocked (water, lava, unloaded).
+
+![lime: fits](docs/ghost-area-shots/area_flat.png)
+![yellow: needs foundations](docs/ghost-area-shots/area_hill.png)
+![red: blocked by water](docs/ghost-area-shots/area_shore.png)
 
 Config (`config/mcmcp-common.toml`, section `ghostGenerate`): `python` (empty = `architect/.venv/Scripts/python.exe`, then `python`), `architectDir` (empty = `architect` next to the game's `run` folder), `costCapUsd` (default 0.15, passed to the architect as `--max-cost`).
 

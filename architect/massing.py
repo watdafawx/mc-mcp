@@ -56,7 +56,7 @@ KITS: dict[str, dict[str, str]] = {
     "solarpunk": {  # warm white limestone, moss, wood, lots of glass, green roofs
         "base": "minecraft:mossy_stone_bricks", "wall": "create:polished_cut_limestone", "wall2": "minecraft:birch_planks",
         "trim": "create:cut_limestone_bricks", "pillar": "create:limestone_pillar", "accent": "minecraft:moss_block", "glass": "connectedglass:borderless_glass",
-        "glow": "luminax:lime_luminax_block", "rail": "minecraft:oak_fence", "roof": "minecraft:moss_block",
+        "glow": "minecraft:shroomlight", "band": "minecraft:green_terracotta", "rail": "minecraft:oak_fence", "roof": "minecraft:moss_block",
         "detail": "minecraft:oak_leaves[persistent=true]", "antenna": "minecraft:lightning_rod", "tip": "minecraft:lantern"},
     "rust_industrial": {  # teal concrete, rusty copper, iron (sea platform)
         "base": "minecraft:gray_concrete", "wall": "minecraft:cyan_terracotta", "wall2": "minecraft:light_gray_concrete",
@@ -256,7 +256,7 @@ def structure(shape: str = "rect", w: int = 15, d: int = 11, r: int = 8, r_in: i
                 elif row == 0:
                     b = K["trim"]  # floor line
                 elif y == top:
-                    b = K["accent"] if stripe else (K["glow"] if f in glow and not mull else K["wall"])
+                    b = K["accent"] if stripe else (K.get("band", K["glow"]) if f in glow and not mull else K["wall"])
                 else:
                     at = _arch_top(floor_h, wb, u, kit)
                     win = {"band": not mull,

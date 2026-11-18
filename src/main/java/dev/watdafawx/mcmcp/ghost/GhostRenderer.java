@@ -85,7 +85,7 @@ public final class GhostRenderer {
             BlockPos o = g.origin;
             RenderType rt = RenderType.translucent();
             rt.setupRenderState();
-            if (solid) RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            if (solid || "area".equals(g.tags.get("kind"))) RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             else RenderSystem.setShaderColor(0.85f, 0.95f, 1f, g.alpha);
             // The camera offset goes in ChunkOffset, like chunk sections: the shader computes fog from
             // Position + ChunkOffset, so a translated model-view would fog ghosts by their distance from their own

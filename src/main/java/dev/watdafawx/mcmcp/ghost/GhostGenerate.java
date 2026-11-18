@@ -56,6 +56,7 @@ public final class GhostGenerate {
         final long startedMs = System.currentTimeMillis();
         String status = "running"; // running | done | failed
         String error;
+        String site; // one-line site fit summary the architect printed (survey mode)
         double cost;
         Process proc;
         final Deque<String> log = new ArrayDeque<>();
@@ -69,6 +70,10 @@ public final class GhostGenerate {
         }
 
         synchronized void line(String s) {
+            if (s.startsWith("SITE ")) {
+                site = s.substring(5).trim();
+                chat(ChatFormatting.AQUA, "site " + (site.length() > 150 ? site.substring(0, 150) : site));
+            }
             log.addLast(s);
             while (log.size() > 40) log.removeFirst();
             Matcher m = COST.matcher(s);
@@ -94,6 +99,7 @@ public final class GhostGenerate {
                     "seconds", (System.currentTimeMillis() - startedMs) / 1000,
                     "ghosts", ghostIds(), "log", lines);
             if (error != null) m.put("error", error);
+            if (site != null) m.put("site", site);
             return m;
         }
     }
@@ -154,8 +160,24 @@ public final class GhostGenerate {
 
     // ------------------------------------------------------------------ start
 
-    /** Starts a job. Throws ToolError with a clear message when busy or not set up. Safe to call from any thread. */
+    /** Old entry point: site defaults (look at a block, fit to the terrain) unless x and z are both given. */
     public static Job start(String style, Integer x, Integer z, String kit, String layout) {
+        return start(style, x, z, kit, layout, null, true, false);
+    }
+
+    /**
+     * Starts a job. Throws ToolError with a clear message when busy or not set up. Safe to call from any thread.
+     * target: look | here | x,z (default look; explicit x and z win). fit=false: old flat behaviour at x,z (or the player),
+     * no survey. useArea: build in the previewed {@link GhostArea} (its survey and rectangle).
+     */
+    public static Job start(String style, Integer x, Integer z, String kit, String layout, String target, boolean fit,
+            boolean useArea) {
+        GhostArea.Area area = null;
+        if (useArea) {
+            area = GhostArea.current();
+            if (area == null) throw new McpServer.ToolError("no area preview (or older than 15 min): run /ghost area <style> first");
+            if (style == null || style.isBlank()) style = area.style;
+        }
         style = style == null ? "" : style.toLowerCase(Locale.ROOT).trim();
         if (!STYLES.contains(style)) throw new McpServer.ToolError("unknown style '" + style + "'. Styles: " + String.join(", ", STYLES));
         if (kit != null && !kit.isBlank() && !KITS.contains(kit.toLowerCase(Locale.ROOT)))
@@ -164,6 +186,12 @@ public final class GhostGenerate {
             throw new McpServer.ToolError("unknown layout '" + layout + "'. Layouts: " + String.join(", ", LAYOUTS));
         String problem = preflight();
         if (problem != null) throw new McpServer.ToolError(problem);
+        synchronized (GhostGenerate.class) {
+            Job c = current;
+            if (c != null && c.running())
+                throw new McpServer.ToolError("a generate job is already running (" + c.id + ", " + c.style
+                        + "). Wait for it to finish; ghost_generate_status shows progress.");
+        }
 
         Minecraft mc = Minecraft.getInstance();
         int[] at = GameThread.call(mc, () -> {
@@ -173,6 +201,27 @@ public final class GhostGenerate {
         });
         int ox = x != null ? x : at[0];
         int oz = z != null ? z : at[2];
+        java.nio.file.Path surveyFile = null;
+        String near = null, rect = null;
+        if (area != null) {
+            surveyFile = area.surveyFile;
+            ox = area.x;
+            oz = area.z;
+            near = area.cx + "," + area.cz;
+            rect = area.x + "," + area.z + "," + area.w + "," + area.d + "," + area.rot;
+            if (layout == null || layout.isBlank()) layout = area.layout;
+        } else if (fit) {
+            Object[] r = WorldSurvey.surveyAt(target, x, z, GhostArea.SURVEY_RADIUS, GhostArea.SURVEY_STEP);
+            WorldSurvey.Target t = (WorldSurvey.Target) r[0];
+            try {
+                surveyFile = ((WorldSurvey.Result) r[1]).writeTemp();
+            } catch (IOException e) {
+                throw new McpServer.ToolError("cannot write survey: " + e.getMessage());
+            }
+            ox = t.x();
+            oz = t.z();
+            near = t.x() + "," + t.z();
+        }
 
         String id = "gen_" + style + "_" + LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss")) + "_" + SEQ.incrementAndGet();
         Job job = new Job(id, style, ox, at[1], oz);
@@ -190,6 +239,8 @@ public final class GhostGenerate {
                 "--max-cost", String.valueOf(Config.GEN_COST_CAP.get())));
         if (kit != null && !kit.isBlank()) cmd.addAll(List.of("--kit", kit.toLowerCase(Locale.ROOT)));
         if (layout != null && !layout.isBlank()) cmd.addAll(List.of("--layout", layout.toLowerCase(Locale.ROOT)));
+        if (surveyFile != null) cmd.addAll(List.of("--survey", surveyFile.toString(), "--near=" + near));
+        if (rect != null) cmd.addAll(List.of("--site-rect=" + rect));
         ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true);
         String bind = Config.CLIENT_BIND.get();
         String host = bind.equals("0.0.0.0") || bind.equals("::") ? "127.0.0.1" : bind;
@@ -210,7 +261,7 @@ public final class GhostGenerate {
         Thread t = new Thread(() -> watch(job), "mcmcp-ghost-generate");
         t.setDaemon(true);
         t.start();
-        chat(ChatFormatting.AQUA, "generate " + style + " started at " + ox + " " + oz + " (job " + id + ", cap $"
+        chat(ChatFormatting.AQUA, "generate " + style + (area != null ? " in area" : surveyFile != null ? " fitted" : "") + " at " + ox + " " + oz + " (job " + id + ", cap $"
                 + String.format(Locale.ROOT, "%.2f", Config.GEN_COST_CAP.get()) + ")");
         return job;
     }
@@ -274,16 +325,22 @@ public final class GhostGenerate {
     public static void registerTools(McpServer mcp) {
         mcp.add(new Tool("ghost_generate",
                 "Start the LLM architect to design a themed base as ghosts (async: returns a job id at once; poll ghost_generate_status). "
-                        + "style: steampunk | hextech | gothic | station_white | solarpunk. x,z: site corner (default: the player's position). "
-                        + "kit: optional palette kit; layout: spine | radial | cloister | linear | terraces. Ghosts land under '<job>/'. "
-                        + "One job at a time. Costs real API money (capped per job by config ghostGenerate.costCapUsd, default $0.15). "
-                        + "Needs architect/.env and a python venv on the machine running this client.",
-                J.Schema.of().enumOf("style", "base style", STYLES.toArray(String[]::new)).integer("x", "site min x (default player x)")
-                        .integer("z", "site min z (default player z)").str("kit", "palette kit, default = style")
-                        .enumOf("layout", "campus layout, default per style", LAYOUTS.toArray(String[]::new)).required("style").build(),
+                        + "style: steampunk | hextech | gothic | station_white | solarpunk. WORLD-AWARE by default: surveys the terrain around "
+                        + "target (look = the block the crosshair is on (default) | here | x,z; explicit x,z also count), picks the best site "
+                        + "(rotation, smaller layout when tight), adds foundations/terraces and lists trees to clear. fit=false skips the survey "
+                        + "(old flat behaviour with x,z = site min corner, default the player). use_area=true builds in the area ghost_area "
+                        + "previewed (no new survey). kit: optional palette kit; layout: spine | radial | cloister | linear | terraces. "
+                        + "Ghosts land under '<job>/'. One job at a time. Costs real API money (capped per job by config ghostGenerate.costCapUsd, "
+                        + "default $0.15). Needs architect/.env and a python venv on the machine running this client.",
+                J.Schema.of().enumOf("style", "base style", STYLES.toArray(String[]::new)).integer("x", "centre x of the survey (default: target)")
+                        .integer("z", "centre z of the survey").str("kit", "palette kit, default = style")
+                        .enumOf("layout", "campus layout, default per style / fitted", LAYOUTS.toArray(String[]::new))
+                        .str("target", "look | here | x,z (default look)").bool("fit", "survey and fit the site (default true)")
+                        .bool("use_area", "build in the previewed ghost_area (default false)").required("style").build(),
                 false, a -> {
                     Job j = start(J.str(a, "style", null), a.has("x") ? J.i(a, "x", 0) : null, a.has("z") ? J.i(a, "z", 0) : null,
-                            J.str(a, "kit", null), J.str(a, "layout", null));
+                            J.str(a, "kit", null), J.str(a, "layout", null), J.str(a, "target", null), J.b(a, "fit", true),
+                            J.b(a, "use_area", false));
                     return J.obj("job", j.id, "status", "running", "style", j.style, "origin", List.of(j.x, j.y, j.z),
                             "cost_cap_usd", Config.GEN_COST_CAP.get(), "hint", "poll ghost_generate_status with this job id");
                 }));

@@ -34,6 +34,14 @@ import shapes
 
 HERE = Path(__file__).resolve().parent
 
+import importlib.util as _ilu  # site.py shares its name with the stdlib `site` (already loaded): import it by path
+
+_sp = _ilu.spec_from_file_location("arch_site", HERE / "site.py")
+site = _ilu.module_from_spec(_sp)
+sys.modules["arch_site"] = site
+_sp.loader.exec_module(site)
+SITE: dict | None = None  # set from --survey: {survey, plan, near, force}; None = the old flat behaviour
+
 
 def _load_dotenv(path: Path) -> None:
     """Reads KEY=VALUE lines from architect/.env into os.environ (never overrides, never prints a value)."""
@@ -508,6 +516,10 @@ class Architect:
                 self.mcp.nogold = True
             ghosts = campus.build(a["kit"], a.get("wings") or [], bool(a.get("home", True)),
                                   a.get("landmark") or "tower", a.get("roles"), layout=a.get("layout"))
+            site_rep = None
+            if SITE:  # surveyed terrain: re-place the campus, add foundations, report fill/cut/trees
+                ghosts, site_rep = site.apply(ghosts, SITE["survey"], near=SITE.get("near"), force=SITE.get("force"))
+                a = dict(a, origin=site_rep["origin"])
             ox, oy, oz = a["origin"]
             rep = []
             for g in ghosts:
@@ -547,6 +559,10 @@ class Architect:
             allmin = [min(r["world_min"][i] for r in rep) for i in range(3)]
             allmax = [max(r["world_max"][i] for r in rep) for i in range(3)]
             return json.dumps({"ghosts": rep, "floor_y": oy + campus.STEPS + 1, "site_min": allmin, "site_max": allmax,
+                               **({"site": {k: v for k, v in site_rep.items() if k != "origin"},
+                                   "site_note": "Placed on surveyed terrain at origin " + str(site_rep["origin"]) + ". " + site_rep["summary"]
+                                                + ". Mention the foundations (fill/cut) and the trees to clear in your summary; ghosts never remove blocks."}
+                                  if site_rep else {}),
                                "note": "All coordinates are WORLD coordinates. world_min/world_max = each ghost's bounding "
                                        "box; roof_deck_y = y of a wing's flat deck (a part at that y+1 sits on it); wall "
                                        "planes are the box faces (a part touching x=world_min.x-1 or world_max.x+1 or the "
@@ -936,8 +952,13 @@ Check with view (iso, front, top) and fix the worst gaps. Summarise what you bui
 
 
 def generate_request(style: str, x: int, y: int, z: int, kit: str, layout: str, ident: str) -> str:
-    return GEN_BRIEF.format(style=style, x=x, y=y, z=z, kit=kit or style,
-                            layout=f", layout={layout}" if layout else "", id=ident)
+    brief = GEN_BRIEF.format(style=style, x=x, y=y, z=z, kit=kit or style,
+                             layout=f", layout={layout}" if layout else "", id=ident)
+    if SITE:  # survey summary only (never the raw grid): keeps the prompt cheap
+        p = SITE["plan"]
+        brief = brief.replace("(about 150-180 x 110-130 blocks)", f"(about {p['w']} x {p['d']} blocks, hard limit)")
+        brief += "\n" + site.prompt_note(p)
+    return brief
 
 
 def main():
@@ -955,11 +976,32 @@ def main():
     ap.add_argument("--z", type=int, default=0)
     ap.add_argument("--kit")
     ap.add_argument("--layout")
+    ap.add_argument("--survey", help="world_survey JSON (written by the mod): fit the campus to the terrain")
+    ap.add_argument("--near", help="x,z the player aimed at (site picker prefers spots close to it)")
+    ap.add_argument("--site-rect", help="x,z,w,d,rot of a previewed /ghost area: build exactly there")
     ap.add_argument("request", nargs="*")
     args = ap.parse_args()
-    global MAX_COST
+    global MAX_COST, SITE
     if args.max_cost is not None:
         MAX_COST = args.max_cost
+    if args.survey:
+        sv = site.Survey.from_file(args.survey)
+        near = tuple(int(v) for v in args.near.split(",")) if args.near else None
+        style = args.generate or args.kit or "hextech"
+        if args.site_rect:
+            fx, fz, fw, fd, frot = (int(v) for v in args.site_rect.split(","))
+            lay = args.layout or site.DEFAULT_LAYOUT.get(style, "spine")
+            plan = site.evaluate(sv, fx, fz, fw, fd, frot, near)
+            plan.update(layout=lay, wings=site.wings_for(lay, fw, fd), style=style)
+            plan["size"] = "m" if plan["wings"] >= 4 else "s"
+            force = {"x": fx, "z": fz, "w": fw, "d": fd, "rot": frot}
+        else:
+            plan = site.plan(sv, style, near, args.layout)
+            force = None
+        SITE = {"survey": sv, "plan": plan, "near": near, "force": force}
+        args.x, args.z, args.y = plan["x"], plan["z"], plan["ref"] - 1
+        args.layout = args.layout or plan["layout"]
+        print("SITE " + site.describe(plan), flush=True)
     if args.generate:
         args.request = [generate_request(args.generate, args.x, args.y, args.z, args.kit, args.layout, args.session)]
     arch = Architect(args.session)

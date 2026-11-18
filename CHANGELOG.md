@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- World-aware base generation. New `world_survey` tool: compact terrain survey of the loaded client world (heightmap grid in base-36 rows, flags for water/lava/trees/snow/unloaded, slope stats, biome, dominant ground block). Never loads chunks.
+- `ghost_generate` now surveys first (`target` look/here/x,z, `fit` default true, `use_area`) and passes the survey to the architect (`--survey`). New `architect/site.py` picks the best campus rectangle (flatness, water, trees, unknown, slope; 90-degree rotation; smaller layout and fewer wings when tight), puts the campus at its own ground level, adds stone-brick foundation walls, support pillars and access stairs where the ground drops away, and reports fill/cut and the trees to clear. Nothing is removed from the world. Without a survey the architect behaves exactly as before.
+- `/ghost area <style> [look|here|x z]` and `ghost_area` tool: preview the site as a thin outline ghost with corner posts (lime = fits, yellow = needs foundations, red = blocked/water) and one chat line, with no LLM call. `/ghost area move|rotate|clear`, `/ghost generate confirm` (or `/ghost generate <style>` right after a preview) builds in the previewed area. Tab completion for all of it. `/ghost generate <style>` with no coordinates now uses the looked-at block; new words `here` and `nofit`.
+- Fix: area-preview ghosts render in their own colours (no blue xray tint), via the `kind=area` tag in `GhostRenderer`.
+- Docs: README tables, `architect/README.md` (site picker, survey format, fit colours). Offline tests: `python architect/test_site.py`.
+- Screenshots of the area preview in `docs/ghost-area-shots/`, used as captions in the README.
+
 ## 0.3.1
 
 - Architect refresh (in the repo's `architect/` folder, not in the jar): per-wing facades and roofs in campus layouts, gothic porch and spire, hextech palette and airship dock, steampunk gears and pipes, station radar dish, solarpunk roof pond and waterfall, footprint guard and `room_origins` retargeting for room ghosts.
