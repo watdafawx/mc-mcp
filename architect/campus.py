@@ -24,7 +24,7 @@ ALT_ROOF = {"steampunk": "flat", "gothic": "flat", "hextech": "flat", "solarpunk
             "cyber_dark": "crown"}
 # v15: 7 distinct forms per kit (a campus has <= 6-7 wings), so neighbouring wings never share a roof form
 ROOF_CYCLE = {"steampunk": ["sawtooth", "gable_low", "mansard", "barrel", "hip_low", "flat", "gable_steep"],
-              "gothic": ["gable_steep", "hip", "gable", "mansard", "gable_low", "hip_steep", "flat"],
+              "gothic": ["gable_steep", "hip_steep", "gable_steep", "hip", "gable_steep", "hip_steep", "gable"],
               "hextech": ["hip_low", "mansard", "gable_low", "flat", "gable", "hip", "barrel"],
               "solarpunk": ["garden", "barrel", "hip_low", "gable_low", "garden", "sawtooth", "dome"],
               "station_white": ["barrel", "gable_low", "flat", "dome", "hip_low", "sawtooth", "gable"]}
@@ -33,9 +33,9 @@ ROOF_CYCLE = {"steampunk": ["sawtooth", "gable_low", "mansard", "barrel", "hip_l
 ROOF_MATS = {"steampunk": ["minecraft:deepslate_tiles", "minecraft:oxidized_cut_copper", "minecraft:bricks",
                            "minecraft:cut_copper", "minecraft:polished_blackstone_bricks", "minecraft:red_nether_bricks",
                            "minecraft:weathered_cut_copper"],
-             "gothic": ["minecraft:oxidized_cut_copper", "minecraft:deepslate_tiles", "minecraft:tuff_bricks",
-                        "minecraft:weathered_cut_copper", "minecraft:blackstone", "minecraft:mossy_stone_bricks",
-                        "minecraft:polished_deepslate"],
+             "gothic": ["minecraft:deepslate_tiles", "minecraft:polished_blackstone_bricks", "minecraft:blackstone",
+                        "minecraft:polished_deepslate", "minecraft:deepslate_bricks", "minecraft:cobbled_deepslate",
+                        "minecraft:deepslate_tiles"],
              "hextech": ["minecraft:deepslate_tiles", "minecraft:purple_terracotta", "minecraft:polished_blackstone_bricks",
                          "minecraft:blackstone", "minecraft:cyan_terracotta", "minecraft:purple_concrete", "minecraft:polished_deepslate"],
              "solarpunk": ["minecraft:moss_block", "create:cut_limestone_bricks", "minecraft:green_terracotta",
@@ -495,6 +495,84 @@ def _gothic_variety(out, x0, z0, w, d, H, y, K, sides, i):
                             r2 = ddx * ddx + ddy * ddy
                             if r2 <= 5 and cy_ + ddy < H - 1:
                                 out.append(list(at(c + ddx, 1, cy_ + ddy)) + [K["trim"] if r2 >= 4 else K["glass"]])
+
+
+def _wing_massing(out, x0, z0, w, d, H, y, K, sides, i, kit):
+    """v21 hextech / station_white wing massing variety, per wing i%3, so wings stop reading as one repeated box.
+    hextech: 0 pillared colonnade + lintel, 1 corner turrets (3x3 quartz, capped), 2 cornice ledge + glazed oriel bays.
+    station_white: 0 full-height fins + stripe, 1 module pods on legs, 2 corner towers + ring ledge. Cheap blocks, all touching walls."""
+    v = i % 3
+    P = K.get("pillar", K["trim"])
+    for side in sides:
+        L = w if side in "ns" else d
+        if L < 17:
+            continue
+        def at(t, k, dy, side=side):
+            if side == "n":
+                return x0 + t, y + dy, z0 - k
+            if side == "s":
+                return x0 + t, y + dy, z0 + d - 1 + k
+            if side == "w":
+                return x0 - k, y + dy, z0 + t
+            return x0 + w - 1 + k, y + dy, z0 + t
+        def put(t, k, dy, b):
+            out.append(list(at(t, k, dy)) + [b])
+        if kit == "hextech" and v == 0:
+            for t in range(3, L - 2, 4):
+                for dy in range(0, 7):
+                    put(t, 2, dy, P)
+                for k in (0, 1):
+                    put(t, k, 3, P)
+                put(t, 2, 7, K["trim"])
+                put(t, 2, 8, K["tip"])
+            for t in range(3, L - 2):
+                for k in (0, 1, 2):
+                    put(t, k, 7, K["trim"])
+        elif kit == "hextech" and v == 2:
+            for t in range(1, L - 1):
+                put(t, 1, H - 2, K["trim"])
+            mid = L // 2
+            for t in range(mid - 3, mid + 4):
+                for dy in range(2, H - 3):
+                    edge = abs(t - mid) == 3 or dy in (2, H - 4)
+                    put(t, 1, dy, K["trim"] if edge else K["glass"])
+                    put(t, 2, dy, K["trim"] if edge else K["glass"])
+                put(t, 2, H - 3, K["trim"])
+        elif kit == "station_white" and v == 0:
+            for t in range(3, L - 2, 4):
+                for dy in range(H - 1):
+                    put(t, 1, dy, K["trim"])
+                    if dy % 6 == 3:
+                        put(t, 2, dy, K["accent"])
+                put(t, 1, H - 1, K["accent"])
+        elif kit == "station_white" and v == 1:
+            for t in (L // 4, (3 * L) // 4):
+                for a in range(-2, 2):
+                    for k in range(1, 5):
+                        for dy in range(H - 8, H - 3):
+                            edge = a in (-2, 1) or k == 4 or dy in (H - 8, H - 4)
+                            put(t + a, k, dy, K["wall"] if edge else (K["glass"] if k == 4 or a in (-1, 0) and dy == H - 6 else K["trim"]))
+                for dy in range(H - 8):
+                    put(t - 2, 4, dy, K["trim"])
+                    put(t + 1, 4, dy, K["trim"])
+                put(t, 4, H - 3, K["accent"])
+    if (kit == "hextech" and v == 1) or (kit == "station_white" and v == 2):
+        tall = H + (3 if kit == "hextech" else 4)
+        for cx_, cz_ in ((x0 - 1, z0 - 1), (x0 + w - 2, z0 - 1), (x0 - 1, z0 + d - 2), (x0 + w - 2, z0 + d - 2)):
+            for a in range(3):
+                for b in range(3):
+                    for dy in range(tall):
+                        ring = a != 1 or b != 1
+                        if not ring and dy < tall - 1:
+                            continue
+                        glass = (a == 1 or b == 1) and (a != b) and dy % 5 in (2, 3) and dy < tall - 2
+                        out.append([cx_ + a, y + dy, cz_ + b, K["glass"] if glass else (P if dy % 4 else K["trim"])])
+            out.append([cx_ + 1, y + tall, cz_ + 1, K["tip"]])
+            out.append([cx_ + 1, y + tall + 1, cz_ + 1, K["antenna"]])
+        if kit == "station_white":
+            for t in range(0, w):
+                for z_ in (z0 - 1, z0 + d):
+                    out.append([x0 + t, y + H - 2, z_, K["accent"]])
 
 
 def _buttresses(out, x0, z0, w, d, H, y, K, sides):
@@ -1441,7 +1519,10 @@ class _Site:
                         _slopeworks(K, self.seed, self.ghosts, x0, z0, f["i"], feat)
             elif kit == "gothic":
                 _gothic_porch(self, f)
+                _gothic_roof(self.ghosts, x0, z0, feat)
                 _gothic_variety(feat, x0, z0, w_, d_, H, y + ty, dict(K, wall="minecraft:stone_bricks", trim="minecraft:smooth_stone"), sides, f["i"])
+            elif kit in ("hextech", "station_white"):
+                _wing_massing(feat, x0, z0, w_, d_, H, y + ty, K, sides, f["i"], kit)
             elif kit == "solarpunk":
                 _greenwall(feat, x0, z0, w_, d_, H, y + ty, sides, self.seed + f["i"])
                 if f["roof"] == "flat":
@@ -1455,6 +1536,45 @@ class _Site:
         if feat:
             self.add("features", 0, 0, 0, feat, {"kind": "features"})
         return used, allhall
+
+
+def _gothic_roof(ghosts, x0, z0, feat):
+    """v21 gothic roof crown: dark lead-look roofs get ridge cresting (blackstone wall comb), spirelets (stone-brick wall +
+    lightning rod) on the ridge ends, every 7th ridge cell and the four eave corners. All stand on roof blocks."""
+    wg = next((g for g in ghosts if g["id"].startswith("wing_") and g["origin"][0] == x0 and g["origin"][2] == z0), None)
+    if not wg:
+        return
+    ox, oy, oz = wg["origin"]
+    top = {}
+    for bx, by, bz, _b in wg["blocks"]:
+        if top.get((bx, bz), -1) < by:
+            top[(bx, bz)] = by
+    if not top:
+        return
+    mx = max(top.values())
+    ridge = sorted(p for p, v in top.items() if v == mx)
+    xs = [p[0] for p in top]
+    zs = [p[1] for p in top]
+    def put(x, y, z, b):
+        feat.append([ox + x, oy + y, oz + z, b])
+    def spire(x, z, h):
+        y = top[(x, z)] + 1
+        for k in range(h):
+            put(x, y + k, z, "minecraft:stone_brick_wall")
+        put(x, y + h, z, "minecraft:lightning_rod")
+    if len(ridge) < len(top) * 0.6:  # a real ridge, not a plateau
+        for n, (x, z) in enumerate(ridge):
+            if n % 7 == 3:
+                spire(x, z, 3)
+            else:
+                put(x, mx + 1, z, "minecraft:polished_blackstone_brick_wall")
+        for (x, z) in (ridge[0], ridge[-1]):
+            spire(x, z, 5)
+    for c in {(min(xs), min(zs)), (min(xs), max(zs)), (max(xs), min(zs)), (max(xs), max(zs))}:
+        for q in [c] + [(c[0] + a, c[1] + b) for a in (-1, 0, 1) for b in (-1, 0, 1)]:
+            if q in top and top[q] >= top[c] - 1:
+                spire(q[0], q[1], 4)
+                break
 
 
 def _roofworks(K, seed, ghosts, x0, z0, i, feat):

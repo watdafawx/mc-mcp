@@ -36,9 +36,24 @@ def pick_room(cells, glow_words=None, prefer_wings=True):
     if not best:
         return None
     score, grp, stuff, gi, cx, cz, fl, y = best
+    # v21: centre on the room's WALLS (ray from the light centroid at eye height to the first solid cell each way), not the lights
+    yy = fl + 2
+    def hit(dx, dz):
+        for k in range(1, 26):
+            if (int(cx) + dx * k, yy, int(cz) + dz * k) in cells:
+                return k
+        return None
+    ex, wx, sz, nz = hit(1, 0), hit(-1, 0), hit(0, 1), hit(0, -1)
+    wallspan = 0
+    if ex and wx:
+        cx = int(cx) + (ex - wx) / 2.0
+        wallspan = max(wallspan, ex + wx)
+    if sz and nz:
+        cz = int(cz) + (sz - nz) / 2.0
+        wallspan = max(wallspan, sz + nz)
     return {"ghost": gi, "lights": len(grp), "stuff": stuff, "floor": fl, "ceil": y, "cut_y": y - 1,
-            "aim": [cx, fl + 2, cz], "span": max(max(l[0] for l in grp) - min(l[0] for l in grp),
-                                                 max(l[2] for l in grp) - min(l[2] for l in grp)) + 8}
+            "aim": [cx, fl + 2, cz], "span": max(wallspan, max(max(l[0] for l in grp) - min(l[0] for l in grp),
+                                                 max(l[2] for l in grp) - min(l[2] for l in grp)) + 8)}
 
 
 def name_is_wing(gi):

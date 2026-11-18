@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Architect tooling only (v21), no Java change. Gothic wings get steep roofs only (gable_steep/hip_steep) in dark lead-look materials with ridge cresting, spirelets and eave-corner pins (`_gothic_roof` in `campus.py`); hextech and station_white wings get per-wing massing variety (colonnade, corner turrets, cornice and oriel; fins, module pods, corner towers); the judge interior cut aims at the room's wall centre (`judge/room_pick.py`).
+
 ## 0.4.1
 
 - Architect/Python tooling changes only (v19, v20). Mod Java code is unchanged since 0.4.0.
