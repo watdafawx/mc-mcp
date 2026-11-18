@@ -203,6 +203,9 @@ slab ridge over a flat roof), `lanterns` (cobblestone wall post plus lantern, 1 
 `suggest`, in its own colours like area ghosts. Only plain survival blocks. `/ghost clear suggest` removes it,
 `/ghost suggest nooverlay` skips it. Nothing is placed in the world.
 
+![chat tips with cost line](ghost-suggest-shots/suggest-tips-chat.png)
+![ghost overlay: gable roof + corner posts on the oak box](ghost-suggest-shots/suggest-overlay.png)
+
 Cost: one call is about $0.001-0.005. The job stops at `ghostGenerate.suggestCostCapUsd` (default $0.10) and is killed
 after 5 minutes. One suggest job at a time; `ghost_suggest_status` shows it. Same setup as `/ghost generate` (the
 architect folder, `architect/.env` and a venv on the machine running the client). The mod never reads the key.

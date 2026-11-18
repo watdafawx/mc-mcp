@@ -102,6 +102,11 @@ Area preview outlines (`/ghost area hextech`): lime = fits, yellow = needs found
 ![yellow: needs foundations](docs/ghost-area-shots/area_hill.png)
 ![red: blocked by water](docs/ghost-area-shots/area_shore.png)
 
+`/ghost suggest` on a plain oak box: tips in chat with the cost line, then the ghost overlay (gable roof and corner posts) fitted onto the real build.
+
+![chat tips with cost line](docs/ghost-suggest-shots/suggest-tips-chat.png)
+![ghost overlay: gable roof + corner posts on the oak box](docs/ghost-suggest-shots/suggest-overlay.png)
+
 Config (`config/mcmcp-common.toml`, section `ghostGenerate`): `python` (empty = `architect/.venv/Scripts/python.exe`, then `python`), `architectDir` (empty = `architect` next to the game's `run` folder), `costCapUsd` (default 0.15, passed to the architect as `--max-cost`).
 
 \* on a client these need a singleplayer world (they use the integrated server).
