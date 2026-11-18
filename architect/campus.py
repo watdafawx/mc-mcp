@@ -422,6 +422,81 @@ def _chimney(out, x, z, y0, h, K):
     out.append([x, y0 + h + 1, z, "minecraft:campfire[lit=true]"])
 
 
+def _gothic_variety(out, x0, z0, w, d, H, y, K, sides, i):
+    """v20 gothic facade rhythm, varies per wing i: a = flying buttresses every 6 with a blind pointed arch (tracery panel,
+    glass + mullion) on every 2nd bay; b = heavy stepped piers every 5 with an arch in EVERY bay; c = tall flying buttresses
+    every 8 with a wide 7-high rose-topped arch every bay. Cheap survival blocks, all against the wall faces."""
+    v = i % 3
+    step = (6, 5, 8)[v]
+    for side in sides:
+        L = w if side in "ns" else d
+        if L < 17:
+            continue
+        ts = list(range(4, L - 3, step))
+        def at(t, k, dy):
+            if side == "n":
+                return x0 + t, y + dy, z0 - k
+            if side == "s":
+                return x0 + t, y + dy, z0 + d - 1 + k
+            if side == "w":
+                return x0 - k, y + dy, z0 + t
+            return x0 + w - 1 + k, y + dy, z0 + t
+        for n, t in enumerate(ts):
+            if v == 1:  # stepped pier: 2 wide at the foot, 1 wide above a third of the height
+                for dy in range((H - 2) // 3):
+                    out.append(list(at(t + 1, 1, dy)) + [K["wall"]])
+                for dy in range(H - 2):
+                    out.append(list(at(t, 1, dy)) + [K["trim"] if dy % 4 else K["wall"]])
+                out.append(list(at(t, 1, H - 2)) + [K["trim"]])
+                for r in range(1 + n % 2 + 1):
+                    out.append(list(at(t, 1, H - 1 + r)) + [K["antenna"] if r else K["trim"]])
+                out.append(list(at(t, 1, H + 2 + n % 2)) + [K["tip"]])
+            else:
+                hp = max(5, H // 2) if v == 0 else max(7, (H * 2) // 3)
+                for dy in range(H - 2):
+                    out.append(list(at(t, 1, dy)) + [K["trim"] if dy % 4 else K["wall"]])
+                for dy in range(hp):
+                    out.append(list(at(t, 3, dy)) + [K["trim"] if dy % 4 else K["wall"]])
+                for k, dy in ((3, hp), (2, hp + 1), (2, hp + 2), (1, hp + 3)):
+                    out.append(list(at(t, k, dy)) + [K["trim"]])
+                for k, dy in ((2, hp - 1), (2, hp)):
+                    out.append(list(at(t, k, dy)) + [K["wall"]])
+                out.append(list(at(t, 1, H - 2)) + [K["trim"]])
+                out.append(list(at(t, 1, H - 1)) + [K["antenna"]])
+                for r in range(n % 3):
+                    out.append(list(at(t, 1, H + r)) + [K["antenna"]])
+                out.append(list(at(t, 1, H + n % 3)) + [K["tip"]])
+                out.append(list(at(t, 3, hp)) + [K["antenna"]])
+                out.append(list(at(t, 3, hp + 1)) + [K["tip"]])
+            # blind tracery arch in the bay after this pier
+            every = (2, 1, 1)[v]
+            if n % every == 0 and n + 1 < len(ts):
+                c = t + step // 2
+                ha = min(H - 3, (9, 8, 7)[v] + n % 2)
+                hw = 2 if v != 2 else 3
+                for dy in range(2, ha + 1):
+                    top = ha - dy
+                    half = hw if top > 2 else max(0, top - (1 if hw == 2 else 0))
+                    for a in range(-hw, hw + 1):
+                        if abs(a) > half:
+                            continue
+                        edge = abs(a) == half
+                        if edge or dy == 2:
+                            blk = K["trim"]
+                        elif a == 0 and dy % 3 == 0:
+                            blk = K["trim"]
+                        else:
+                            blk = K["glass"]
+                        out.append(list(at(c + a, 1, dy)) + [blk])
+                if v == 2:  # rose window over the arch: ring of trim round a glass disc, radius 2
+                    cy_ = ha + 3
+                    for ddx in range(-2, 3):
+                        for ddy in range(-2, 3):
+                            r2 = ddx * ddx + ddy * ddy
+                            if r2 <= 5 and cy_ + ddy < H - 1:
+                                out.append(list(at(c + ddx, 1, cy_ + ddy)) + [K["trim"] if r2 >= 4 else K["glass"]])
+
+
 def _buttresses(out, x0, z0, w, d, H, y, K, sides):
     """Gothic flying buttresses: a tall pier against the wall (pinnacle on top), a lower outer pier three blocks out
     and a stepped rib arching from the outer pier up to the wall pier. Spaced every 6 blocks."""
@@ -1366,7 +1441,7 @@ class _Site:
                         _slopeworks(K, self.seed, self.ghosts, x0, z0, f["i"], feat)
             elif kit == "gothic":
                 _gothic_porch(self, f)
-                _buttresses(feat, x0, z0, w_, d_, H, y + ty, dict(K, wall="minecraft:stone_bricks", trim="minecraft:smooth_stone"), sides)
+                _gothic_variety(feat, x0, z0, w_, d_, H, y + ty, dict(K, wall="minecraft:stone_bricks", trim="minecraft:smooth_stone"), sides, f["i"])
             elif kit == "solarpunk":
                 _greenwall(feat, x0, z0, w_, d_, H, y + ty, sides, self.seed + f["i"])
                 if f["roof"] == "flat":

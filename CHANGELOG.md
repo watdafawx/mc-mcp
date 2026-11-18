@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Architect roof detail: steampunk slope roofs get copper seams, dormers, ridge with lightning rods and chimneys; solarpunk flat wings get a rooftop garden deck (planter hedge, skylight, pergola, beds). Fix: floater guard now forgets cells a merge-mode air box/block erased, so later parts no longer count phantom blocks as support and hang in the air. Offline test: `python architect/test_floaters.py`.
+- Architect gothic wing variety: each wing gets its own facade rhythm (flying buttresses with blind tracery arches, stepped piers with staggered pinnacles, tall buttresses with rose windows) via `_gothic_variety` in `campus.py`.
+- Architect judge tooling in `architect/judge/` (`judge2.py`, `room_pick.py`, `judge_call.py`): interior cut now aims at a real built room (ceiling-light cluster with a floor below) found from the replayed campus cells instead of a fixed ceiling layer.
 
 ## 0.4.0
 
