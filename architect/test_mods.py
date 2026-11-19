@@ -23,12 +23,15 @@ def check(cond, msg):
 
 def piece_ids(r):
     def walk(p):
-        check(p[0] in ("single", "stack", "cube", "tower", "group", "gear", "cog", "belt", "column"), f"{r.theme}: unknown piece kind {p[0]}")
+        check(p[0] in ("single", "stack", "cube", "tower", "group", "gear", "cog", "belt", "column", "kgear", "kwheel", "kbelt"), f"{r.theme}: unknown piece kind {p[0]}")
         if p[0] == "group":
             for (dx, dz, sub) in p[1:]:
                 check(abs(dx) <= 3 and abs(dz) <= 3, f"{r.theme}: group offset outside the 7x7 plinth {dx},{dz}")
                 yield from walk(sub)
             return
+        if p[0] in ("kgear", "kwheel", "kbelt"):  # fixed real Create kinetics inside
+            yield from ("create:shaft", "create:cogwheel", "create:large_cogwheel", "create:gearbox",
+                        "create:large_water_wheel", "create:water_wheel", "create:belt")
         for x in p[1:]:
             if isinstance(x, str) and not x.startswith("minecraft:"):  # vanilla fillers (fake cogwheel parts) are not whitelisted
                 yield x.split("[")[0]
@@ -88,16 +91,19 @@ def main():
         n_pieces = sum(1 for b in used if b in mods.REGISTRY[theme].blocks)
         print(f"{theme}: {len(mods.REGISTRY[theme].blocks)} ids, room uses {n_pieces} distinct registry blocks")
     check(mods.themes_in([{"rooms": ["mod_room:ae2", "mod_room:create"]}]) == ["create"], "themes_in")
-    # v24: Create's rotating parts are invisible in ghosts: the room must never place them, and every mod gets facade signage
-    INVIS = {"create:" + n for n in "shaft cogwheel large_cogwheel powered_shaft water_wheel large_water_wheel flywheel belt hand_crank".split()}
+    # v25: ghosts draw block-entity renderers, so the Create room uses real cogs, shafts, belt and water wheel
+    KIN = {"create:" + n for n in "shaft cogwheel large_cogwheel large_water_wheel belt".split()}
     placed = {}
     cells = {(x, z) for x in range(40) for z in range(24)}
     K = {"trim": "minecraft:stone", "detail": "minecraft:stone", "glow": "minecraft:glowstone", "wall": "minecraft:stone"}
     spine = {(x, z) for (x, z) in cells if abs(z - 12) <= 1}
     interiors.fit_room("mod_room:create", cells, 1, 9, K, spine, spine, "steampunk", 1,
                        lambda x, y, z, b: placed.__setitem__((x, y, z), b))
-    check(not {b.split("[")[0] for b in placed.values()} & INVIS, "create room places invisible kinetic blocks")
-    check(sum(1 for b in placed.values() if b == "minecraft:dark_oak_planks") > 20, "create room has no fake cogwheel discs")
+    got = {b.split("[")[0] for b in placed.values()}
+    check(KIN <= got, f"create room misses real kinetic blocks: {sorted(KIN - got)}")
+    check(all("[" in b for b in placed.values() if b.split("[")[0] in KIN), "kinetic blocks need explicit axis/part states")
+    import mods.shapes as fake_shapes  # the fake disc stays available as a fallback
+    check(len(fake_shapes.disc(2, "a", "b", "c")) > 10, "fake cog disc fallback broken")
     import mods.signs as signs
     for theme in mods.REGISTRY:
         cells_ = signs.facade(theme, 0, 0, 37, 49, 2, 11, "s")

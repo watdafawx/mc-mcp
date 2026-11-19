@@ -2,6 +2,10 @@ package dev.watdafawx.mcmcp.ghost;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.function.Function;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,6 +30,8 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -46,7 +52,19 @@ import net.neoforged.neoforge.common.NeoForge;
 
 /** Draws every visible ghost as see-through blocks plus a bounding box. Meshes are rebuilt only when a ghost changes. */
 public final class GhostRenderer {
-    private record Baked(int version, int clipY, VertexBuffer vbo, AABB box) {}
+    /** A mesh drawn with one texture: block-entity quads from chest, sign, banner... sheets. */
+    private record Part(ResourceLocation tex, VertexBuffer vbo) {}
+
+    private record Baked(int version, int clipY, VertexBuffer vbo, List<Part> parts, AABB box) {
+        void close() {
+            if (vbo != null) vbo.close();
+            for (Part p : parts) p.vbo.close();
+        }
+
+        boolean empty() {
+            return vbo == null && parts.isEmpty();
+        }
+    }
 
     private static final Map<String, Baked> BAKED = new HashMap<>();
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("mcmcp-ghost");
@@ -77,11 +95,11 @@ public final class GhostRenderer {
             if (!g.visible || !dim.equals(g.dimension)) continue;
             Baked baked = BAKED.get(g.id);
             if (baked == null || baked.version != g.version || baked.clipY != clipY) {
-                if (baked != null && baked.vbo != null) baked.vbo.close();
+                if (baked != null) baked.close();
                 baked = bake(g);
                 BAKED.put(g.id, baked);
             }
-            if (baked.vbo == null) continue;
+            if (baked.empty()) continue;
             BlockPos o = g.origin;
             RenderType rt = RenderType.translucent();
             rt.setupRenderState();
@@ -93,9 +111,17 @@ public final class GhostRenderer {
             ShaderInstance sh = GameRenderer.getRendertypeTranslucentShader();
             if (sh.CHUNK_OFFSET != null)
                 sh.CHUNK_OFFSET.set((float) (o.getX() - cam.x), (float) (o.getY() - cam.y), (float) (o.getZ() - cam.z));
-            baked.vbo.bind();
-            baked.vbo.drawWithShader(e.getModelViewMatrix(), e.getProjectionMatrix(), sh);
+            if (baked.vbo != null) {
+                baked.vbo.bind();
+                baked.vbo.drawWithShader(e.getModelViewMatrix(), e.getProjectionMatrix(), sh);
+            }
+            for (Part p : baked.parts) {
+                RenderSystem.setShaderTexture(0, p.tex);
+                p.vbo.bind();
+                p.vbo.drawWithShader(e.getModelViewMatrix(), e.getProjectionMatrix(), sh);
+            }
             VertexBuffer.unbind();
+            if (!baked.parts.isEmpty()) RenderSystem.setShaderTexture(0, TextureAtlas.LOCATION_BLOCKS);
             if (sh.CHUNK_OFFSET != null) sh.CHUNK_OFFSET.set(0f, 0f, 0f);
             RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             rt.clearRenderState();
@@ -111,9 +137,10 @@ public final class GhostRenderer {
         }
         BAKED.entrySet().removeIf(en -> {
             if (live.contains(en.getKey())) return false;
-            if (en.getValue().vbo != null) en.getValue().vbo.close();
+            en.getValue().close();
             return true;
         });
+        GhostBlockEntities.retain(live);
     }
 
     private static Baked bake(Ghost g) {
@@ -130,41 +157,96 @@ public final class GhostRenderer {
             int localMax = clip - g.origin.getY();
             blocks.long2ObjectEntrySet().removeIf(en -> BlockPos.getY(en.getLongKey()) > localMax);
         }
-        if (b == null) return new Baked(version, clip, null, new AABB(0, 0, 0, 1, 1, 1));
+        if (b == null) return new Baked(version, clip, null, List.of(), new AABB(0, 0, 0, 1, 1, 1));
         AABB box = new AABB(b[0], b[1], b[2], b[3] + 1, b[4] + 1, b[5] + 1);
         Minecraft mc = Minecraft.getInstance();
         BlockRenderDispatcher dispatcher = mc.getBlockRenderer();
         GhostLevel level = new GhostLevel(blocks, g.origin);
         RandomSource rand = RandomSource.create();
         PoseStack ps = new PoseStack();
+        boolean bes = GhostBlockEntities.enabled() && mc.level != null;
+        Map<ResourceLocation, ByteBufferBuilder> extraBytes = new LinkedHashMap<>();
+        Map<ResourceLocation, BufferBuilder> extra = new LinkedHashMap<>();
         try (ByteBufferBuilder bytes = new ByteBufferBuilder(Math.max(1 << 16, blocks.size() * 512))) {
             BufferBuilder bb = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-            VertexRecorder rec = new VertexRecorder();
-            for (var en : blocks.long2ObjectEntrySet()) {
-                BlockState st = en.getValue();
-                if (st.getRenderShape() != RenderShape.MODEL) continue;
-                pos.set(en.getLongKey());
-                ps.pushPose();
-                ps.translate(pos.getX(), pos.getY(), pos.getZ());
-                rand.setSeed(st.getSeed(pos));
-                rec.reset();
-                try {
-                    dispatcher.renderBatched(st, pos, level, ps, rec, true, rand, ModelData.EMPTY, null);
-                    rec.flushTo(bb); // only whole, finished blocks reach the mesh
-                } catch (RuntimeException ex) {
-                    // Some modded models expect real block entity data; skip them rather than break the ghost.
-                    if (FAILED.add(st.getBlock())) LOG.warn("ghost {}: skipping {} ({})", g.id, st, ex.toString());
+            // Block-entity quads on the block atlas join the main mesh; other sheets (chest, sign...) get their own.
+            Function<ResourceLocation, VertexConsumer> sink = tex -> tex.equals(TextureAtlas.LOCATION_BLOCKS) ? bb
+                    : extra.computeIfAbsent(tex, t -> {
+                        ByteBufferBuilder by = new ByteBufferBuilder(1 << 14);
+                        extraBytes.put(t, by);
+                        return new BufferBuilder(by, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+                    });
+            Runnable draw = () -> {
+                BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+                BlockPos.MutableBlockPos world = new BlockPos.MutableBlockPos();
+                VertexRecorder rec = new VertexRecorder();
+                GhostBlockEntities.Capture cap = bes ? new GhostBlockEntities.Capture() : null;
+                for (var en : blocks.long2ObjectEntrySet()) {
+                    BlockState st = en.getValue();
+                    RenderShape shape = st.getRenderShape();
+                    // INVISIBLE blocks can still have a renderer (BaseEntityBlock default: signs, banners, skulls).
+                    if (shape != RenderShape.MODEL && !bes) continue;
+                    pos.set(en.getLongKey());
+                    ps.pushPose();
+                    ps.translate(pos.getX(), pos.getY(), pos.getZ());
+                    // Block-entity renderer (chest, sign, Create shaft/cog/belt...) through a client-only dummy.
+                    int beVerts = 0;
+                    boolean hasBe = false;
+                    if (bes) {
+                        world.setWithOffset(pos, g.origin);
+                        BlockEntity be = GhostBlockEntities.dummy(g.id, en.getLongKey(), world, st);
+                        if (be != null) {
+                            hasBe = true;
+                            if (GhostBlockEntities.render(g.id, be, ps, cap)) beVerts = cap.flush(sink);
+                        }
+                    }
+                    // Block model: always for MODEL blocks; for animated ones only when their renderer drew nothing.
+                    if (shape == RenderShape.MODEL || (shape == RenderShape.ENTITYBLOCK_ANIMATED && beVerts == 0)) {
+                        int n = model(g, dispatcher, st, pos, level, ps, rec, rand, bb, ModelData.EMPTY);
+                        // Create's kinetic models (shaft, cogwheel...) are empty unless asked for their "virtual" model.
+                        if (n == 0 && hasBe && beVerts == 0 && GhostBlockEntities.VIRTUAL != ModelData.EMPTY)
+                            model(g, dispatcher, st, pos, level, ps, rec, rand, bb, GhostBlockEntities.VIRTUAL);
+                    }
+                    ps.popPose();
                 }
-                ps.popPose();
+            };
+            if (bes) GhostBlockEntities.withFlywheelOff(draw);
+            else draw.run();
+            List<Part> parts = new ArrayList<>();
+            for (var en : extra.entrySet()) {
+                MeshData m = en.getValue().build();
+                if (m != null) parts.add(new Part(en.getKey(), upload(m)));
             }
             MeshData mesh = bb.build();
-            if (mesh == null) return new Baked(version, clip, null, box);
-            VertexBuffer vbo = new VertexBuffer(VertexBuffer.Usage.STATIC);
-            vbo.bind();
-            vbo.upload(mesh);
-            VertexBuffer.unbind();
-            return new Baked(version, clip, vbo, box);
+            return new Baked(version, clip, mesh == null ? null : upload(mesh), parts, box);
+        } finally {
+            for (ByteBufferBuilder by : extraBytes.values()) by.close();
+        }
+    }
+
+    private static VertexBuffer upload(MeshData mesh) {
+        VertexBuffer vbo = new VertexBuffer(VertexBuffer.Usage.STATIC);
+        vbo.bind();
+        vbo.upload(mesh);
+        VertexBuffer.unbind();
+        return vbo;
+    }
+
+    /** Bakes one block model into bb; returns the vertices it added (0 if empty or it threw). */
+    private static int model(Ghost g, BlockRenderDispatcher dispatcher, BlockState st, BlockPos pos, GhostLevel level,
+            PoseStack ps, VertexRecorder rec, RandomSource rand, BufferBuilder bb, ModelData data) {
+        rand.setSeed(st.getSeed(pos));
+        rec.reset();
+        try {
+            dispatcher.renderBatched(st, pos, level, ps, rec, true, rand, data, null);
+            int n = rec.size() - rec.size() % 4;
+            rec.flushTo(bb); // only whole, finished blocks reach the mesh
+            return n;
+        } catch (RuntimeException ex) {
+            // Some modded models expect real block entity data; skip them rather than break the ghost.
+            if (FAILED.add(st.getBlock())) LOG.warn("ghost {}: skipping {} ({})", g.id, st, ex.toString());
+            rec.reset();
+            return 0;
         }
     }
 

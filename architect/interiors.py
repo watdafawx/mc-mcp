@@ -331,6 +331,44 @@ def _mod_piece(piece, cx, cz, fy, h, put):
                 put(cx, y, cz + z, casing)
         shapes.put_plane(put_xyz(put), shapes.disc(r, body, teeth, hub), cx, sy, cz, "x", thick)
         return
+    if kind == "kgear":  # ("kgear", casing): REAL Create gear train, wheels face +z: large cog, meshing small cog, large cog
+        casing, K = piece[1], "create:"
+        sy = fy + 3
+        put(cx - 1, fy + 1, cz, casing)  # casing post under the low large cog
+        put(cx - 1, sy, cz, K + "large_cogwheel[axis=z]")
+        put(cx, sy + 1, cz, K + "cogwheel[axis=z]")  # small cog meshes diagonally with both large ones
+        put(cx - 1, sy, cz + 1, K + "shaft[axis=z]")  # axles into a casing bearing behind
+        put(cx - 1, sy, cz + 2, casing)
+        if h >= 8:
+            put(cx + 1, sy + 2, cz, K + "large_cogwheel[axis=z]")
+            put(cx + 1, sy + 2, cz + 1, K + "shaft[axis=z]")
+            put(cx + 1, sy + 2, cz + 2, casing)
+            for y in range(fy + 1, sy + 2):  # casing pillar behind the high cog
+                put(cx + 1, y, cz + 2, casing)
+        for y in range(fy + 1, sy):  # bearing pillar behind the low cog
+            put(cx - 1, y, cz + 2, casing)
+        for x in (cx + 2, cx + 3):  # output shaft along x into a gearbox
+            put(x, fy + 1, cz, K + "shaft[axis=x]")
+        put(cx + 3, fy + 2, cz, K + "gearbox[axis=y]")
+        return
+    if kind == "kwheel":  # ("kwheel", casing): REAL large water wheel (axis x) on a shaft between two casing pillars
+        casing, K = piece[1], "create:"
+        sy = fy + 4 if h >= 8 else fy + 3
+        put(cx, sy, cz, K + ("large_water_wheel[axis=x]" if h >= 8 else "water_wheel[facing=east]"))
+        for x in (-1, 1):
+            put(cx + x, sy, cz, K + "shaft[axis=x]")
+        for x in (-2, 2):
+            for y in range(fy + 1, sy + 1):
+                put(cx + x, y, cz, casing)
+        return
+    if kind == "kbelt":  # ("kbelt", n, end_block): REAL Create belt along x, 2n+1 long, on casing-capped shaft ends
+        n, eb, K = int(piece[1]), piece[2], "create:"
+        for dx in range(-n, n + 1):
+            part = "start" if dx == -n else "end" if dx == n else "middle"
+            put(cx + dx, fy + 1, cz, K + f"belt[facing=east,part={part},slope=horizontal]")
+        for dx in (-n - 1, n + 1):
+            put(cx + dx, fy + 1, cz, eb)
+        return
     if kind == "belt":  # ("belt", n, belt_block, end_block): strip along x, 2n+1 long, end blocks as pulleys
         n, bb, eb = int(piece[1]), piece[2], piece[3]
         for dx in range(-n, n + 1):

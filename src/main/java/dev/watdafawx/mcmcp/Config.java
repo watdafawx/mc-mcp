@@ -41,6 +41,9 @@ public final class Config {
     public static final ModConfigSpec.DoubleValue GEN_COST_CAP;
     public static final ModConfigSpec.DoubleValue SUGGEST_COST_CAP;
 
+    // --- ghost rendering ---
+    public static final ModConfigSpec.BooleanValue GHOST_BLOCK_ENTITIES;
+
     static {
         B.comment("MCP server inside the game client (also serves singleplayer's integrated server).").push("client");
         CLIENT_ENABLED = B.define("enabled", true);
@@ -93,6 +96,12 @@ public final class Config {
                 .defineInRange("costCapUsd", 0.15, 0.01, 50.0);
         SUGGEST_COST_CAP = B.comment("Stop a /ghost suggest job once its API cost reaches this many USD (passed as --max-cost).")
                 .defineInRange("suggestCostCapUsd", 0.10, 0.01, 50.0);
+        B.pop();
+
+        B.comment("How ghosts are drawn (client only).").push("ghostRender");
+        GHOST_BLOCK_ENTITIES = B.comment("Also draw blocks that a block-entity renderer draws (chests, signs, Create shafts, cogs, belts...)",
+                        "through a client-only dummy block entity. Off = block models only (the old behaviour).")
+                .define("blockEntities", true);
         B.pop();
     }
 

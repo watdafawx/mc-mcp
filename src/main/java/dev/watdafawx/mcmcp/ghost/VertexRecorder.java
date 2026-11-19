@@ -20,15 +20,37 @@ final class VertexRecorder implements VertexConsumer {
         cur = -1;
     }
 
+    int size() {
+        return count;
+    }
+
     /** Copies the recorded whole quads to out. */
     void flushTo(VertexConsumer out) {
+        flushTo(out, false);
+    }
+
+    /**
+     * Copies the recorded whole quads to out. shade: multiply the colour by vanilla's directional face shade from the
+     * normal (up 1, down 0.5, north/south 0.8, east/west 0.6), for entity models drawn with a shader that has no lighting.
+     */
+    void flushTo(VertexConsumer out, boolean shade) {
         int n = count - count % 4;
         for (int i = 0; i < n; i++) {
             int o = i * STRIDE;
-            out.addVertex(f(o), f(o + 1), f(o + 2), data[o + 3], f(o + 4), f(o + 5), data[o + 6], data[o + 7],
+            int color = data[o + 3];
+            if (shade) color = shade(color, f(o + 8), f(o + 9), f(o + 10));
+            out.addVertex(f(o), f(o + 1), f(o + 2), color, f(o + 4), f(o + 5), data[o + 6], data[o + 7],
                     f(o + 8), f(o + 9), f(o + 10));
         }
         reset();
+    }
+
+    private static int shade(int argb, float nx, float ny, float nz) {
+        float len = nx * nx + ny * ny + nz * nz;
+        if (len < 1e-6f) return argb;
+        float s = (nx * nx * 0.6f + ny * ny * (ny > 0 ? 1f : 0.5f) + nz * nz * 0.8f) / len;
+        int r = Math.round(((argb >> 16) & 255) * s), g = Math.round(((argb >> 8) & 255) * s), b = Math.round((argb & 255) * s);
+        return argb & 0xFF000000 | r << 16 | g << 8 | b;
     }
 
     private float f(int i) {

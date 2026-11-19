@@ -13,6 +13,10 @@ Piece kinds (interiors._mod_piece), all anchored on the 5x5 pad centre:
   ("tower", casing, glass, n)        3x3 footprint, n high: casing corners/edges, glass faces (unformed multiblock look)
   ("group", (dx, dz, piece), ...)    sub-pieces at offsets from the pad centre (a cluster, plinth 7x7: offsets within +-3)
   ("gear", casing, shaft, cog, large) Create gear train: 3 casing pillars, shaft run, large + small cogwheels, vertical drive
+  ("kgear", casing)                  REAL Create gear train (large/small/large cogwheels, axis z) with shafts, bearings, gearbox
+  ("kwheel", casing)                 REAL Create large water wheel (axis x) on a shaft between two casing pillars
+  ("kbelt", n, end_block)            REAL Create belt along x (2n+1, start/middle/end), end blocks at both ends
+  ("gear"/"cog"/"belt", ...)         fake (vanilla-block) versions, the fallback when a block-entity block does not draw
 """
 from __future__ import annotations
 
