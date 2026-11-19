@@ -451,6 +451,7 @@ class Architect:
         self._guides: Guides | None = None
         self.guard = floaters.Guard()
         self.spectator = False
+        self.protected: set[str] = set()  # featured registry mod wing ghosts: never cleared or replaced, only added to
         self.prev_view: dict | None = None  # ghost view modes before the first screenshot view of a run
         self.cost = 0.0
         self.active_mods: list[str] = list(FEATURE_MODS)  # registered mod room themes whose whitelist the blocks tool adds
@@ -465,6 +466,9 @@ class Architect:
 
     def ghost_set_guarded(self, a: dict):
         """ghost_set without parts floating in the air: those are dropped and reported back."""
+        if a["id"] in self.protected and a.get("mode") != "merge":
+            return json.dumps({"error": f"{a['id']} is the featured registry mod wing: do not replace it. Add to it with "
+                                        "ghost_set mode=merge (same id), or build extra pieces under another id."}), True
         args, floating = self.guard.check(a["id"], a)
         snapped = [p for p in floating if "snapped_down" in p]
         rej = [p for p in floating if "rejected" in p]
@@ -482,6 +486,9 @@ class Architect:
             out = (out if isinstance(out, str) else json.dumps(out)) + "\nDROPPED floating parts (touch nothing): " + \
                 json.dumps(floating) + " -- attach them to a building or remove them."
         return out, is_err
+
+    def clear_hits_protected(self, gid: str) -> bool:
+        return any(k == gid or gid == "*" or (gid.endswith("/") and k.startswith(gid)) for k in self.protected)
 
     def restore_view(self):
         """After a run: undo the screenshot view modes (xray off unless it was on before, solid as before, HUD back)."""
@@ -557,6 +564,8 @@ class Architect:
                                                   "blocks": g["blocks"]})
                 self.guard.record(f"{a['area']}/{g['id']}", {"origin": o, "blocks": g["blocks"]}, True)
                 self.guard.campus_ids.add(f"{a['area']}/{g['id']}")
+                if any(g["id"] == f"wing_{t}" for t in FEATURE_MODS):
+                    self.protected.add(f"{a['area']}/{g['id']}")
                 xs = [b[0] for b in g["blocks"]]; ys = [b[1] for b in g["blocks"]]; zs = [b[2] for b in g["blocks"]]
                 item = {"id": f"{a['area']}/{g['id']}", "origin": o,
                         "size": [max(xs) - min(xs) + 1, max(ys) - min(ys) + 1, max(zs) - min(zs) + 1],
@@ -943,6 +952,9 @@ class Architect:
                         is_err = False
                     elif c.name == "ghost_set" and c.input.get("id"):
                         out, is_err = self.ghost_set_guarded(c.input)
+                    elif c.name == "ghost_clear" and self.clear_hits_protected(str(c.input.get("id", ""))):
+                        out, is_err = ("not cleared: the featured registry mod wing (" + ", ".join(sorted(self.protected))
+                                       + ") stays. Keep it and add to it with ghost_set mode=merge; clear other ghosts by exact id.", True)
                     else:
                         out, is_err = self.mcp.call(c.name, c.input)
                         if c.name == "ghost_clear" and not is_err:
@@ -1007,7 +1019,11 @@ def generate_request(style: str, x: int, y: int, z: int, kit: str, layout: str, 
         brief += (f"\nFEATURE WING: the {r.name} mod. Give it its OWN large wing (size l, floors 1, floor_h 9, name \"{t}\", "
                   f"rooms [\"mod_room:{t}\", \"mod_room:{t}\", \"expansion\"]) and make it the showpiece of the campus: the "
                   f"room fit-out already puts real {r.name} machines on every pad; add more of them with ghost_set using "
-                  f"the whitelist, and look inside with view(angle=cut). Kit {r.style} fits it best. Keep the other wings few and plain: at most an AE2 wing and one more, size s or m, no extra mod rooms, so the budget goes into the {r.name} wing: its facade, its interior and the mod blocks you add with ghost_set (use the whitelist ids, place them as visible set pieces with aisles clear).\n" + mods.prompt_note(t))
+                  f"the whitelist, and look inside with view(angle=cut). Kit {r.style} fits it best. Keep the other wings few and plain: at most an AE2 wing and one more, size s or m, no extra mod rooms, so the budget goes into the {r.name} wing: its facade, its interior and the mod blocks you add with ghost_set (use the whitelist ids, place them as visible set pieces with aisles clear). "
+                  f"THE REGISTRY WING STAYS: the campus tool builds this wing with the {r.name} room kit, facade signage and "
+                  f"real {r.name} blocks (ghost id <area>/wing_{t}). Never ghost_clear it, never rebuild it under another id, "
+                  f"never replace it: ghost_clear and ghost_set mode=replace on it are refused. Keep it as the featured wing "
+                  f"and only ADD to it (ghost_set mode=merge with that same id, or extra pieces around it).\n" + mods.prompt_note(t))
     if SITE:  # survey summary only (never the raw grid): keeps the prompt cheap
         p = SITE["plan"]
         brief = brief.replace("(about 150-180 x 110-130 blocks)", f"(about {p['w']} x {p['d']} blocks, hard limit)")
