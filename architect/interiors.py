@@ -223,10 +223,45 @@ def fit_room(kind: str, cells: set, fy: int, h: int, K: dict, keep: set, spine: 
 
 
 def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, place, seed):
-    """Registered mod room (mods/): 3x3 pads on a 6-grid (3-wide aisles between), a centrepiece on every pad (the mod's
-    `pieces`, cycled, offset per room), wall machines along the edges (`wall`, else the single pieces)."""
+    """Registered mod room (mods/): centrepiece clusters on big pads, wall machines along the edges.
+    With reg.plinth set (v23): a contrasting deck over the whole room floor (light under dark machines, dark under light),
+    7x7 plinths (lit/contrast ring, inner field, mod-block centre) and one centrepiece cluster per plinth, greedy-packed
+    from the room corner with >= 2-cell aisles. Without it: the v22 3x3 pads on a 6-grid."""
     pad, mid = reg.pad
-    cset, pads = set(centre), []
+    cset = set(centre)
+    if reg.plinth:
+        ring, field = reg.plinth
+        if reg.deck:
+            for (x, z) in cset | set(edge):
+                if (x, z) not in keep:
+                    put(x, fy, z, reg.deck)
+        fp7 = lambda c: {(c[0] + dx, c[1] + dz) for dx in range(-3, 4) for dz in range(-3, 4)}
+        pads = []
+        for c in sorted(cset, key=lambda p: (p[1], p[0])):
+            if fp7(c) <= cset and not (fp7(c) & keep) and all(max(abs(c[0] - o[0]), abs(c[1] - o[1])) >= 9 for o in pads):
+                pads.append(c)
+        for k, c in enumerate(pads):
+            for (x, z) in fp7(c):
+                d = max(abs(x - c[0]), abs(z - c[1]))
+                if d == 3:
+                    put(x, fy, z, ring if (x + z) % 2 == 0 or not reg.ring_dash else field)
+                elif d == 2 or (d == 1 and False):
+                    put(x, fy, z, field)
+                else:
+                    put(x, fy, z, mid if d == 0 else field)
+            for dx in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    if (dx, dz) != (0, 0):
+                        put(c[0] + dx, fy, c[1] + dz, pad)
+            _mod_piece(reg.pieces[(k + seed) % len(reg.pieces)], c[0], c[1], fy, h, put)
+            used |= fp7(c)
+        wall = reg.wall or tuple(p[1] for p in reg.pieces if p[0] == "single")
+        for i, p in enumerate(edge):
+            if wall and i % 3 != 2 and p not in used:
+                for dy in (1, 2 if h >= 3 else 1):
+                    place(p, wall[(i // 3 + seed) % len(wall)], dy)
+        return
+    pads = []
     for (x, z) in sorted(centre):
         if (x, z) in keep:
             continue
@@ -261,6 +296,26 @@ def _registered(theme: str):
 def _mod_piece(piece, cx, cz, fy, h, put):
     """One registry centrepiece on a 5x5 pad, anchored on its centre (cx, cz); see mods/__init__.py for the kinds."""
     kind = piece[0]
+    if kind == "group":  # ("group", (dx, dz, piece), ...): sub-pieces anchored at offsets from the pad centre
+        for (dx, dz, sub) in piece[1:]:
+            _mod_piece(sub, cx + dx, cz + dz, fy, h, put)
+        return
+    if kind == "gear":  # ("gear", casing, shaft, cog, large_cog): gear train on casing pillars, wheel disks face +z
+        casing, shaft, cog, large = piece[1:5]
+        top = min(3, max(2, h - 3))
+        for x in (-3, 0, 3):
+            for dy in range(1, top + 1):
+                put(cx + x, fy + dy, cz, casing)
+        for x in (-2, -1, 1, 2):
+            put(cx + x, fy + top, cz, shaft + "[axis=x]")
+        put(cx - 3, fy + top + 1, cz, large + "[axis=z]")
+        put(cx + 3, fy + top + 1, cz, large + "[axis=z]")
+        put(cx, fy + top + 1, cz, cog + "[axis=z]")
+        for dy in range(top + 2, min(top + 4, h - 1) + 1):  # vertical drive shaft with a flat cog on top
+            put(cx, fy + dy, cz, shaft + "[axis=y]")
+        if top + 4 <= h - 1:
+            put(cx, fy + top + 4, cz, cog + "[axis=y]")
+        return
     if kind == "single":
         put(cx, fy + 1, cz, piece[1])
     elif kind == "stack":

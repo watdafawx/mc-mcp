@@ -8,10 +8,19 @@ ROOM = ModRoom(
     brief="Kinetic workshop: a shaft and cogwheel gear train along the spine with a large water wheel at one wall, a "
           "mechanical press + mixer line over basins, fluid tanks with pipes, an encased fan, brass/andesite/copper "
           "casing machines, a gearbox and clutch, metal girders overhead, brass and zinc blocks as stock.",
-    pieces=(("stack", C + "fluid_tank", 3), ("single", C + "mechanical_press"), ("single", C + "large_cogwheel"),
-            ("cube", C + "brass_casing", C + "framed_glass", C + "mechanical_mixer"),
-            ("single", C + "gearbox"), ("stack", C + "shaft", 4), ("single", C + "water_wheel"),
-            ("stack", C + "encased_fan", 2)),
+    deck="minecraft:smooth_sandstone", plinth=("minecraft:smooth_stone", "minecraft:polished_diorite"),
+    pieces=(  # v23: light floor under the dark kinetic parts; gear trains on casing pillars instead of a plain grid
+            ("gear", C + "andesite_casing", C + "shaft", C + "cogwheel", C + "large_cogwheel"),
+            ("group", (0, 0, ("cube", C + "brass_casing", C + "framed_glass", C + "mechanical_mixer")),
+             (-3, 0, ("stack", C + "fluid_tank", 3)), (3, 0, ("stack", C + "fluid_tank", 3)),
+             (0, 3, ("single", C + "mechanical_press")), (0, -3, ("single", C + "basin")),
+             *[(d, 0, ("single", C + "shaft[axis=x]")) for d in (-2, 2)]),
+            ("group", (0, 3, ("gear", C + "brass_casing", C + "shaft", C + "cogwheel", C + "large_cogwheel")),
+             (0, -2, ("stack", C + "encased_fan", 2)), (-3, -3, ("stack", C + "andesite_casing", 3)),
+             (3, -3, ("stack", C + "andesite_casing", 3))),
+            ("group", (0, 0, ("stack", C + "water_wheel", 1)), (-3, 0, ("stack", C + "brass_casing", 3)),
+             (3, 0, ("stack", C + "brass_casing", 3)), (0, 3, ("single", C + "gearbox")), (0, -3, ("single", C + "clutch"))),
+            ("gear", C + "brass_casing", C + "shaft", C + "cogwheel", C + "large_cogwheel")),
     wall=tuple(C + n for n in "mechanical_press mechanical_mixer fluid_tank gearbox millstone mechanical_saw basin brass_casing depot".split()),
     ghost_rules="Shafts/cogwheels do not rotate in a ghost: they are static. Belts, chutes and pipes are thin models, "
                 "belts have no ghost texture (skip them): use casings, tanks, wheels, presses, mixers and girders for "

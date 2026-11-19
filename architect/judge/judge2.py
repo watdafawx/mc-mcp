@@ -44,6 +44,27 @@ def occupancy(gid, sel):
         print("occupancy replay failed:", repr(e)[:120])
     return cells, done
 
+def mod_wings(gid):
+    """{wing ghost key: (theme, namespaces)} for campus wings with a registered mod_room:<theme> (v23: judged separately)."""
+    out = {}
+    f = ARCH / "sessions" / gid / "messages.json"
+    try:
+        import mods
+        for m in json.load(open(f, encoding="utf-8")):
+            if m.get("role") != "assistant" or not isinstance(m.get("content"), list):
+                continue
+            for b in m["content"]:
+                if b.get("type") == "tool_use" and b["name"] == "campus":
+                    for i, w in enumerate((b.get("input") or {}).get("wings") or []):
+                        for r in list(w.get("rooms") or []) + list(w.get("upper") or []):
+                            k, _, th = str(r).partition(":")
+                            if k == "mod_room" and th in mods.REGISTRY:
+                                out["wing_" + str(w.get("name", i))] = (th, mods.REGISTRY[th].namespaces)
+    except Exception as e:  # noqa: BLE001
+        print("mod_wings failed:", repr(e)[:100])
+    return out
+
+
 REFS = "X:/Dev/Minecraft/mc-mcp/architect/knowledge/style_refs/"
 OUT = ARCH / "exports" / "judge2"  # ignored dir; sheets are not committed
 OUT.mkdir(parents=True, exist_ok=True)
@@ -157,7 +178,10 @@ for arg in sys.argv[1:]:
         return n / max(1, (b[0] - a[0]) * (b[2] - a[2]))
     wcand = [k for k in by if k.startswith("wing_") and k != "wing_home"]
     wrect = [k for k in wcand if not occ or _fill(k) >= 0.55] or wcand
-    wkeys = sorted(wrect, key=_len, reverse=True) +         [k for k in by if k == "wing_home"]
+    mw_ = {k: v for k, v in mod_wings(gid).items() if k in by}
+    wkeys = sorted(wrect, key=lambda k: (k not in mw_, -_len(k))) +         [k for k in by if k == "wing_home"]
+    if mw_:
+        print("mod wings:", {k: v[0] for k, v in mw_.items()})
     print("facade candidates", [(k, round(_fill(k), 2), _len(k)) for k in wcand])
     wkey, best, used_fb = None, None, False
 
@@ -187,7 +211,7 @@ for arg in sys.argv[1:]:
 
     for wk in wkeys:
         L = _len(wk)
-        ds = tuple(int(min(75, max(28, L * f))) for f in (1.0, 1.25, 0.85, 1.5))
+        ds = tuple(int(min(75, max(28, L * f))) for f in ((0.8, 1.0, 0.65, 1.25) if wk in mw_ else (1.0, 1.25, 0.85, 1.5)))
         best = search(wk, ds, (int(ds[0] * 0.3), int(ds[0] * 0.45), int(ds[0] * 0.2)), (0, 3, -3, 6, -6, 10, -10))
         if best:
             wkey = wk
@@ -242,7 +266,28 @@ for arg in sys.argv[1:]:
                     dense = [wl[0] + k[0] * 8 + 4, wl[1] + 2, wl[2] + k[1] * 8 + 4, grid[k]]
                 return y, lit_, wl, wh, dense
         return None
-    room = room_pick.pick_room({k: v for k, v in occ.items() if v[0] != "bbox"}, GLOW_WORDS) if occ else None
+    def find_mod_room():
+        """v23: the featured mod's room: centroid/extent of that mod's blocks inside its wing (room_pick prefers it)."""
+        for wk, (th, ns) in mw_.items():
+            pts = [p_ for p_, v in occ.items() if v[0] != "bbox" and v[1].endswith("/" + wk) and v[0].split(":")[0] in ns]
+            if len(pts) < 4:
+                continue
+            xs, zs, ys = [p_[0] for p_ in pts], [p_[2] for p_ in pts], [p_[1] for p_ in pts]
+            fl = min(ys) - 1
+            r_ = ceiling_of(wk)
+            cy_ = (r_[0] - 1) if r_ else fl + 9
+            return {"wing": wk, "theme": th, "floor": fl, "cut_y": cy_, "n": len(pts),
+                    "aim": [(min(xs) + max(xs)) / 2, fl + 2, (min(zs) + max(zs)) / 2],
+                    "span": max(max(xs) - min(xs), max(zs) - min(zs)) + 10}
+        return None
+    modroom = find_mod_room()
+    room = None if modroom else (room_pick.pick_room({k: v for k, v in occ.items() if v[0] != "bbox"}, GLOW_WORDS) if occ else None)
+    if modroom:
+        print("mod room:", modroom)
+        call("ghost_show", {"id": "*", "clip_y": modroom["cut_y"]})
+        tiles.append(shot(modroom["aim"], min(modroom["span"] * 1.0 + 12, 70), -0.25, 1.35, 0.35,
+                          f"interior cut MOD ROOM {modroom['theme']} ({modroom['wing']}, {modroom['n']} mod blocks) y={modroom['cut_y']}"))
+        call("ghost_show", {"id": "*", "clip_off": True})
     if room:  # v20: a real built room (ceiling lights over a floor), not the densest-area guess
         call("ghost_show", {"id": "*", "clip_y": room["cut_y"]})
         tiles.append(shot(room["aim"], min(room["span"] * 1.3 + 14, 72), -0.25, 1.35, 0.35,
@@ -256,7 +301,7 @@ for arg in sys.argv[1:]:
         if r_ and (best_c is None or len(r_[1]) > len(best_c[1][1])
                    or (len(r_[1]) == len(best_c[1][1]) and len(r_[1]) < 4 and (r_[4] or [0] * 4)[3] > (best_c[1][4] or [0] * 4)[3])):
             best_c = (wk, r_)
-    if room:
+    if room or modroom:
         pass
     elif best_c:
         wk, (cy, lit, wl, wh, dense) = best_c
@@ -520,6 +565,28 @@ for arg in sys.argv[1:]:
                 dtiles.append(im)
                 notes.append("massing " + wk_)
                 break
+    if modroom:  # v23: mod-room close-ups sheet: facade front-on ~15 out, overhead of the room, low front-on inside
+        mtiles = []
+        wl_, wh_ = bounds([by[modroom["wing"]]])
+        wc_ = [(wl_[i] + wh_[i]) / 2 for i in range(3)]
+        hx_, hz_ = (wh_[0] - wl_[0]) / 2, (wh_[2] - wl_[2]) / 2
+        out_ = (wc_[0] - c[0], wc_[2] - c[2])
+        for nx_, nz_ in sorted(((1, 0), (-1, 0), (0, 1), (0, -1)), key=lambda n_: -(n_[0] * out_[0] + n_[1] * out_[1])):
+            tgt_ = [wc_[0] + nx_ * hx_, wl_[1] + max(5, (wh_[1] - wl_[1]) * 0.4), wc_[2] + nz_ * hz_]
+            im = eye_shot(tgt_, [(nx_, nz_)], (15, 18, 22), (4, 7, 10), f"MOD wing facade {modroom['theme']} front-on", 3.0)
+            if im:
+                mtiles.append(im)
+                break
+        call("ghost_show", {"id": "*", "clip_y": modroom["cut_y"]})
+        mtiles.append(shot(modroom["aim"], modroom["span"] * 0.9 + 6, -0.02, 1.6, 0.04, f"MOD room overhead {modroom['theme']}"))
+        mtiles.append(shot([modroom["aim"][0], modroom["floor"] + 1, modroom["aim"][2]], 16, 0.0, 0.35, 1.0, f"MOD room low front-on {modroom['theme']}"))
+        mtiles.append(shot([modroom["aim"][0], modroom["floor"] + 1, modroom["aim"][2]], 16, 1.0, 0.35, 0.0, f"MOD room low side {modroom['theme']}"))
+        call("ghost_show", {"id": "*", "clip_off": True})
+        msheet = Image.new("RGB", (TW * 2, TH * ((len(mtiles) + 1) // 2)), (20, 20, 20))
+        for i, im in enumerate(mtiles):
+            msheet.paste(im, ((i % 2) * TW, (i // 2) * TH))
+        msheet.save(OUT / f"{gid}_modroom.jpg", quality=88)
+        print(gid, len(mtiles), "mod room shots ->", OUT / f"{gid}_modroom.jpg")
     print(gid, "detail:", "; ".join(notes))
     if dtiles:
         rows_d = (len(dtiles) + 1) // 2

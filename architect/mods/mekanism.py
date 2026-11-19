@@ -8,12 +8,24 @@ ROOM = ModRoom(
     brief="Clean-room machine hall: steel casing and structural glass shells, a Digital Miner and teleporter frame as "
           "centrepieces, rows of tiered energy cubes, a factory line (crusher > enrichment > smelter), chemical tanks "
           "and an induction matrix block of casing + cells behind glass.",
-    pieces=(("cube", M + "steel_casing", M + "structural_glass", M + "digital_miner"),
-            ("tower", M + "induction_casing", M + "structural_glass", 4, M + "ultimate_induction_cell"),
-            ("stack", M + "ultimate_energy_cube", 1),
-            ("cube", G + "turbine_casing", G + "reactor_glass", G + "turbine_rotor"),
-            ("single", M + "teleporter_frame"),
-            ("stack", M + "elite_chemical_tank", 2)),
+    deck="minecraft:black_concrete", plinth=("minecraft:cyan_concrete", "minecraft:gray_concrete"),
+    pieces=(  # v23: clusters on lit-ring plinths. Digital miner cube, four energy cubes on cable spokes
+            ("group", (0, 0, ("cube", M + "steel_casing", M + "structural_glass", M + "digital_miner")),
+             (-3, 0, ("stack", M + "ultimate_energy_cube", 1)), (3, 0, ("stack", M + "ultimate_energy_cube", 1)),
+             (0, -3, ("stack", M + "elite_chemical_tank", 2)), (0, 3, ("stack", M + "elite_chemical_tank", 2)),
+             *[(d, 0, ("single", M + "ultimate_universal_cable")) for d in (-2, 2)]),
+            # induction matrix: casing tower with glass faces and cell core, ports and energy cubes around it
+            ("group", (0, 0, ("tower", M + "induction_casing", M + "structural_glass", 5, M + "ultimate_induction_cell")),
+             (-3, -3, ("stack", M + "ultimate_energy_cube", 1)), (3, -3, ("stack", M + "ultimate_energy_cube", 1)),
+             (-3, 3, ("stack", M + "ultimate_energy_cube", 1)), (3, 3, ("stack", M + "ultimate_energy_cube", 1)),
+             (0, 2, ("single", M + "induction_port"))),
+            # QIO: drive array cube behind glass, dashboards on stacks
+            ("group", (0, 0, ("cube", M + "steel_casing", M + "structural_glass", M + "qio_drive_array")),
+             (-3, 0, ("stack", M + "qio_dashboard", 2)), (3, 0, ("stack", M + "qio_dashboard", 2)),
+             (0, 3, ("stack", M + "ultimate_bin", 2))),
+            ("group", (0, 0, ("cube", G + "turbine_casing", G + "reactor_glass", G + "turbine_rotor")),
+             (-3, 0, ("single", M + "teleporter_frame")), (3, 0, ("single", M + "teleporter_frame")),
+             (0, -3, ("stack", M + "ultimate_chemical_tank", 2)), (0, 3, ("stack", M + "ultimate_chemical_tank", 2)))),
     wall=tuple(M + n for n in "crusher enrichment_chamber energized_smelter combiner osmium_compressor purification_chamber metallurgic_infuser chemical_infuser electrolytic_separator isotopic_centrifuge ultimate_energy_cube elite_chemical_tank".split()),
     ghost_rules="Multiblocks (induction matrix, boiler, fission/fusion reactor, evaporation tower, SPS) do not form in a "
                 "ghost: show them as the unformed look (plain casing + glass, ports on the faces). Do not rely on "
@@ -25,7 +37,7 @@ ROOM = ModRoom(
         "elite_induction_cell ultimate_induction_cell ultimate_induction_provider sps_casing sps_port boiler_casing "
         "boiler_valve dynamic_tank dynamic_valve thermal_evaporation_block thermal_evaporation_controller "
         "thermal_evaporation_valve superheating_element supercharged_coil digital_miner teleporter teleporter_frame "
-        "basic_energy_cube advanced_energy_cube elite_energy_cube ultimate_energy_cube basic_chemical_tank "
+        "ultimate_universal_cable basic_universal_cable basic_energy_cube advanced_energy_cube elite_energy_cube ultimate_energy_cube basic_chemical_tank "
         "advanced_chemical_tank elite_chemical_tank ultimate_chemical_tank basic_fluid_tank ultimate_fluid_tank "
         "crusher enrichment_chamber combiner osmium_compressor energized_smelter purification_chamber "
         "pressurized_reaction_chamber metallurgic_infuser chemical_infuser chemical_oxidizer chemical_washer "

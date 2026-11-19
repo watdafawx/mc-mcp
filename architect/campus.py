@@ -12,7 +12,7 @@ import random
 
 import massing
 
-SIZES = {"s": (19, 25), "m": (23, 31), "l": (29, 41)}  # wing width (along the gallery) x depth
+SIZES = {"s": (19, 25), "m": (23, 31), "l": (29, 41), "x": (37, 49)}  # wing width (along the gallery) x depth
 GAP = 7  # courtyard between wings
 GD = 11  # gallery depth
 HUB = 33  # hub octagon size
@@ -821,7 +821,7 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
         if _mats and "roof" not in (wing.get("roles") or {}):  # v16: a model-wide roles.roof must not flatten every wing to one hue
             wing_roles["roof"] = _mats[i % len(_mats)]
         blocks = massing.structure("rect", w=w_, d=d_, floor_hs=hs, program=prog, kit=kit, roles=wing_roles,
-                                   entrances=["s" if side_ns == "n" else "n"], roof=roof, bay=4+i%3, windows=_windows(K_style, i),
+                                   entrances=["s" if side_ns == "n" else "n"], roof=roof, bay=4+i%3, windows=wing.get("windows") or _windows(K_style, i),
                                    accent_floor=0, seed=seed + i, core="auto", rhythm=1 + i % 3, finial=1)
         add("wing_" + str(wing.get("name", i)), [x0, y, z0], blocks)
         bays_legacy += _wing_bays(x0, z0, w_, d_, y, hs[0], sum(hs) + 1, "s" if side_ns == "n" else "n", K, kit, seed + i, i)
@@ -1398,7 +1398,7 @@ class _Site:
         prog = [wing.get("rooms") or ["expansion"]] + [wing.get("upper") or ["expansion"]] * (len(hs) - 1)
         blocks = massing.structure("rect", w=w, d=d, kit=kit, roles=wr, floor_hs=hs, program=prog,
                                    entrances=[door], roof=roof, bay=6 if kit in ("gothic", "hextech") else 4 + i % 3,
-                                   windows=_windows(kit, i), rhythm=1 + i % 3, finial=1,
+                                   windows=wing.get("windows") or _windows(kit, i), rhythm=1 + i % 3, finial=1,
                                    seed=self.seed + i)
         H = sum(hs) + 1
         name = str(wing.get("name", i))
@@ -2343,9 +2343,43 @@ def _build_terraces(kit, wings, landmark, roles, seed):
     return S, tiers, X, stair_used
 
 
+def _is_mod_wing(w):
+    try:
+        import mods
+    except ImportError:
+        return False
+    for key in ("rooms", "upper"):
+        for r in w.get(key) or []:
+            k, _, th = str(r).partition(":")
+            if k == "mod_room" and th in mods.REGISTRY:
+                return True
+    return False
+
+
+def _feature_mod_wings(wings, layout, home):
+    """v23: the first wing with a registered mod room becomes the showpiece: size x (37x49), one tall floor, big-pane
+    windows, and never wing 0 of the linear layout (that slot is the habitat ring round the hub, which swallowed it)."""
+    wings = [dict(w) for w in wings]
+    idx = next((i for i, w in enumerate(wings) if _is_mod_wing(w)), None)
+    if idx is None:
+        return wings
+    w = wings[idx]
+    w["size"], w["floors"] = "x", 1
+    w["floor_h"] = max(int(w.get("floor_h") or 0), 10)
+    w.setdefault("windows", "grid")
+    if layout == "linear" and idx == 0 and not home:
+        other = next((i for i, v in enumerate(wings) if i and not _is_mod_wing(v)), None)
+        if other is None:
+            wings.insert(0, {"name": "habitat", "rooms": ["living", "workshop"], "upper": ["living", "storage"]})
+        else:
+            wings[0], wings[other] = wings[other], wings[0]
+    return wings
+
+
 def build(kit="hextech", wings=None, home=True, landmark="tower", roles=None, seed=1, layout=None):
     """Style-specific horizontal campuses. layout overrides the kit's default archetype."""
     layout = layout or LAYOUTS.get(kit, "spine")
+    wings = _feature_mod_wings(wings or [], layout, home)
     CUR_KIT[0] = kit if isinstance(kit, str) else ""
     if layout not in LAYOUT_NAMES:
         raise ValueError("unknown layout: " + str(layout))

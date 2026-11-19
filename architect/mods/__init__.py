@@ -11,6 +11,8 @@ Piece kinds (interiors._mod_piece), all anchored on the 5x5 pad centre:
   ("stack", block, n)                column n high
   ("cube", casing, glass, core)      3x3x3 shell: casing, glass window row (middle layer faces), core block inside
   ("tower", casing, glass, n)        3x3 footprint, n high: casing corners/edges, glass faces (unformed multiblock look)
+  ("group", (dx, dz, piece), ...)    sub-pieces at offsets from the pad centre (a cluster, plinth 7x7: offsets within +-3)
+  ("gear", casing, shaft, cog, large) Create gear train: 3 casing pillars, shaft run, large + small cogwheels, vertical drive
 """
 from __future__ import annotations
 
@@ -27,6 +29,9 @@ class ModRoom:
     style: str                  # best-fit style kit
     alt_styles: tuple = ()
     pad: tuple = ("", "")       # (border, centre) pad blocks for the pads
+    deck: str = ""              # v23: contrasting floor over the whole room (light under dark machines, dark under light)
+    plinth: tuple = ()          # v23: (ring, field) blocks of the 7x7 plinths under each centrepiece cluster
+    ring_dash: bool = False     # ring alternates ring/field blocks (a dashed lit strip)
     pieces: tuple = ()          # centrepieces cycled over the pads (see module doc)
     wall: tuple = ()            # wall machines along the room edges (default: the single pieces)
     ghost_rules: str = ""       # ghost-rendering limits for this mod

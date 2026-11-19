@@ -22,11 +22,18 @@ def check(cond, msg):
 
 
 def piece_ids(r):
-    for p in r.pieces:
-        check(p[0] in ("single", "stack", "cube", "tower"), f"{r.theme}: unknown piece kind {p[0]}")
+    def walk(p):
+        check(p[0] in ("single", "stack", "cube", "tower", "group", "gear"), f"{r.theme}: unknown piece kind {p[0]}")
+        if p[0] == "group":
+            for (dx, dz, sub) in p[1:]:
+                check(abs(dx) <= 3 and abs(dz) <= 3, f"{r.theme}: group offset outside the 7x7 plinth {dx},{dz}")
+                yield from walk(sub)
+            return
         for x in p[1:]:
             if isinstance(x, str):
-                yield x
+                yield x.split("[")[0]
+    for p in r.pieces:
+        yield from walk(p)
 
 
 def main():
@@ -49,6 +56,7 @@ def main():
             seen_global.setdefault(b, []).append(theme)
         check(all(b in r.blocks for b in piece_ids(r)), f"{theme}: piece block not in whitelist")
         check(all(b in r.blocks for b in r.pad), f"{theme}: pad block not in whitelist")
+        check(not r.plinth or (len(r.plinth) == 2 and r.deck), f"{theme}: plinth needs (ring, field) and a deck")
         check(r.pieces, f"{theme}: no pieces")
         check(all(b in r.blocks for b in r.wall), f"{theme}: wall block not in whitelist")
         if lib is not None:
