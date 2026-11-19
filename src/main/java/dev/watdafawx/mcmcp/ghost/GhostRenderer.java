@@ -89,7 +89,6 @@ public final class GhostRenderer {
         String dim = mc.level.dimension().location().toString();
         Vec3 cam = e.getCamera().getPosition();
         Set<String> live = new HashSet<>();
-        if (xray) RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
         for (Ghost g : GhostStore.all()) {
             live.add(g.id);
             if (!g.visible || !dim.equals(g.dimension)) continue;
@@ -103,6 +102,12 @@ public final class GhostRenderer {
             BlockPos o = g.origin;
             RenderType rt = RenderType.translucent();
             rt.setupRenderState();
+            // Xray: ignore terrain depth by turning the depth test and depth writes off for this draw. The depth buffer
+            // is never cleared or written, so later stages (particles, weather, hand) still depth-test against terrain.
+            if (xray) {
+                RenderSystem.disableDepthTest();
+                RenderSystem.depthMask(false);
+            }
             if (solid || "area".equals(g.tags.get("kind"))) RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             else RenderSystem.setShaderColor(0.85f, 0.95f, 1f, g.alpha);
             // The camera offset goes in ChunkOffset, like chunk sections: the shader computes fog from
@@ -125,6 +130,7 @@ public final class GhostRenderer {
             if (sh.CHUNK_OFFSET != null) sh.CHUNK_OFFSET.set(0f, 0f, 0f);
             RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             rt.clearRenderState();
+            restoreDepth();
 
             if (mc.options.hideGui) continue; // HUD off (F1 / ghost_show hud=false): clean shots, no outline box
             MultiBufferSource.BufferSource buf = mc.renderBuffers().bufferSource();
@@ -141,6 +147,13 @@ public final class GhostRenderer {
             return true;
         });
         GhostBlockEntities.retain(live);
+    }
+
+    /** Exact vanilla state after the translucent pass: depth test on, LEQUAL, depth writes on. */
+    private static void restoreDepth() {
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthFunc(org.lwjgl.opengl.GL11.GL_LEQUAL);
+        RenderSystem.depthMask(true);
     }
 
     private static Baked bake(Ghost g) {

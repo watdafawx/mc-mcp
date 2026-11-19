@@ -21,6 +21,7 @@ In-game commands (same code as the tools):
 | Command | Does |
 |---|---|
 | `/ghost hide [id]`, `/ghost show [id]` | hide / show one ghost or all |
+| `/ghost xray [on\|off]`, `/ghost solid [on\|off]` | view modes: draw over terrain / fully opaque; toggles with no argument |
 | `/ghost list` | list ghosts with block count and origin |
 | `/ghost clear [id]` | delete one ghost, a `prefix/`, or all |
 | `/ghost import <name> [x y z]` | load a `.schem` (Sponge v2/v3) or vanilla `.nbt` as a ghost |

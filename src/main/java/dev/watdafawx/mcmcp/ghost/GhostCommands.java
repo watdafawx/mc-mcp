@@ -73,6 +73,29 @@ public final class GhostCommands {
         return SharedSuggestionProvider.suggest(List.of("look", "here", "nooverlay", "r=16", "r=24", "r=32", "r=40"), w);
     };
 
+    private static final SuggestionProvider<CommandSourceStack> ON_OFF =
+            (ctx, b) -> SharedSuggestionProvider.suggest(List.of("on", "off"), b);
+
+    /** /ghost xray|solid [on|off]: toggles without an argument. */
+    private static int mode(boolean xray, String arg) {
+        return guard(() -> {
+            boolean cur = xray ? GhostRenderer.xray : GhostRenderer.solid;
+            boolean now;
+            if (arg == null) now = !cur;
+            else switch (arg.toLowerCase(Locale.ROOT)) {
+                case "on", "true" -> now = true;
+                case "off", "false" -> now = false;
+                default -> throw new IllegalArgumentException("use on or off");
+            }
+            if (xray) GhostRenderer.xray = now;
+            else GhostRenderer.solid = now;
+            say(ChatFormatting.GREEN, (xray ? "xray " : "solid ") + (now ? "on" : "off")
+                    + (xray ? (now ? " (ghosts draw over terrain)" : " (terrain hides ghosts)")
+                            : (now ? " (ghosts fully opaque)" : " (ghosts see-through)")));
+            return 1;
+        });
+    }
+
     private static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("ghost")
                 .then(Commands.literal("hide").executes(c -> show("*", false))
@@ -81,6 +104,12 @@ public final class GhostCommands {
                 .then(Commands.literal("show").executes(c -> show("*", true))
                         .then(Commands.argument("id", StringArgumentType.greedyString()).suggests(IDS)
                                 .executes(c -> show(StringArgumentType.getString(c, "id"), true))))
+                .then(Commands.literal("xray").executes(c -> mode(true, null))
+                        .then(Commands.argument("state", StringArgumentType.word()).suggests(ON_OFF)
+                                .executes(c -> mode(true, StringArgumentType.getString(c, "state")))))
+                .then(Commands.literal("solid").executes(c -> mode(false, null))
+                        .then(Commands.argument("state", StringArgumentType.word()).suggests(ON_OFF)
+                                .executes(c -> mode(false, StringArgumentType.getString(c, "state")))))
                 .then(Commands.literal("list").executes(c -> list()))
                 .then(Commands.literal("clear").executes(c -> clear("*"))
                         .then(Commands.argument("id", StringArgumentType.greedyString()).suggests(IDS)

@@ -451,6 +451,7 @@ class Architect:
         self._guides: Guides | None = None
         self.guard = floaters.Guard()
         self.spectator = False
+        self.prev_view: dict | None = None  # ghost view modes before the first screenshot view of a run
         self.cost = 0.0
         self.active_mods: list[str] = list(FEATURE_MODS)  # registered mod room themes whose whitelist the blocks tool adds
 
@@ -481,6 +482,17 @@ class Architect:
             out = (out if isinstance(out, str) else json.dumps(out)) + "\nDROPPED floating parts (touch nothing): " + \
                 json.dumps(floating) + " -- attach them to a building or remove them."
         return out, is_err
+
+    def restore_view(self):
+        """After a run: undo the screenshot view modes (xray off unless it was on before, solid as before, HUD back)."""
+        if self.prev_view is None:
+            return
+        prev, self.prev_view = self.prev_view, None
+        try:
+            self.mcp.call("ghost_show", {"id": "*", "xray": bool(prev.get("xray", False)),
+                                         "solid": bool(prev.get("solid", False)), "hud": True, "clip_off": True})
+        except Exception:
+            pass
 
     def run_local(self, name: str, a: dict):
         if name == "plan":
@@ -760,6 +772,11 @@ class Architect:
                 self.mcp.call("run_command", {"command": cmd})
             self.spectator = True
         # Every view: terrain can't hide the ghosts, they draw opaque, no HUD.
+        if self.prev_view is None:  # remember the player's own view modes so restore_view() can put them back
+            try:
+                self.prev_view = self.mcp.json("ghost_show", {"id": "*"})
+            except Exception:
+                self.prev_view = {}
         show = {"id": "*", "xray": True, "solid": True, "hud": False}
         if angle == "cut":
             show["clip_y"] = int(cut_y) if cut_y is not None else lo[1] + 4
@@ -1055,6 +1072,7 @@ def main():
         except Exception as e:  # a bad reference shouldn't kill the REPL or chat loop
             out = f"error: {e}"
         finally:
+            arch.restore_view()
             release_focus(arch.mcp, held)
         first_refs = []
         print(f"\n{out}\n  [{MODEL}, cost ~${arch.cost:.4f}, {getattr(arch, 'tokens_in', 0)} in / "

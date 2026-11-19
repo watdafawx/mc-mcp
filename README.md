@@ -87,6 +87,7 @@ Client-side, ghosts exist only in this client's memory. Tab completion for ids a
 | Command | Does |
 |---|---|
 | `/ghost hide [id]` / `/ghost show [id]` | hide or show one ghost, or all (same code as `ghost_show`) |
+| `/ghost xray [on\|off]` / `/ghost solid [on\|off]` | view modes (same as `ghost_show` xray / solid); no argument toggles; tab completion |
 | `/ghost list` | ghosts in chat: id, block count, origin, `[hidden]` |
 | `/ghost import <name> [x y z]` | same as `ghost_import`; tab completion lists schematics found in the search folders |
 | `/ghost clear [id]` | delete one ghost, a `prefix/`, or all (same code as `ghost_clear`) |

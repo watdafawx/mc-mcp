@@ -238,7 +238,7 @@ public final class GhostTools {
 
         mcp.add(new Tool("ghost_show",
                 "Show or hide ghosts and set their opacity. id: one ghost, or '*' for all. "
-                        + "Global view modes (all ghosts): xray=true draws ghosts over terrain so hills and trees can't hide them; "
+                        + "Global view modes (all ghosts): xray=true draws ghosts over terrain so hills and trees can't hide them (it only skips the depth test for ghosts: terrain depth is untouched, so particles stay hidden behind walls; ghosts do not hide their own back faces; also /ghost xray [on|off]); "
                         + "solid=true draws them fully opaque (good for screenshots); clip_y=<world y> is a cutaway that hides every ghost "
                         + "block above that y so rooms can be seen from above (clip_off=true removes it).",
                 J.Schema.of().str("id", "ghost id or *").bool("visible", "show (true) or hide").num("alpha", "0.1..1, default 0.55")
