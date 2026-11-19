@@ -202,6 +202,10 @@ class Mcp:
         return self._rpc("tools/list", {})["tools"]
 
     def call(self, name: str, args: dict) -> tuple[str, bool]:
+        if name == "ghost_set":  # v26: explicit fluid_pipe connection states (the default all-true state draws nothing)
+            args, n = floaters.fix_pipes(args)
+            if n:
+                print(f"  [pipes] set explicit connections on {n} fluid_pipe entries in ghost_set {args.get('id')}", flush=True)
         if name == "ghost_set" and self.nogold:
             args, n = floaters.swap_gold(args)
             if n:

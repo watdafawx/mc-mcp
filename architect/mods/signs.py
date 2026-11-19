@@ -23,11 +23,32 @@ def _ring(r, rim, fill=None, hub=None, hr=1.0):
     return out
 
 
-def _create():
-    # brass + andesite: a big cogwheel (dark-oak wheel, andesite-alloy teeth, brass hub) on a brass ring
-    cells = disc(5, "minecraft:dark_oak_planks", "create:andesite_alloy_block", "create:brass_block")
-    cells = [(u, v, b) for (u, v, b) in cells]
-    return cells
+REAL_PARTS = True  # Create emblem from real cogwheels (ghosts draw block-entity parts); False = the fake dark-oak disc
+
+
+def _create_fake(r=5):
+    # fallback when kinetic parts do not draw: dark-oak wheel, andesite-alloy teeth, brass hub
+    return disc(r, "minecraft:dark_oak_planks", "create:andesite_alloy_block", "create:brass_block")
+
+
+def _create(r=5):
+    """v26: dark panel (black concrete) with a brass rim, and a diagonal chain of REAL cogwheels standing 1 block proud of it
+    (layer 1, axis set per facade by the caller via {AX}): r>=7: large/small/large/small/large (diagonal neighbours mesh),
+    r<7: large/small/large. Cells are (u, v, block, layer)."""
+    if not REAL_PARTS:
+        return [(u, v, b, 0) for (u, v, b) in _create_fake(r)]
+    out = []
+    for u in range(-r - 1, r + 2):
+        for v in range(-r - 1, r + 2):
+            d = math.hypot(u, v)
+            if d <= r + 0.4:
+                rim = d >= r - 1.0
+                out.append((u, v, "create:brass_block" if rim else "minecraft:black_concrete", 0))
+    L, S = "create:large_cogwheel[axis={AX}]", "create:cogwheel[axis={AX}]"
+    k = 2 if r >= 7 else 1
+    for t in range(-k, k + 1):
+        out.append((t, t, L if t % 2 == k % 2 else S, 1))
+    return out
 
 
 def _mekanism():
@@ -82,40 +103,51 @@ def _industrialforegoing():
 
 EMBLEMS = {"create": _create, "mekanism": _mekanism, "powah": _powah, "bigreactors": _bigreactors,
            "industrialforegoing": _industrialforegoing}
-# lintel band (two rows) and the pilaster colour beside the emblems
+# lintel band (three rows) in the mod colours
 BANDS = {"create": ("create:brass_block", "create:andesite_alloy_block"),
          "mekanism": ("minecraft:cyan_concrete", "minecraft:black_concrete"),
          "powah": ("minecraft:blue_concrete", "minecraft:sea_lantern"),
          "bigreactors": ("minecraft:yellow_concrete", "minecraft:black_concrete"),
          "industrialforegoing": ("minecraft:orange_concrete", "minecraft:black_concrete")}
-R = 5  # emblem radius (all emblems fit r=5..6)
+R = 5  # emblem radius of the two door flankers; the single emblem on each of the other three sides is RBIG
+RBIG = {"create": 7}
 
 
 def facade(theme, x0, z0, w, d, y, H, door):
-    """[x, y, z, block] cells in absolute coordinates: band round all four sides under the roofline (rows H-2, H-1 above y),
-    and two emblems flanking the door at a quarter and three quarters of the door side, centre height y+H-8."""
+    """[x, y, z, block] cells in absolute coordinates, y = wing base level: a three-row lintel band round all four sides
+    (rows H-3..H-1 above y, wider and brass for Create), two r=5 emblems flanking the door at a quarter and three quarters of
+    the door side, and ONE big emblem (r=7 for Create) centred on each of the other three sides, so the outward side of a
+    wing (the one the judge camera and the visitor see) is signed whichever side the door is on. Emblems stand 1+r above y
+    (they may rise above a low wall, like a signboard). Emblem cells override the band."""
     if theme not in EMBLEMS:
         return []
-    out = []
+    cells = {}
     a, b = BANDS[theme]
+    plane = {"n": z0 - 1, "s": z0 + d, "w": x0 - 1, "e": x0 + w}
+    out_ = {"n": (0, -1), "s": (0, 1), "w": (-1, 0), "e": (1, 0)}
+
+    def at(sd, t, yy, layer):  # absolute x,y,z of lateral offset t (from the wing's min corner) on side sd, layer 0/1 outwards
+        ox, oz = out_[sd]
+        if sd in "ns":
+            return (x0 + t, yy, plane[sd] + oz * layer)
+        return (plane[sd] + ox * layer, yy, z0 + t)
+
     for sd in "nsew":
-        plane = {"n": z0 - 1, "s": z0 + d, "w": x0 - 1, "e": x0 + w}[sd]
         n = w if sd in "ns" else d
         for t in range(-1, n + 1):
-            for k, blk in ((H - 2, a), (H - 1, b if t % 2 else a)):
-                if sd in "ns":
-                    out.append([x0 + t, y + k, plane, blk])
-                else:
-                    out.append([plane, y + k, z0 + t, blk])
-    cells = EMBLEMS[theme]()
-    n = w if door in "ns" else d
-    cy = y + H - 3 - R
-    plane = {"n": z0 - 1, "s": z0 + d, "w": x0 - 1, "e": x0 + w}[door]
-    for c in (n // 4, n - 1 - n // 4):
-        for (u, v, blk) in cells:
-            t = c + (u if door in "sw" else -u)  # viewer's right: n -> -x, s -> +x, w -> +z, e -> -z
-            if door in "ns":
-                out.append([x0 + t, cy + v, plane, blk])
-            else:
-                out.append([plane, cy + v, z0 + t, blk])
-    return out
+            for k, blk in ((H - 3, a), (H - 2, b if t % 2 else a), (H - 1, a)):
+                cells[at(sd, t, y + k, 0)] = blk
+    for sd in "nsew":
+        n = w if sd in "ns" else d
+        if sd == door:
+            spots = [(n // 4, R), (n - 1 - n // 4, R)]
+        else:
+            spots = [(n // 2, RBIG.get(theme, R))]
+        for (c, r) in spots:
+            ax = "z" if sd in "ns" else "x"
+            for cell in EMBLEMS[theme](r) if theme == "create" else EMBLEMS[theme]():
+                u, v, blk = cell[0], cell[1], cell[2]
+                layer = cell[3] if len(cell) > 3 else 0
+                t = c + (u if sd in "sw" else -u)  # viewer's right: n -> -x, s -> +x, w -> +z, e -> -z
+                cells[at(sd, t, y + 1 + r + v, layer)] = blk.replace("{AX}", ax)
+    return [[x, yy, z, blk] for (x, yy, z), blk in cells.items()]

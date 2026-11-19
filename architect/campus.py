@@ -825,6 +825,10 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
                                    accent_floor=0, seed=seed + i, core="auto", rhythm=1 + i % 3, finial=1)
         add("wing_" + str(wing.get("name", i)), [x0, y, z0], blocks)
         bays_legacy += _wing_bays(x0, z0, w_, d_, y, hs[0], sum(hs) + 1, "s" if side_ns == "n" else "n", K, kit, seed + i, i)
+        _th = _wing_mod(wing)  # v26: the spine layout (default for steampunk) never went through Site.wing: sign it here too
+        if _th:
+            import mods.signs as _signs
+            bays_legacy += _signs.facade(_th, x0, z0, w_, d_, y, sum(hs) + 1, "s" if side_ns == "n" else "n")
         foot.append((x0, z0, w_, d_, sum(hs) + 1, side_ns, roof or massing.ROOF_DEFAULT.get(K_style, "flat")))
         gdoors[side_ew].append((side_ns, x0 + w_ // 2))
         # courtyard trees and lamps beside the wing, on the far end from the gallery

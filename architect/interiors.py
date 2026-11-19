@@ -255,6 +255,8 @@ def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, pl
                         put(c[0] + dx, fy, c[1] + dz, pad)
             _mod_piece(reg.pieces[(k + seed) % len(reg.pieces)], c[0], c[1], fy, h, put)
             used |= fp7(c)
+        if reg.extra.get("clutter") and pads:
+            _create_clutter(pads, set(cells), fy, h, put, reg.extra["clutter"])
         wall = reg.wall or tuple(p[1] for p in reg.pieces if p[0] == "single")
         for i, p in enumerate(edge):
             if wall and i % 3 != 2 and p not in used:
@@ -282,6 +284,45 @@ def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, pl
         if wall and i % 3 != 2 and p not in used:
             for dy in (1, 2 if h >= 3 else 1):
                 place(p, wall[(i // 3 + seed) % len(wall)], dy)
+
+
+def _create_clutter(pads, room, fy, h, put, casing):
+    """v26 kinetic clutter so the room reads as Create from the low shots. Between every two neighbouring plinths in a row:
+    a REAL belt line at eye height (casing pillar at each end), and a large water wheel (small one in a low room) on a shaft
+    between two casing pillars just behind it (axis z, so it faces the aisle). Over every pad row, plus rows 4 cells either
+    side: a high shaft run wall to wall through a casing block every 6th cell. `casing` is the casing block id. Every
+    run touches a pillar or a wall (no floaters)."""
+    K = "create:"
+    by = fy + 3  # belt height: eye level of a player standing on the deck
+    rows = sorted({c[1] for c in pads})
+    for rz in rows:
+        rp = sorted(c[0] for c in pads if c[1] == rz)
+        for xa, xb in zip(rp, rp[1:]):
+            x0, x1 = xa + 4, xb - 4
+            if x1 - x0 < 4 or any((x, rz) not in room for x in range(x0, x1 + 1)):
+                continue
+            for x in range(x0, x1 + 1):
+                if x in (x0, x1):
+                    for y in range(fy + 1, by + 1):
+                        put(x, y, rz, casing)
+                else:
+                    part = "start" if x == x0 + 1 else "end" if x == x1 - 1 else "middle"
+                    put(x, by, rz, K + f"belt[facing=east,part={part},slope=horizontal]")
+            mx, wz = (x0 + x1) // 2, rz + 4
+            wy = fy + 5 if h >= 9 else fy + 3
+            if all((mx + dx, wz + dz) in room for dx in (-2, 2) for dz in (-2, 2)):
+                put(mx, wy, wz, K + ("large_water_wheel[axis=z]" if h >= 9 else "water_wheel[facing=south]"))
+                for dz in (-1, 1):
+                    put(mx, wy, wz + dz, K + "shaft[axis=z]")
+                for dz in (-2, 2):
+                    for y in range(fy + 1, wy + 1):
+                        put(mx, y, wz + dz, casing)
+    top = fy + h - 2
+    if top >= fy + 7:
+        for rz in sorted({r + o for r in rows for o in (-4, 0, 4)}):
+            xs = sorted(x for (x, z) in room if z == rz)
+            for i, x in enumerate(xs):
+                put(x, top, rz, casing if i % 6 == 3 else K + "shaft[axis=x]")
 
 
 def _registered(theme: str):
@@ -331,22 +372,20 @@ def _mod_piece(piece, cx, cz, fy, h, put):
                 put(cx, y, cz + z, casing)
         shapes.put_plane(put_xyz(put), shapes.disc(r, body, teeth, hub), cx, sy, cz, "x", thick)
         return
-    if kind == "kgear":  # ("kgear", casing): REAL Create gear train, wheels face +z: large cog, meshing small cog, large cog
+    if kind == "kgear":  # ("kgear", casing): REAL Create gear train, wheels face +z: a diagonal chain of LARGE cogs (v26)
         casing, K = piece[1], "create:"
+        big = h >= 9  # tall room: 3 large cogs + 2 small climbing the diagonal; else 2 large + 1 small
         sy = fy + 3
-        put(cx - 1, fy + 1, cz, casing)  # casing post under the low large cog
-        put(cx - 1, sy, cz, K + "large_cogwheel[axis=z]")
-        put(cx, sy + 1, cz, K + "cogwheel[axis=z]")  # small cog meshes diagonally with both large ones
-        put(cx - 1, sy, cz + 1, K + "shaft[axis=z]")  # axles into a casing bearing behind
-        put(cx - 1, sy, cz + 2, casing)
-        if h >= 8:
-            put(cx + 1, sy + 2, cz, K + "large_cogwheel[axis=z]")
-            put(cx + 1, sy + 2, cz + 1, K + "shaft[axis=z]")
-            put(cx + 1, sy + 2, cz + 2, casing)
-            for y in range(fy + 1, sy + 2):  # casing pillar behind the high cog
-                put(cx + 1, y, cz + 2, casing)
-        for y in range(fy + 1, sy):  # bearing pillar behind the low cog
-            put(cx - 1, y, cz + 2, casing)
+        chain = [(-2, 0, "L"), (-1, 1, "s"), (0, 2, "L")] + ([(1, 3, "s"), (2, 4, "L")] if big else [])
+        for (dx, dy, k) in chain:
+            y = sy + dy
+            if y + 2 > fy + h:
+                break
+            put(cx + dx, y, cz, K + ("large_cogwheel" if k == "L" else "cogwheel") + "[axis=z]")
+            if k == "L":
+                put(cx + dx, y, cz + 1, K + "shaft[axis=z]")  # axle into a casing bearing wall behind
+                for yy in range(fy + 1, y + 1):
+                    put(cx + dx, yy, cz + 2, casing)
         for x in (cx + 2, cx + 3):  # output shaft along x into a gearbox
             put(x, fy + 1, cz, K + "shaft[axis=x]")
         put(cx + 3, fy + 2, cz, K + "gearbox[axis=y]")
@@ -360,6 +399,9 @@ def _mod_piece(piece, cx, cz, fy, h, put):
         for x in (-2, 2):
             for y in range(fy + 1, sy + 1):
                 put(cx + x, y, cz, casing)
+        return
+    if kind == "pipe":  # ("pipe",): one REAL fluid pipe along x at pad height 2, ALL six connection states set (default draws nothing)
+        put(cx, fy + 2, cz, "create:fluid_pipe[north=false,south=false,east=true,west=true,up=false,down=false]")
         return
     if kind == "kbelt":  # ("kbelt", n, end_block): REAL Create belt along x, 2n+1 long, on casing-capped shaft ends
         n, eb, K = int(piece[1]), piece[2], "create:"

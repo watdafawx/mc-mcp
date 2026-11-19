@@ -23,12 +23,14 @@ def check(cond, msg):
 
 def piece_ids(r):
     def walk(p):
-        check(p[0] in ("single", "stack", "cube", "tower", "group", "gear", "cog", "belt", "column", "kgear", "kwheel", "kbelt"), f"{r.theme}: unknown piece kind {p[0]}")
+        check(p[0] in ("single", "stack", "cube", "tower", "group", "gear", "cog", "belt", "column", "kgear", "kwheel", "kbelt", "pipe"), f"{r.theme}: unknown piece kind {p[0]}")
         if p[0] == "group":
             for (dx, dz, sub) in p[1:]:
                 check(abs(dx) <= 3 and abs(dz) <= 3, f"{r.theme}: group offset outside the 7x7 plinth {dx},{dz}")
                 yield from walk(sub)
             return
+        if p[0] == "pipe":
+            yield "create:fluid_pipe"
         if p[0] in ("kgear", "kwheel", "kbelt"):  # fixed real Create kinetics inside
             yield from ("create:shaft", "create:cogwheel", "create:large_cogwheel", "create:gearbox",
                         "create:large_water_wheel", "create:water_wheel", "create:belt")
@@ -94,14 +96,32 @@ def main():
     # v25: ghosts draw block-entity renderers, so the Create room uses real cogs, shafts, belt and water wheel
     KIN = {"create:" + n for n in "shaft cogwheel large_cogwheel large_water_wheel belt".split()}
     placed = {}
-    cells = {(x, z) for x in range(40) for z in range(24)}
+    cells = {(x, z) for x in range(2, 35) for z in range(2, 17)}  # the real campus room: 33 x 15, two plinths in a row
     K = {"trim": "minecraft:stone", "detail": "minecraft:stone", "glow": "minecraft:glowstone", "wall": "minecraft:stone"}
-    spine = {(x, z) for (x, z) in cells if abs(z - 12) <= 1}
-    interiors.fit_room("mod_room:create", cells, 1, 9, K, spine, spine, "steampunk", 1,
+    spine = {(x, z) for (x, z) in cells if 13 <= x <= 21}  # a hall through the middle, as in the campus wings
+    interiors.fit_room("mod_room:create", cells, 1, 10, K, spine, spine, "steampunk", 1,
                        lambda x, y, z, b: placed.__setitem__((x, y, z), b))
     got = {b.split("[")[0] for b in placed.values()}
     check(KIN <= got, f"create room misses real kinetic blocks: {sorted(KIN - got)}")
     check(all("[" in b for b in placed.values() if b.split("[")[0] in KIN), "kinetic blocks need explicit axis/part states")
+    n_big = sum(1 for b in placed.values() if b.startswith("create:large_cogwheel"))
+    check(n_big >= 3, f"create room should have >= 3 large cogwheels, has {n_big}")
+    check(any(b.startswith("create:large_water_wheel") for b in placed.values()), "no large water wheel between the plinths")
+    belts = sorted(x for (x, y, z), b in placed.items() if b.startswith("create:belt["))
+    check(len(belts) >= 8, f"eye-level belt line too short ({len(belts)})")
+    check(sum(1 for b in placed.values() if b.startswith("create:shaft[axis=x]")) >= 20, "no shaft clutter along the room axis")
+    pipes = [b for b in placed.values() if b.startswith("create:fluid_pipe")]
+    check(pipes and all(all(f"{k}=" in b for k in ("north", "south", "east", "west", "up", "down")) for b in pipes),
+          "fluid pipes must set all six connection states")
+    import floaters
+    fx, nfix = floaters.fix_pipes({"id": "t", "blocks": [[0, 0, 0, "create:fluid_pipe"], [1, 0, 0, "create:fluid_tank"]]})
+    check(nfix == 1 and "east=true" in fx["blocks"][0][3] and "up=false" in fx["blocks"][0][3], "fix_pipes")
+    import campus  # v26: the spine layout must sign mod wings too (it skipped Site.wing and lost the signage)
+    cs = campus.build(kit="steampunk", wings=[{"name": "create", "rooms": ["mod_room:create", "expansion"], "size": "l",
+                                                 "floors": 1, "floor_h": 9}])
+    feat = [g for g in cs if g["id"] == "features"][0]["blocks"]
+    check(sum(1 for b in feat if b[3].startswith("create:large_cogwheel")) >= 9, "spine campus lost the Create facade emblems")
+    check(any(b[3] == "create:brass_block" for b in feat), "spine campus lost the brass lintel")
     import mods.shapes as fake_shapes  # the fake disc stays available as a fallback
     check(len(fake_shapes.disc(2, "a", "b", "c")) > 10, "fake cog disc fallback broken")
     import mods.signs as signs

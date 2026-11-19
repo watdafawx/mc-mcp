@@ -7,25 +7,24 @@ ROOM = ModRoom(
     style="steampunk", alt_styles=(),
     pad=("create:andesite_casing", "create:brass_casing"),
     brief="Kinetic workshop: real gear trains (large + small cogwheels on shafts into casing bearings), a large water "
-          "wheel on a shaft between casing pillars, a belt line with a mechanical press on a depot, a mixer over a basin, "
-          "fluid tanks with pipes, an encased fan, brass/andesite/copper casing machines, gearboxes and clutches, metal "
+          "wheel on a shaft between casing pillars, a belt line at eye level and a big water wheel between the machine plinths, a mechanical press on a depot, a mixer over a basin, "
+          "fluid tanks joined by pipes, an encased fan, brass/andesite/copper casing machines, gearboxes and clutches, metal "
           "girders overhead, brass and zinc blocks as stock.",
     deck="minecraft:smooth_sandstone", plinth=("minecraft:smooth_stone", "minecraft:polished_diorite"),
     pieces=(  # v25: real rotating parts. mc-mcp ghosts draw block-entity renderers now (static, not turning).
               # The fake kinds (gear/cog/belt in interiors.py) stay as a fallback for packs where they do not draw.
             ("kgear", CAS),
-            ("group", (0, -1, ("column", C + "depot", C + "mechanical_press[facing=east]")),
-             (0, 2, ("kbelt", 2, CAS)),
+            ("group", (0, 0, ("column", C + "depot", C + "mechanical_press[facing=east]")),
              (-3, -2, ("stack", C + "fluid_tank", 3)), (3, -2, ("stack", C + "fluid_tank", 3)),
-             (-2, -1, ("single", C + "shaft[axis=x]")), (-1, -1, ("single", C + "shaft[axis=x]")),
-             (1, -1, ("single", C + "shaft[axis=x]")), (2, -1, ("single", C + "shaft[axis=x]"))),
-            ("group", (0, 0, ("kwheel", CAS)),
-             (-3, 3, ("column", BR, C + "gearbox[axis=x]")), (3, 3, ("column", BR, C + "clutch[axis=x]"))),
+             *[(d, -2, ("pipe",)) for d in (-2, -1, 0, 1, 2)],
+             (-2, 0, ("single", C + "shaft[axis=x]")), (-1, 0, ("single", C + "shaft[axis=x]")),
+             (1, 0, ("single", C + "shaft[axis=x]")), (2, 0, ("single", C + "shaft[axis=x]"))),
+            ("kgear", C + "brass_casing"),  # order kgear, tanks, kgear, mixer: any two neighbouring pads include a gear train
             ("group", (0, 0, ("cube", C + "brass_casing", C + "framed_glass", C + "mechanical_mixer")),
              (-3, 0, ("stack", C + "fluid_tank", 3)), (3, 0, ("stack", C + "fluid_tank", 3)),
              (0, 3, ("column", C + "depot", C + "mechanical_press[facing=east]")), (0, -3, ("single", C + "basin")),
-             *[(d, 0, ("single", C + "shaft[axis=x]")) for d in (-2, 2)]),
-            ("kgear", C + "brass_casing")),
+             *[(d, 0, ("single", C + "shaft[axis=x]")) for d in (-2, 2)])),  # water wheels and belts sit between the pads (interiors._create_clutter)
+    extra={"clutter": CAS},  # v26: belt line, shaft lines, water wheel over the aisles (interiors._create_clutter)
     wall=tuple(C + n for n in "mechanical_press mechanical_mixer fluid_tank gearbox millstone mechanical_saw basin brass_casing depot".split()),
     ghost_rules="Rotating parts DO show in ghosts now (static, not turning): shaft, cogwheel, large_cogwheel, water_wheel, "
                 "large_water_wheel, flywheel, belt, hand_crank. Give them their state: shaft/cogwheel/large_cogwheel/flywheel "

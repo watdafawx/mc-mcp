@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Architect tooling only, no Java change. Create round 5: mod facade signage now also runs on the spine / `_legacy_build` path, with real cogwheel emblems on the doors; mod-room scale changes; `fix_pipes` tidies pipe runs (`floaters.py`); `test_mods.py` extended. Honest status: the Create room reads about 8/10 in judged shots. The facade panel contrast and the in-room gear visibility are still weak.
+
 - Ghosts now draw block-entity-rendered blocks: Create shafts, cogwheels, belts, water wheels, flywheels, and vanilla chest, sign, banner, shulker box, bell and enchanting table. New `ghost/GhostBlockEntities.java` runs the block's renderer on a client-only dummy block entity and bakes the quads into the ghost mesh (other texture sheets become extra buffers, with the same tint, solid and xray handling). New config `ghostRender.blockEntities` (default true); off gives the old models-only behaviour. For Create, the Flywheel backend is switched off by reflection during a bake and restored after, and if that fails the ghost falls back to the Ponder virtual model. Parts are static (no animation). No compile-time dependency on Create.
 - Architect: the Create room uses real kinetic blocks (cogwheels, large cogwheels, water wheel, belt) instead of fake stand-ins; the fakes stay as a fallback.
 

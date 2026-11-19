@@ -364,3 +364,55 @@ def swap_gold(args: dict) -> tuple[dict, int]:
                 new.append(e)
             out[kind] = new
     return out, n
+
+
+_PIPE = "create:fluid_pipe"
+_PIPE_KEYS = ("north", "south", "east", "west", "up", "down")
+_PIPE_LINK = ("fluid_pipe", "fluid_tank", "mechanical_pump", "fluid_valve", "spout", "item_drain", "basin", "hose_pulley",
+              "smart_fluid_pipe", "portable_fluid_interface")
+
+
+def fix_pipes(args: dict) -> tuple[dict, int]:
+    """Create's fluid_pipe draws NOTHING in a ghost when its six connection props are the default (all true: no multipart
+    case matches). Give every pipe in a ghost_set `blocks` list explicit north/south/east/west/up/down states, connected towards
+    the neighbouring pipe/tank/pump blocks of the same call (a lone pipe runs east-west). Existing partial states are completed
+    with false. Palette/box pipes get a plain east-west state. Returns (new args, number of pipes fixed)."""
+    out = dict(args)
+    n = 0
+    lst = args.get("blocks")
+    if lst:
+        link = set()
+        for e in lst:
+            if len(e) > 3 and isinstance(e[3], str) and e[3].split("[")[0].split(":")[-1] in _PIPE_LINK:
+                link.add((e[0], e[1], e[2]))
+        dirs = {"north": (0, 0, -1), "south": (0, 0, 1), "east": (1, 0, 0), "west": (-1, 0, 0), "up": (0, 1, 0), "down": (0, -1, 0)}
+        new = []
+        for e in lst:
+            if len(e) > 3 and isinstance(e[3], str) and e[3].split("[")[0] == _PIPE:
+                st = {}
+                if "[" in e[3]:
+                    for kv in e[3].split("[", 1)[1].rstrip("]").split(","):
+                        k, _, v = kv.partition("=")
+                        st[k.strip()] = v.strip()
+                if not all(k in st for k in _PIPE_KEYS) or all(st.get(k) == "true" for k in _PIPE_KEYS):
+                    if "[" in e[3] and not all(st.get(k) == "true" for k in _PIPE_KEYS) and any(k in st for k in _PIPE_KEYS):
+                        con = {k: st.get(k, "false") for k in _PIPE_KEYS}
+                    else:
+                        con = {k: str((e[0] + d[0], e[1] + d[1], e[2] + d[2]) in link).lower() for k, d in dirs.items()}
+                        if not any(v == "true" for v in con.values()):
+                            con["east"] = con["west"] = "true"
+                    e = list(e)
+                    e[3] = _PIPE + "[" + ",".join(f"{k}={con[k]}" for k in _PIPE_KEYS) + "]"
+                    n += 1
+            new.append(e)
+        out["blocks"] = new
+    pal = args.get("palette")
+    if isinstance(pal, dict):
+        newp = {}
+        for k, v in pal.items():
+            if isinstance(v, str) and v == _PIPE:
+                v = _PIPE + "[north=false,south=false,east=true,west=true,up=false,down=false]"
+                n += 1
+            newp[k] = v
+        out["palette"] = newp
+    return out, n
