@@ -451,7 +451,9 @@ def _fit(put, out, inner, wall_ring, hs, y0s, ry, K, kit, program, core, entranc
         prog = program[f] if program and f < len(program) else None
         if prog:
             interiors.fit_floor(prog, icells, fy[f], ceil[f] - fy[f] - 1, K, reserved, kitname,
-                                seed + f * 17, final_put, ceil[f], K["wall2"])
+                                seed + f * 17, final_put, ceil[f], K["wall2"],
+                                door=(str(([entrances] if isinstance(entrances, str) else list(entrances or []))[0])[:1].lower()
+                                      if entrances and f == 0 else None))
     for x, y, z, blk in later:
         final_put(x, y, z, blk)
 

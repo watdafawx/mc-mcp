@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Architect tooling only (no Java change). Mod wings are sized from their machine count, and every style gets service infrastructure: a 3-wide, 2-deep trench from the hub under each wing (ME / power / fluid lanes, hatches, junction blocks), a port wall with labelled M/P/F/I bays facing the hub, and ceiling cable trays with drops to the machines (`architect/services.py`, `test_services.py`). Honest status: AE2 cables are invisible in a ghost, so ME runs are shown as coloured lanes with real AE2 end blocks; Mekanism cables only draw as core cubes; steampunk surface pipes not done. Ghost-render findings are in the architect README.
+
 ## 0.5.1
 
 - Fix: ghosts no longer wipe the depth buffer in xray. After `/ghost generate` (or any xray view), other mods' particles (Ars Nouveau and others) drew through ground and walls, because xray cleared the whole depth buffer. Ghosts now draw with depth test and depth writes off and restore LEQUAL / depth mask on, so later stages (particles, weather, hand) keep terrain depth. Side effect: xray ghosts no longer hide their own back faces.

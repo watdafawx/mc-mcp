@@ -11,6 +11,7 @@ import math
 import random
 
 import massing
+import services
 
 SIZES = {"s": (19, 25), "m": (23, 31), "l": (29, 41), "x": (37, 49)}  # wing width (along the gallery) x depth
 GAP = 7  # courtyard between wings
@@ -763,7 +764,7 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
                          "floor_h": 6})
     if not wings:
         wings = [{"name": "machines", "rooms": ["mod_room", "expansion"]}]
-    sizes = [SIZES.get(str(w.get("size", "m"))[:1], SIZES["m"]) for w in wings]
+    sizes = [_dims(w) for w in wings]
     ww = max(s[0] for s in sizes)
     pitch = ww + GAP
     # slots: east-north, east-south, west-north, west-south, then the next ring out
@@ -799,6 +800,7 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
     grounds = []
     foot = []  # wing footprints: (x0, z0, w, d, height, side, roof)
     bays_legacy = []
+    svc_l = []
     for i, (wing, (side_ew, side_ns, k)) in enumerate(zip(wings, slots)):
         w_, d_ = sizes[i]
         x0 = hx1 + GAP + k * pitch if side_ew == "e" else hx0 - GAP - ww - k * pitch
@@ -808,6 +810,10 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
         else:
             z0 = gz + GD - 1
         rooms = wing.get("rooms") or ["mod_room", "expansion"]
+        door_l = "s" if side_ns == "n" else "n"
+        th_l = _wing_mod(wing)
+        if th_l:
+            rooms = _rooms_door_first(rooms, door_l, w_, d_)
         fh = int(wing.get("floor_h") or (9 + 2 * ((i + seed) % 3)))  # 9 / 11 / 13: varied skyline
         floors = int(wing.get("floors") or 1)
         hs = [fh] + [6] * (floors - 1)
@@ -820,10 +826,19 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
         _mats = ROOF_MATS.get(K_style)
         if _mats and "roof" not in (wing.get("roles") or {}):  # v16: a model-wide roles.roof must not flatten every wing to one hue
             wing_roles["roof"] = _mats[i % len(_mats)]
+        services.reset()
         blocks = massing.structure("rect", w=w_, d=d_, floor_hs=hs, program=prog, kit=kit, roles=wing_roles,
                                    entrances=["s" if side_ns == "n" else "n"], roof=roof, bay=4+i%3, windows=wing.get("windows") or _windows(K_style, i),
                                    accent_floor=0, seed=seed + i, core="auto", rhythm=1 + i % 3, finial=1)
         add("wing_" + str(wing.get("name", i)), [x0, y, z0], blocks)
+        rec_l = services.take()
+        if th_l and rec_l["manifold"]:
+            svc_l.append({"name": str(wing.get("name", i)), "theme": th_l, "door": door_l, "ty": 0, "i": i,
+                          "door_cell": (x0 + w_ // 2, z0 + d_) if door_l == "s" else (x0 + w_ // 2, z0 - 1),
+                          "centre": (x0 + w_ // 2, z0 + d_ // 2), "w": w_, "d": d_,
+                          "manifold": {(x0 + a, z0 + b) for a, b in rec_l["manifold"]},
+                          "risers": [(x0 + a, z0 + b) for a, b in rec_l["risers"]],
+                          "bays": [(x0 + a, z0 + b, l) for (a, b), l in rec_l["bays"]]})
         bays_legacy += _wing_bays(x0, z0, w_, d_, y, hs[0], sum(hs) + 1, "s" if side_ns == "n" else "n", K, kit, seed + i, i)
         _th = _wing_mod(wing)  # v26: the spine layout (default for steampunk) never went through Site.wing: sign it here too
         if _th:
@@ -931,6 +946,28 @@ def _legacy_build(kit: str = "hextech", wings: list | None = None, home: bool = 
     for b in ghosts[0]["blocks"]:
         if b[1] == STEPS - 1 and (b[0], b[2]) not in occ:
             b[3] = "minecraft:grass_block"
+    if svc_l:  # v28: trench along the gallery centre line, branching under every mod wing's door to its port wall
+        hub_c = (hx0 + HUB // 2, hz0 + HUB // 2)
+        gal = set()
+        for half, gx0, gx1 in (("w", margin, hx0), ("e", hx1 - 1, W - margin)):
+            gal |= {(x, z) for x in range(gx0 + 1, gx1) for z in range(gz + 1, gz + GD - 1)}
+        gal -= {(x, z) for x in range(hx0, hx0 + HUB) for z in range(hz0, hz0 + HUB)}
+        gal |= {(x, z) for x in range(hx0 + 3, hx0 + HUB - 3) for z in range(hz0 + 3, hz0 + HUB - 3)
+                if 4 < max(abs(x - hx0 - HUB // 2), abs(z - hz0 - HUB // 2)) < 14}
+        bld = {(x, z) for (x0_, z0_, w_, d_, *_r) in foot for x in range(x0_, x0_ + w_) for z in range(z0_, z0_ + d_)}
+        bld |= {(x, z) for x in range(hx0, hx0 + HUB) for z in range(hz0, hz0 + HUB)}
+        paths = []
+        for r in svc_l:
+            dc = r["door_cell"]
+            via = services.straight(hub_c, (dc[0], hub_c[1])) + services.straight((dc[0], hub_c[1]), dc)[1:]
+            paths.append({"name": r["name"], "ty": 0, "cells": services.route(None, dc, r["door"], r["manifold"], hub_c, via=via),
+                          "risers": r["risers"]})
+        meta = services.apply({"kit": kit, "K": K, "hub": hub_c, "paths": paths, "buildings": bld - gal,
+                               "halls": {}, "galleries": {0: gal}}, ghosts)
+        if meta:
+            meta["wings"] = [{"name": r["name"], "theme": r["theme"], "door": r["door"], "ty": 0, "centre": list(r["centre"]),
+                              "bays": [list(b) for b in r["bays"]], "manifold": [list(m) for m in sorted(r["manifold"])]}
+                             for r in svc_l]
     return ghosts
 
 
@@ -1364,6 +1401,24 @@ def _windows(kit, i):
     return "lancet" if kit in ("gothic", "hextech") else ("grid" if i % 2 else "band")
 
 
+def _dims(w):
+    """(w, d) of a wing: explicit dims (mod wings sized from their machine count) or the size letter."""
+    d = w.get("dims")
+    return tuple(d) if d else SIZES.get(str(w.get("size", "m"))[:1], SIZES["m"])
+
+
+def _rooms_door_first(rooms, door, w, d):
+    """Mod rooms first, and the end of the long axis that holds them next to the door (port wall faces the hub)."""
+    rooms = list(rooms or [])
+    mods = [r for r in rooms if str(r).startswith("mod_room")]
+    rest = [r for r in rooms if r not in mods]
+    rooms = mods + rest
+    long_x = w >= d
+    if (long_x and door == "e") or (not long_x and door == "s"):
+        rooms = rooms[::-1]
+    return rooms
+
+
 class _Site:
     def __init__(self, kit, roles, seed, layout):
         self.kit, self.roles, self.seed, self.layout = kit, roles, seed, layout
@@ -1376,6 +1431,9 @@ class _Site:
         self.meta = {}
         self.bays = []
         self.porch_cells = set()
+        self.svc = []        # v28: mod wings that need services (trench, port wall)
+        self.net = None      # hall centre-line cells (BFS for the trench)
+        self.svc_tiers = []  # terraces: tier risers
 
     def add(self, gid, x, y, z, blocks, meta=None):
         self.ghosts.append({"id": gid, "origin": [x, y, z], "blocks": blocks, "meta": meta or {}})
@@ -1399,7 +1457,10 @@ class _Site:
             wr["roof"] = mats[i % len(mats)]
         roof = _roof_for(wing, kit, i)
         hs = [int(wing.get("floor_h") or (8 + 2 * (i % 3)))] + [6] * (int(wing.get("floors") or 1) - 1)
-        prog = [wing.get("rooms") or ["expansion"]] + [wing.get("upper") or ["expansion"]] * (len(hs) - 1)
+        th = _wing_mod(wing)
+        rooms0 = _rooms_door_first(wing.get("rooms") or ["expansion"], door, w, d) if th else (wing.get("rooms") or ["expansion"])
+        prog = [rooms0] + [wing.get("upper") or ["expansion"]] * (len(hs) - 1)
+        services.reset()
         blocks = massing.structure("rect", w=w, d=d, kit=kit, roles=wr, floor_hs=hs, program=prog,
                                    entrances=[door], roof=roof, bay=6 if kit in ("gothic", "hextech") else 4 + i % 3,
                                    windows=wing.get("windows") or _windows(kit, i), rhythm=1 + i % 3, finial=1,
@@ -1407,7 +1468,7 @@ class _Site:
         H = sum(hs) + 1
         name = str(wing.get("name", i))
         self.bays += _wing_bays(x, z, w, d, STEPS + ty, hs[0], H, door, K, kit, self.seed + i, i)
-        th = _wing_mod(wing)
+        rec = services.take()
         if th:  # v24: facade signage so the outside says which mod is inside
             import mods.signs as _signs
             self.bays += _signs.facade(th, x, z, w, d, STEPS + ty, H, door)
@@ -1422,6 +1483,12 @@ class _Site:
         ex, ez = {"n": (x + w // 2, z - 1), "s": (x + w // 2, z + d), "w": (x - 1, z + d // 2),
                   "e": (x + w, z + d // 2)}[door]
         self.doors.append((ex, ez, door, ty))
+        if th and rec["manifold"]:
+            self.svc.append({"name": name, "theme": th, "door": door, "door_cell": (ex, ez), "ty": ty, "i": i,
+                             "centre": (x + w // 2, z + d // 2), "w": w, "d": d,
+                             "manifold": {(x + a, z + b) for a, b in rec["manifold"]},
+                             "risers": [(x + a, z + b) for a, b in rec["risers"]],
+                             "bays": [(x + a, z + b, l) for (a, b), l in rec["bays"]]})
 
     def connect(self, net, ty=0, bound=260):
         """BFS from every wing door to the nearest hall centre line; adds 5-wide halls along each route."""
@@ -1511,6 +1578,33 @@ class _Site:
         self.reserve(rect(side), pad=1)
         self.obstacles |= rect(side)  # halls route round the dock
         self.meta["airdock"] = side
+
+    def service_info(self, allhall):
+        """Trench centre lines hub -> every mod wing's port manifold (see services.apply)."""
+        hub = (0, 0)
+        paths, vertical, done = [], [], set()
+        for r in self.svc:
+            ty = r["ty"]
+            if ty == 0:
+                cells = services.route(self.net or set(), r["door_cell"], r["door"], r["manifold"], hub)
+            else:
+                tr = next(t for t in self.svc_tiers if t["ty"] == ty)
+                zs, X = tr["zsk"], 7
+                if ty not in done:
+                    done.add(ty)
+                    g = services.straight(hub, (0, tr["ground_z"])) + services.straight((0, tr["ground_z"]), (X, tr["ground_z"]))[1:]                         + services.straight((X, tr["ground_z"]), (X, zs + 1))[1:]
+                    paths.append({"name": f"riser{ty}", "ty": 0, "cells": g, "risers": []})
+                    vertical.append({"ty": ty, "x": X, "z": zs + 1})
+                dc = r["door_cell"]
+                via = services.straight((X, zs), (dc[0], zs)) + services.straight((dc[0], zs), dc)[1:]
+                cells = services.route(None, dc, r["door"], r["manifold"], hub, via=via)
+            paths.append({"name": r["name"], "ty": ty, "cells": cells, "risers": r["risers"]})
+        halls = {ty: set(m) - self.blocked for ty, m in self.levels.items()}
+        hubc = {(x - 16, z - 16) for x, z in massing.fp_octagon(33, 33, 6)}
+        hubc = {c for c in hubc if max(abs(c[0]), abs(c[1])) > 3 and max(abs(c[0]), abs(c[1])) < 14}  # grates in the hub floor, centre free
+        halls.setdefault(0, set()).update(hubc)
+        return {"kit": self.kit, "K": self.K, "hub": hub, "paths": paths, "buildings": set(self.blocked) - hubc, "halls": halls,
+                "vertical": vertical}
 
     def finish(self, extra_cells=None):
         """Halls, platform, gardens and per-wing style features, then shift to a (0,0) min corner."""
@@ -2158,9 +2252,26 @@ def _finish_site(S, garth=None, tiers=None, X=0, extra_used=None):
     ghosts = [{"id": "platform", "origin": [0, 0, 0], "blocks": platform, "meta": {"kind": "platform"}}] + S.ghosts
     xmin = min(r[3] for r in regions)
     zmin = min(r[1] for r in regions)
+    meta = None
+    if S.svc:  # v28: service trench from the hub under every mod wing
+        meta = services.apply(S.service_info(allhall), ghosts)
+        if meta:
+            meta["wings"] = [{"name": r["name"], "theme": r["theme"], "door": r["door"], "ty": r["ty"], "centre": list(r["centre"]),
+                              "bays": [[a, b, l] for a, b, l in r["bays"]], "manifold": [list(m) for m in sorted(r["manifold"])]}
+                             for r in S.svc]
     for g in ghosts:
         g["origin"][0] -= xmin
         g["origin"][2] -= zmin
+    if meta:
+        sh = lambda c: [c[0] - xmin, c[1] - zmin]
+        meta["hub"] = sh(meta["hub"])
+        for p in meta["paths"]:
+            p["cells"] = [sh(c) for c in p["cells"]]
+        meta["junctions"] = [[sh(c), t, n] for c, t, n in meta["junctions"]]
+        for w in meta["wings"]:
+            w["centre"] = sh(w["centre"])
+            w["bays"] = [sh(b) + [b[2]] for b in w["bays"]]
+            w["manifold"] = [sh(m) for m in w["manifold"]]
     return [g for g in ghosts if g["blocks"]]
 
 
@@ -2168,7 +2279,7 @@ LEAFWALL = "minecraft:azalea_leaves[persistent=true]"
 
 
 def _plan_sizes(wings):
-    return [SIZES.get(str(w.get("size", "m"))[:1], SIZES["m"]) for w in wings]
+    return [_dims(w) for w in wings]
 
 
 def _build_radial_linear(kit, wings, landmark, roles, seed, layout):
@@ -2177,16 +2288,17 @@ def _build_radial_linear(kit, wings, landmark, roles, seed, layout):
     sizes = _plan_sizes(wings)
     place = []
     maxw = max(s[0] for s in sizes)
+    pitch = max(48, max(max(s) for s in sizes) + GAP)  # v28: big mod wings push the next ring out
     for i, wing in enumerate(wings):
         w, d = sizes[i]
         if layout == "radial":
             side, ring = ("e", "s", "w")[i % 3], i // 3
             if side == "s":
-                place.append((i, -w // 2 + ring * 40, 32 + ring * 48, w, d, "n"))
+                place.append((i, -w // 2 + ring * (pitch - 8), 32 + ring * pitch, w, d, "n"))
             else:
                 w, d = d, w
-                x = 32 + ring * 48 if side == "e" else -32 - w - ring * 48
-                place.append((i, x, -d // 2 + ring * 40, w, d, "w" if side == "e" else "e"))
+                x = 32 + ring * pitch if side == "e" else -32 - w - ring * pitch
+                place.append((i, x, -d // 2 + ring * (pitch - 8), w, d, "w" if side == "e" else "e"))
         elif i > 0:  # linear: wing 0 is the habitat ring round the hub
             j = i - 1
             place.append((i, 36 + (j // 2) * (maxw + 12), -d - 12 if j % 2 == 0 else 12, w, d,
@@ -2231,6 +2343,7 @@ def _build_radial_linear(kit, wings, landmark, roles, seed, layout):
     for (i, x, z, w, d, door) in place:
         S.wing(i, wings[i], x, z, w, d, door)
     S.connect(net)
+    S.net = net
     return S
 
 
@@ -2272,7 +2385,9 @@ def _build_cloister(kit, wings, landmark, roles, seed):
         w, d = sizes[i]
         S.wing(i, wings[i], x, rz1 + 10, w, d, "n")
         x += w + 10
-    S.connect(set(centre))
+    net = set(centre)
+    S.connect(net)
+    S.net = net
     return S, garth
 
 
@@ -2342,6 +2457,7 @@ def _build_terraces(kit, wings, landmark, roles, seed):
         else:
             tiers.append((ty, zmin_w - 8, zsk))
     X = max(abs(v) for v in xext)
+    S.svc_tiers = [{"ty": tk * R, "zsk": zs[tk], "ground_z": zs[1] + R + 3} for tk in (1, 2) if tk in zs and (tk == 1 or two)]
     tiers.insert(0, (0, zs[1] + 1, 34))
     # stairs between tiers, inside the five-wide landings
     for tk in (1, 2):
@@ -2385,10 +2501,14 @@ def _feature_mod_wings(wings, layout, home):
     idx = next((i for i, w in enumerate(wings) if _is_mod_wing(w)), None)
     if idx is None:
         return wings
+    for v in wings:  # v28: every mod wing is sized from its machine count (floor area ~ clusters x footprint + services)
+        if _is_mod_wing(v):
+            v["dims"] = services.size_for(services.machine_count(v, _wing_mod(v)))
+            v["floors"] = 1
+            v["floor_h"] = max(int(v.get("floor_h") or 0), 12)
+            v.setdefault("windows", "grid")
     w = wings[idx]
-    w["size"], w["floors"] = "x", 1
-    w["floor_h"] = max(int(w.get("floor_h") or 0), 10)
-    w.setdefault("windows", "grid")
+    w["size"] = "x"
     if layout == "linear" and idx == 0 and not home:
         other = next((i for i, v in enumerate(wings) if i and not _is_mod_wing(v)), None)
         if other is None:

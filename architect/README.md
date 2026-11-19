@@ -94,10 +94,39 @@ duplicates; needs the git-ignored `knowledge/blocklib.json` built from the ATM10
 
 - **Room fit-out**: a campus room `mod_room:<theme>` with a registered theme gets 3x3 pads on a 6-grid with a centrepiece
   on each pad and wall machines along the edges (`interiors._mod_room_registered`). `mod_room:ae2` and unregistered
-  themes keep the old generic pads.
+  themes keep the old generic pads (the service port wall is added to every mod room with a plinth).
 - **Agent**: when a campus call uses a registered `mod_room:<theme>`, that mod's whitelist is added to the `blocks` tool
   (also `blocks(mod='<theme>')`) with the cost filter bypassed (mod machines have no recipe cost), and the campus result
   carries the room brief. All other blocks still go through the cheap-survival cost filter. `architect.py --generate
   <style> --feature-mod <theme>` asks for that mod as the showpiece wing.
 - **Dev client**: ghosts only render mod blocks whose mod is loaded in the client (the dev `run/mods` needs the mod jars).
 - Add a mod: copy a file in `mods/`, list its blocks, import it in `mods/__init__.py`, run `test_mods.py`.
+
+## Service infrastructure (services.py)
+
+Mod wings are sized from their machine count (wing key `machines`, default 14 clusters; `services.size_for`: 27..65 x
+33..81, odd, area monotonic in clusters). Every style gets the same services, built by `services.py`:
+
+- **Service trench** (3 wide, 2 deep) from the hub under every wing: lanes ME cable (purple), power (red), fluid (light
+  blue), grate/glass hatches in the floor, junction blocks (`ae2:interface`, `ae2:energy_acceptor`) where a wing
+  branches off. `campus.Site.service_info` routes it (BFS over the hall network; straight paths for the spine, tiers and
+  terrace risers); `services.apply` carves it and appends a `services` ghost (meta: paths, junctions, hub, wings).
+- **Port wall**: the wall facing the hub, 5-wide bays on a pitch of 6 with a coloured panel and a white glyph
+  M (ME interface / pattern provider), P (energy in), F (fluid in/out), I (item in/out), fed from the trench by a riser grate.
+- **Ceiling trays**: dark gantry header + beams (chains) with opaque conduit runs over the room, a drop to each machine pad.
+- Not done: steampunk surface pipes along the walls.
+
+### What draws in a ghost (rig client test)
+
+- `ae2:cable_glass/covered/smart/dense_smart` are not blocks. Cables are parts of `ae2:cable_bus`, which is **invisible**.
+  Draw: interface, pattern_provider, controller (`state=online|offline`, `type=block|column_y`), energy_acceptor,
+  drive[facing], molecular_assembler, crafting_unit[formed], crafting_accelerator, crafting_storage, energy_cell,
+  io_port. So AE2 cabling is shown with coloured concrete/glass lanes plus real AE2 end blocks.
+- Mekanism transmitters (universal_cable, pressurized_tube, mechanical_pipe, logistical_transporter, thermodynamic_conductor)
+  draw only as isolated core cubes (no arms): usable as node markers, not connected cables.
+- Powah `energy_cable_*` draws connected only with explicit `north/east/south/west/up/down=true|false`; without states it is a dot.
+- Create `fluid_pipe` draws connected only with all six explicit direction states; `glass_fluid_pipe[axis]`, `encased_fluid_pipe`
+  (states), `copper_casing`, `mechanical_pump[facing]`, `fluid_tank` draw.
+- Vanilla fallbacks that draw: `iron_bars` (states for lines), `chain[axis]`, `end_rod`, copper grates, `lightning_rod`,
+  `tinted_glass`, `waxed_copper_bulb`. Translucent glass conduits look like torn sheets; trays use opaque concrete.
+

@@ -190,6 +190,13 @@ def main():
           "mysticalagriculture: a crop is not on farmland")
     pb = [b for b in placed_pb(K) if "beehive" in b or "_nest" in b]
     check(pb and all("honey_level=" in b or "axis=" in b or b.endswith("bumble_bee_nest") for b in pb), "productivebees: nest without state")
+    import services
+    for theme in mods.REGISTRY:
+        w, d = services.size_for(services.machine_count({"machines": 12}, theme))
+        check(w % 2 == 1 and d % 2 == 1 and w >= 27 and d >= 33, f"{theme}: wing size {w}x{d} not odd/clamped")
+    check(services.machine_count({}, "create") == services.DEFAULT_CLUSTERS, "default machine count")
+    check(services.size_for(30)[0] * services.size_for(30)[1] > services.size_for(6)[0] * services.size_for(6)[1],
+          "wing area not monotonic in machine count")
     if fails:
         print("FAIL:\n  " + "\n  ".join(fails))
         sys.exit(1)

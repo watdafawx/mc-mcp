@@ -61,7 +61,7 @@ def _face_in(p, cells):
 
 
 def fit_room(kind: str, cells: set, fy: int, h: int, K: dict, keep: set, spine: set, kit: str = "",
-             seed: int = 1, put=None, ceiling_y: int | None = None):
+             seed: int = 1, put=None, ceiling_y: int | None = None, door: str | None = None):
     """Fit one room. cells: floor cells (x,z) of the room; fy: y of the floor surface block; h: clear headroom
     (air cells above the floor); keep: cells that must stay walkable (spine, doorways, core landing)."""
     rnd = random.Random(seed)
@@ -196,7 +196,7 @@ def fit_room(kind: str, cells: set, fy: int, h: int, K: dict, keep: set, spine: 
         # a themed pad material, wall racks of barrels for that mod's buffers, cable tray over the spine
         reg = _registered(theme)
         if reg and reg.pieces:
-            _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, place, seed)
+            _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, place, seed, door, theme)
         else:
             pad, mid = MOD_PADS.get(theme, (K["trim"], K["detail"]))
             for (x, z) in centre:
@@ -222,13 +222,18 @@ def fit_room(kind: str, cells: set, fy: int, h: int, K: dict, keep: set, spine: 
     return used
 
 
-def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, place, seed):
+def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, place, seed, door=None, theme=""):
     """Registered mod room (mods/): centrepiece clusters on big pads, wall machines along the edges.
     With reg.plinth set (v23): a contrasting deck over the whole room floor (light under dark machines, dark under light),
     7x7 plinths (lit/contrast ring, inner field, mod-block centre) and one centrepiece cluster per plinth, greedy-packed
     from the room corner with >= 2-cell aisles. Without it: the v22 3x3 pads on a 6-grid."""
     pad, mid = reg.pad
     cset = set(centre)
+    zone = set()
+    if door and h >= 9:  # v28: the port wall (labelled service bays) and its aisle keep plinths away
+        import services
+        zone = services.port_zone(set(cells), door)
+        cset -= zone
     if reg.plinth:
         ring, field = reg.plinth
         if reg.deck:
@@ -259,6 +264,9 @@ def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, pl
             _create_clutter(pads, set(cells), fy, h, put, reg.extra["clutter"])
         if reg.extra.get("gate") and pads:
             _mod_gates(pads, set(cells), fy, h, put, reg.extra["gate"])
+        if zone:
+            services.install(theme, set(cells), keep, fy, h, K, put, door, pads, seed)
+            used |= zone
         wall = reg.wall or tuple(p[1] for p in reg.pieces if p[0] == "single")
         for i, p in enumerate(edge):
             if wall and i % 3 != 2 and p not in used:
@@ -276,11 +284,16 @@ def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, pl
                 pads.append((x, z))
     fp = lambda c: {(c[0] + dx, c[1] + dz) for dx in (-1, 0, 1) for dz in (-1, 0, 1)}
     k = 0
+    placed_pads = []
     for c in pads:
         if fp(c) <= cset and not (fp(c) & keep):
             _mod_piece(reg.pieces[(k + seed) % len(reg.pieces)], c[0], c[1], fy, h, put)
             used |= fp(c)
             k += 1
+            placed_pads.append(c)
+    if zone:
+        services.install(theme, set(cells), keep, fy, h, K, put, door, placed_pads, seed)
+        used |= zone
     wall = reg.wall or tuple(p[1] for p in reg.pieces if p[0] == "single")
     for i, p in enumerate(edge):
         if wall and i % 3 != 2 and p not in used:
@@ -510,7 +523,8 @@ def _table_set(centre, cells, used, keep, place, fur, col, put, fy):
 
 
 def fit_floor(program, inner_cells: set, fy: int, h: int, K: dict, reserved: set, kit: str = "",
-              seed: int = 1, put=None, ceiling_y: int | None = None, wall_block: str | None = None):
+              seed: int = 1, put=None, ceiling_y: int | None = None, wall_block: str | None = None,
+              door: str | None = None):
     """Split a floor into rooms along the long axis (partition walls with 3-wide doorways on the spine) and fit
     each. program: a kind or a list of kinds. reserved: core/entrance cells left untouched."""
     kinds = [program] if isinstance(program, str) else list(program or [])
@@ -529,4 +543,4 @@ def fit_floor(program, inner_cells: set, fy: int, h: int, K: dict, reserved: set
                     for dy in range(1, h + 1):
                         put(p[0], fy + dy, p[1], wall_block or K["wall"])
             seg = {p for p in seg if key(p) != first or p in keep}
-        fit_room(kind, seg, fy, h, K, keep, spine, kit, seed + i, put, ceiling_y)
+        fit_room(kind, seg, fy, h, K, keep, spine, kit, seed + i, put, ceiling_y, door)

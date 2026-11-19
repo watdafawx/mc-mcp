@@ -65,6 +65,26 @@ def mod_wings(gid):
     return out
 
 
+def service_data(gid):
+    """v28: (services meta, origin) of the build's campus call, replayed through campus.build (None if no mod wing / no trench)."""
+    f = ARCH / "sessions" / gid / "messages.json"
+    try:
+        import campus
+        for m in json.load(open(f, encoding="utf-8")):
+            if m.get("role") != "assistant" or not isinstance(m.get("content"), list):
+                continue
+            for b in m["content"]:
+                if b.get("type") == "tool_use" and b["name"] == "campus":
+                    a = b.get("input") or {}
+                    for g in campus.build(a["kit"], a.get("wings") or [], bool(a.get("home", True)), a.get("landmark") or "tower",
+                                          a.get("roles"), layout=a.get("layout")):
+                        if g["id"] == "services":
+                            return g["meta"], a["origin"]
+    except Exception as e:  # noqa: BLE001
+        print("service_data failed:", repr(e)[:120])
+    return None
+
+
 REFS = "X:/Dev/Minecraft/mc-mcp/architect/knowledge/style_refs/"
 OUT = ARCH / "exports" / "judge2"  # ignored dir; sheets are not committed
 OUT.mkdir(parents=True, exist_ok=True)
@@ -587,6 +607,46 @@ for arg in sys.argv[1:]:
             msheet.paste(im, ((i % 2) * TW, (i // 2) * TH))
         msheet.save(OUT / f"{gid}_modroom.jpg", quality=88)
         print(gid, len(mtiles), "mod room shots ->", OUT / f"{gid}_modroom.jpg")
+    svc = service_data(gid)
+    if svc:  # v28: services close-ups: trench from above (cut) and through a hatch, ceiling trays low, port wall front-on
+        import services as _sv
+        meta_, (ox_, oy_, oz_) = svc
+        Wy = lambda y: oy_ + y + LIFT
+        stiles = []
+        pth = max(meta_["paths"], key=lambda p_: len(p_["cells"])) if meta_["paths"] else None
+        jx = [pth["cells"][len(pth["cells"]) // 2], pth["ty"]] if pth else None
+        if jx:
+            (jx_, jz_), jty = jx[0], jx[1]
+            call("ghost_show", {"id": "*", "clip_y": Wy(4 + jty)})
+            stiles.append(shot([ox_ + jx_, Wy(1 + jty), oz_ + jz_], 34, -0.02, 1.6, 0.04, "services: trench overhead (cut at floor+2)"))
+            stiles.append(shot([ox_ + jx_, Wy(1 + jty), oz_ + jz_], 14, 0.0, 0.85, 0.7, "services: trench through the hatches + junction"))
+            call("ghost_show", {"id": "*", "clip_off": True})
+        w0 = next((w for w in meta_["wings"] if w["bays"]), None)
+        if w0:
+            nv = _sv.INWARD[w0["door"]]
+            bm = w0["bays"][len(w0["bays"]) // 2]
+            bx, bz = ox_ + bm[0], oz_ + bm[1]
+            fy_w = Wy(2 + w0["ty"])
+            def view(pos, tgt, label):
+                call("run_command", {"command": f"tp @s {pos[0]:.1f} {pos[1]:.1f} {pos[2]:.1f}"})
+                call("look_at", {"x": tgt[0], "y": tgt[1], "z": tgt[2]})
+                time.sleep(2.5)
+                p = json.loads(call("screenshot", {}))["path"]
+                p = "Q:" + p[2:] if p.upper().startswith("G:") else p
+                im = Image.open(p).convert("RGB")
+                im.thumbnail((TW, TH))
+                ImageDraw.Draw(im).text((8, 6), label, fill=(255, 255, 0))
+                return im
+            stiles.append(view([bx + nv[0] * 4, fy_w + 3, bz + nv[1] * 4],
+                               [bx + nv[0] * 34, fy_w + 9, bz + nv[1] * 34], "services: ceiling trays, low shot from the port wall"))
+            stiles.append(view([bx + nv[0] * 13, fy_w + 4.5, bz + nv[1] * 13], [bx, fy_w + 5, bz],
+                               f"services: port wall front-on ({w0['theme']}; bays {''.join(b[2] for b in w0['bays'])})"))
+        if stiles:
+            ssheet = Image.new("RGB", (TW * 2, TH * ((len(stiles) + 1) // 2)), (20, 20, 20))
+            for i, im in enumerate(stiles):
+                ssheet.paste(im, ((i % 2) * TW, (i // 2) * TH))
+            ssheet.save(OUT / f"{gid}_services.jpg", quality=88)
+            print(gid, len(stiles), "services shots ->", OUT / f"{gid}_services.jpg")
     print(gid, "detail:", "; ".join(notes))
     if dtiles:
         rows_d = (len(dtiles) + 1) // 2
