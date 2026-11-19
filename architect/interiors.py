@@ -293,6 +293,10 @@ def _registered(theme: str):
         return None
 
 
+def put_xyz(put):
+    return lambda x, y, z, b: put(x, y, z, b)
+
+
 def _mod_piece(piece, cx, cz, fy, h, put):
     """One registry centrepiece on a 5x5 pad, anchored on its centre (cx, cz); see mods/__init__.py for the kinds."""
     kind = piece[0]
@@ -300,21 +304,41 @@ def _mod_piece(piece, cx, cz, fy, h, put):
         for (dx, dz, sub) in piece[1:]:
             _mod_piece(sub, cx + dx, cz + dz, fy, h, put)
         return
-    if kind == "gear":  # ("gear", casing, shaft, cog, large_cog): gear train on casing pillars, wheel disks face +z
-        casing, shaft, cog, large = piece[1:5]
-        top = min(3, max(2, h - 3))
-        for x in (-3, 0, 3):
-            for dy in range(1, top + 1):
-                put(cx + x, fy + dy, cz, casing)
-        for x in (-2, -1, 1, 2):
-            put(cx + x, fy + top, cz, shaft + "[axis=x]")
-        put(cx - 3, fy + top + 1, cz, large + "[axis=z]")
-        put(cx + 3, fy + top + 1, cz, large + "[axis=z]")
-        put(cx, fy + top + 1, cz, cog + "[axis=z]")
-        for dy in range(top + 2, min(top + 4, h - 1) + 1):  # vertical drive shaft with a flat cog on top
-            put(cx, fy + dy, cz, shaft + "[axis=y]")
-        if top + 4 <= h - 1:
-            put(cx, fy + top + 4, cz, cog + "[axis=y]")
+    if kind == "gear":  # ("gear", casing, shaft, body, teeth, hub): gear train, wheel faces +z/-z, drive shaft up the middle
+        from mods import shapes
+        casing, shaft, body, teeth, hub = piece[1:6]
+        r = max(1, min(2, (h - 3) // 2))
+        sy = fy + 1 + r + 1
+        for x in (-3, 3):
+            for y in range(fy + 1, sy + 1):
+                put(cx + x, y, cz, casing)
+        for x in range(-2, 3):
+            put(cx + x, sy, cz, shaft)
+        shapes.put_plane(lambda x, y, z, b: put(x, y, z, b), shapes.disc(r, body, teeth, hub), cx, sy, cz - 1, "z", 3)
+        for y in range(sy + r + 1, min(sy + r + 2, fy + h - 2) + 1):  # vertical drive shaft + flat cog on top
+            put(cx, y, cz, shaft)
+        top = min(sy + r + 3, fy + h - 2)
+        if top > sy + r + 1:
+            shapes.put_plane(put_xyz(put), shapes.disc(1, body, teeth, hub), cx, top, cz, "y", 1)
+        return
+    if kind == "cog":  # ("cog", r, body, teeth, hub, thick): freestanding wheel on two casing pillars (water wheel, big cog)
+        from mods import shapes
+        r, body, teeth, hub, thick, casing = piece[1:7]
+        r = max(1, min(int(r), (h - 3) // 2))
+        sy = fy + 1 + r
+        for z in (-2, 2):
+            for y in range(fy + 1, sy + 1):
+                put(cx, y, cz + z, casing)
+        shapes.put_plane(put_xyz(put), shapes.disc(r, body, teeth, hub), cx, sy, cz, "x", thick)
+        return
+    if kind == "belt":  # ("belt", n, belt_block, end_block): strip along x, 2n+1 long, end blocks as pulleys
+        n, bb, eb = int(piece[1]), piece[2], piece[3]
+        for dx in range(-n, n + 1):
+            put(cx + dx, fy + 1, cz, eb if abs(dx) == n else bb)
+        return
+    if kind == "column":  # ("column", b1, b2, ...): different blocks stacked bottom to top
+        for dy, b in enumerate(piece[1:], 1):
+            put(cx, fy + dy, cz, b)
         return
     if kind == "single":
         put(cx, fy + 1, cz, piece[1])

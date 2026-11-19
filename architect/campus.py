@@ -1403,6 +1403,10 @@ class _Site:
         H = sum(hs) + 1
         name = str(wing.get("name", i))
         self.bays += _wing_bays(x, z, w, d, STEPS + ty, hs[0], H, door, K, kit, self.seed + i, i)
+        th = _wing_mod(wing)
+        if th:  # v24: facade signage so the outside says which mod is inside
+            import mods.signs as _signs
+            self.bays += _signs.facade(th, x, z, w, d, STEPS + ty, H, door)
         self.add("wing_" + name, x, STEPS + ty, z, blocks,
                  {"kind": "wing", "floor_y": STEPS + ty + 1, "deck_y": STEPS + ty + H + 1, "door": door,
                   "roof": roof, "rooms": wing.get("rooms")})
@@ -2354,6 +2358,20 @@ def _is_mod_wing(w):
             if k == "mod_room" and th in mods.REGISTRY:
                 return True
     return False
+
+
+def _wing_mod(w):
+    """The registered mod theme of a wing's first mod_room, or None."""
+    try:
+        import mods
+    except ImportError:
+        return None
+    for key in ("rooms", "upper"):
+        for r in w.get(key) or []:
+            k, _, th = str(r).partition(":")
+            if k == "mod_room" and th in mods.REGISTRY:
+                return th
+    return None
 
 
 def _feature_mod_wings(wings, layout, home):
