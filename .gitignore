@@ -54,3 +54,6 @@ architect/knowledge/_tex.json
 architect/knowledge/_why.json
 architect/knowledge/_blockers.txt
 
+
+.venv/
+exports/
