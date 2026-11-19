@@ -16,6 +16,10 @@ Piece kinds (interiors._mod_piece), all anchored on the 5x5 pad centre:
   ("kgear", casing)                  REAL Create gear train (large/small/large cogwheels, axis z) with shafts, bearings, gearbox
   ("kwheel", casing)                 REAL Create large water wheel (axis x) on a shaft between two casing pillars
   ("kbelt", n, end_block)            REAL Create belt along x (2n+1, start/middle/end), end blocks at both ends
+  ("field", farmland, (crop, ...), n, age)  (2n+1)^2 farmland with crops (age state added) on top (v27)
+  ("blob", block, r, dy)             solid ball of radius r centred dy above the floor (a leaf crown) (v27)
+  ("ring", (b1, b2, ...), r)         square perimeter at distance r on the floor, blocks cycling (chalk circle) (v27)
+  extra={"gate": (post, cap, lintel, lamp)}  eye-level arches in the aisles between plinths (interiors._mod_gates) (v27)
   ("gear"/"cog"/"belt", ...)         fake (vanilla-block) versions, the fallback when a block-entity block does not draw
 """
 from __future__ import annotations
@@ -46,8 +50,10 @@ REGISTRY: dict[str, ModRoom] = {}
 
 
 def _load():
-    from . import mekanism, powah, bigreactors, create, industrialforegoing
-    for m in (mekanism, powah, bigreactors, create, industrialforegoing):
+    from . import (mekanism, powah, bigreactors, create, industrialforegoing, ars_nouveau, occultism,
+                   mysticalagriculture, productivebees, enderio)
+    for m in (mekanism, powah, bigreactors, create, industrialforegoing, ars_nouveau, occultism, mysticalagriculture,
+              productivebees, enderio):
         REGISTRY[m.ROOM.theme] = m.ROOM
 
 

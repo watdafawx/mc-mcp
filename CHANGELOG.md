@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Architect tooling only, no Java change. Mod room kits for Ars Nouveau, Occultism, Mystical Agriculture, Productive Bees and Ender IO (registry, rooms, facade signage, new `field`/`blob`/`ring` piece kinds, `state_keys.json`, `test_mods.py` extended). Honest status from judged shots (one build each): Occultism 7/10 mod read, Mystical Agriculture 7/10, Productive Bees 5/10, Ender IO 5/10 (no conduits, not recognisable as Ender IO), Ars Nouveau 3/10 (the agent dropped the registry wing and hand-built its own, so no registry room or signage was produced; needs a rerun).
+
 - Architect tooling only, no Java change. Create round 5: mod facade signage now also runs on the spine / `_legacy_build` path, with real cogwheel emblems on the doors; mod-room scale changes; `fix_pipes` tidies pipe runs (`floaters.py`); `test_mods.py` extended. Honest status: the Create room reads about 8/10 in judged shots. The facade panel contrast and the in-room gear visibility are still weak.
 
 - Ghosts now draw block-entity-rendered blocks: Create shafts, cogwheels, belts, water wheels, flywheels, and vanilla chest, sign, banner, shulker box, bell and enchanting table. New `ghost/GhostBlockEntities.java` runs the block's renderer on a client-only dummy block entity and bakes the quads into the ghost mesh (other texture sheets become extra buffers, with the same tint, solid and xray handling). New config `ghostRender.blockEntities` (default true); off gives the old models-only behaviour. For Create, the Flywheel backend is switched off by reflection during a bake and restored after, and if that fails the ghost falls back to the Ponder virtual model. Parts are static (no animation). No compile-time dependency on Create.

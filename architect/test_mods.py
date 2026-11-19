@@ -21,9 +21,24 @@ def check(cond, msg):
         fails.append(msg)
 
 
+def _states(r):
+    """Every block string with a [state] in a room's pieces, wall and gate, plus pad."""
+    out = []
+
+    def walk(x):
+        if isinstance(x, str):
+            if "[" in x:
+                out.append(x)
+        elif isinstance(x, (tuple, list)):
+            for y in x:
+                walk(y)
+    walk(r.pieces), walk(r.wall), walk(r.extra.get("gate", ())), walk(r.pad)
+    return out
+
+
 def piece_ids(r):
     def walk(p):
-        check(p[0] in ("single", "stack", "cube", "tower", "group", "gear", "cog", "belt", "column", "kgear", "kwheel", "kbelt", "pipe"), f"{r.theme}: unknown piece kind {p[0]}")
+        check(p[0] in ("single", "stack", "cube", "tower", "group", "gear", "cog", "belt", "column", "field", "blob", "ring", "kgear", "kwheel", "kbelt", "pipe"), f"{r.theme}: unknown piece kind {p[0]}")
         if p[0] == "group":
             for (dx, dz, sub) in p[1:]:
                 check(abs(dx) <= 3 and abs(dz) <= 3, f"{r.theme}: group offset outside the 7x7 plinth {dx},{dz}")
@@ -41,8 +56,17 @@ def piece_ids(r):
         yield from walk(p)
 
 
+def placed_pb(K):
+    placed = {}
+    cells = {(x, z) for x in range(2, 35) for z in range(2, 17)}
+    spine = {(x, z) for (x, z) in cells if 13 <= x <= 21}
+    interiors.fit_room("mod_room:productivebees", cells, 1, 10, K, spine, spine, "solarpunk", 1,
+                       lambda x, y, z, b: placed.__setitem__((x, y, z), b))
+    return list(placed.values())
+
+
 def main():
-    check(set(mods.REGISTRY) >= {"mekanism", "powah", "bigreactors", "create", "industrialforegoing"}, "registry incomplete")
+    check(set(mods.REGISTRY) >= {"mekanism", "powah", "bigreactors", "create", "industrialforegoing", "ars_nouveau", "occultism", "mysticalagriculture", "productivebees", "enderio"}, "registry incomplete")
     lib = tex = None
     if (KNOW / "blocklib.json").exists() and (KNOW / "_tex.json").exists():
         lib = json.loads((KNOW / "blocklib.json").read_text("utf-8"))
@@ -60,10 +84,10 @@ def main():
         for b in r.blocks:
             seen_global.setdefault(b, []).append(theme)
         check(all(b in r.blocks for b in piece_ids(r)), f"{theme}: piece block not in whitelist")
-        check(all(b in r.blocks for b in r.pad), f"{theme}: pad block not in whitelist")
+        check(all(b.split("[")[0] in r.blocks or b.startswith("minecraft:") for b in r.pad), f"{theme}: pad block not in whitelist")
         check(not r.plinth or (len(r.plinth) == 2 and r.deck), f"{theme}: plinth needs (ring, field) and a deck")
         check(r.pieces, f"{theme}: no pieces")
-        check(all(b in r.blocks for b in r.wall), f"{theme}: wall block not in whitelist")
+        check(all(b.split("[")[0] in r.blocks for b in r.wall), f"{theme}: wall block not in whitelist")
         if lib is not None:
             for b in r.blocks:
                 check(b in lib, f"{theme}: {b} not in blocklib")
@@ -128,6 +152,44 @@ def main():
     for theme in mods.REGISTRY:
         cells_ = signs.facade(theme, 0, 0, 37, 49, 2, 11, "s")
         check(len(cells_) > 150, f"{theme}: facade signage too small ({len(cells_)})")
+    # v27: batch-2 mods. State keys/values are checked against state_keys.json (read from the mod jars' blockstates)
+    NEW = ("ars_nouveau", "occultism", "mysticalagriculture", "productivebees", "enderio")
+    sk = json.loads((HERE / "mods" / "state_keys.json").read_text("utf-8"))
+    for theme in NEW:
+        r = mods.REGISTRY[theme]
+        for st in _states(r):
+            bid, _, rest = st.partition("[")
+            if bid.startswith("minecraft:"):
+                continue
+            allowed = sk.get(bid)
+            check(allowed is not None, f"{theme}: no state table for {bid} (re-run the jar scan)")
+            for kv in rest.rstrip("]").split(","):
+                k, _, v = kv.partition("=")
+                check(allowed is not None and v in allowed.get(k, []), f"{theme}: bad state {bid}[{kv}]")
+        check(r.extra.get("gate"), f"{theme}: no eye-level gate props")
+        check(r.deck and r.plinth, f"{theme}: needs a deck and plinth")
+        placed = {}
+        cells = {(x, z) for x in range(2, 35) for z in range(2, 17)}
+        K = {"trim": "minecraft:stone", "detail": "minecraft:stone", "glow": "minecraft:glowstone", "wall": "minecraft:stone"}
+        spine = {(x, z) for (x, z) in cells if 13 <= x <= 21}
+        interiors.fit_room(f"mod_room:{theme}", cells, 1, 10, K, spine, spine, r.style, 1,
+                           lambda x, y, z, b: placed.__setitem__((x, y, z), b))
+        mine = [b for b in placed.values() if b.split("[")[0].startswith(r.namespaces[0] + ":")]
+        check(len(mine) >= 120, f"{theme}: room has only {len(mine)} mod blocks")
+        check(any(b in r.extra["gate"] for b in placed.values()), f"{theme}: the gate props were not placed")
+    ma = mods.REGISTRY["mysticalagriculture"]
+    placed = {}
+    cells = {(x, z) for x in range(2, 35) for z in range(2, 17)}
+    spine = {(x, z) for (x, z) in cells if 13 <= x <= 21}
+    interiors.fit_room("mod_room:mysticalagriculture", cells, 1, 10, K, spine, spine, "solarpunk", 1,
+                       lambda x, y, z, b: placed.__setitem__((x, y, z), b))
+    crops = [(p, b) for p, b in placed.items() if b.split("[")[0].endswith("_crop")]
+    check(len(crops) >= 25, f"mysticalagriculture: only {len(crops)} crops")
+    check(all("[age=" in b for _, b in crops), "mysticalagriculture: a crop has no age state")
+    check(all(placed.get((x, y - 1, z), "").split("[")[0].endswith("_farmland") for (x, y, z), _ in crops),
+          "mysticalagriculture: a crop is not on farmland")
+    pb = [b for b in placed_pb(K) if "beehive" in b or "_nest" in b]
+    check(pb and all("honey_level=" in b or "axis=" in b or b.endswith("bumble_bee_nest") for b in pb), "productivebees: nest without state")
     if fails:
         print("FAIL:\n  " + "\n  ".join(fails))
         sys.exit(1)

@@ -257,6 +257,8 @@ def _mod_room_registered(reg, cells, centre, edge, keep, fy, h, K, put, used, pl
             used |= fp7(c)
         if reg.extra.get("clutter") and pads:
             _create_clutter(pads, set(cells), fy, h, put, reg.extra["clutter"])
+        if reg.extra.get("gate") and pads:
+            _mod_gates(pads, set(cells), fy, h, put, reg.extra["gate"])
         wall = reg.wall or tuple(p[1] for p in reg.pieces if p[0] == "single")
         for i, p in enumerate(edge):
             if wall and i % 3 != 2 and p not in used:
@@ -323,6 +325,29 @@ def _create_clutter(pads, room, fy, h, put, casing):
             xs = sorted(x for (x, z) in room if z == rz)
             for i, x in enumerate(xs):
                 put(x, top, rz, casing if i % 6 == 3 else K + "shaft[axis=x]")
+
+
+def _mod_gates(pads, room, fy, h, put, spec):
+    """v27 eye-level props for non-Create mod rooms. In every aisle between two neighbouring plinths of a row: two posts
+    (spec = (post, cap, lintel, lamp)) 2 cells either side of the row centre line, a cap block on each, a lintel bar across
+    them at the top and a lamp hanging in the middle. Needs a room at least 8 high; skips an aisle that leaves the room."""
+    post, cap, lintel, lamp = spec
+    top = fy + 5
+    if h < 8:
+        return
+    for rz in sorted({c[1] for c in pads}):
+        rp = sorted(c[0] for c in pads if c[1] == rz)
+        for xa, xb in zip(rp, rp[1:]):
+            mx = (xa + xb) // 2
+            if any((mx, rz + dz) not in room for dz in (-2, -1, 0, 1, 2)):
+                continue
+            for dz in (-2, 2):
+                for y in range(fy + 1, top):
+                    put(mx, y, rz + dz, post)
+                put(mx, top, rz + dz, cap)
+            for dz in (-1, 0, 1):
+                put(mx, top, rz + dz, lintel)
+            put(mx, top - 1, rz, lamp)
 
 
 def _registered(theme: str):
@@ -415,6 +440,28 @@ def _mod_piece(piece, cx, cz, fy, h, put):
         n, bb, eb = int(piece[1]), piece[2], piece[3]
         for dx in range(-n, n + 1):
             put(cx + dx, fy + 1, cz, eb if abs(dx) == n else bb)
+        return
+    if kind == "field":  # ("field", farmland, (crop, ...), n, age): (2n+1)^2 farmland with crops on top, crop type cycles per cell
+        farm, crops, n, age = piece[1], piece[2], int(piece[3]), int(piece[4])
+        for dx in range(-n, n + 1):
+            for dz in range(-n, n + 1):
+                put(cx + dx, fy + 1, cz + dz, farm)
+                c = crops[(dx + dz + 2 * n) % len(crops)]
+                put(cx + dx, fy + 2, cz + dz, c + (f"[age={age}]" if "[" not in c else ""))
+        return
+    if kind == "blob":  # ("blob", block, r, dy): solid ball (leaf crown) of radius r centred dy above the pad
+        b, r, dy = piece[1], int(piece[2]), int(piece[3])
+        for dx in range(-r, r + 1):
+            for dy2 in range(-r, r + 1):
+                for dz in range(-r, r + 1):
+                    if dx * dx + dy2 * dy2 + dz * dz <= r * r + 1 and fy + dy + dy2 < fy + h - 1:
+                        put(cx + dx, fy + dy + dy2, cz + dz, b)
+        return
+    if kind == "ring":  # ("ring", (b1, b2, ...), r): the square perimeter at distance r, blocks cycling, on the floor
+        bs, r = piece[1], int(piece[2])
+        cells = [(dx, dz) for dx in range(-r, r + 1) for dz in range(-r, r + 1) if max(abs(dx), abs(dz)) == r]
+        for i, (dx, dz) in enumerate(cells):
+            put(cx + dx, fy + 1, cz + dz, bs[i % len(bs)])
         return
     if kind == "column":  # ("column", b1, b2, ...): different blocks stacked bottom to top
         for dy, b in enumerate(piece[1:], 1):

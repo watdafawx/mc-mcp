@@ -312,7 +312,7 @@ LOCAL_TOOLS = [
      "kit profile. Recessed glass bays with varied spacing, wing colours, "
      "large yards/gardens, and optional landmark tower with elevator. Returns for every ghost its world_min/world_max, floor_y, roof_deck_y and door_side, plus site_min/site_max: use them to attach extra details. "
      "Wing: {name, rooms:[kinds], size:s|m|l, floors:1|2, floor_h, upper:[kinds], roof:flat|mansard|dome|crown|gable|gable_steep|hip|hip_steep|spire|barrel|sawtooth|garden, roles:{material overrides}}. "
-     "Rooms: mod_room:ae2|create|power|processing|magic|farming|mekanism|powah|bigreactors|industrialforegoing (or arbitrary theme; mekanism/powah/bigreactors/create/industrialforegoing are registered mods with real machines on every pad), expansion, storage, workshop, living, lab, hall. "
+     "Rooms: mod_room:ae2|create|power|processing|magic|farming|mekanism|powah|bigreactors|industrialforegoing|ars_nouveau|occultism|mysticalagriculture|productivebees|enderio (or arbitrary theme; mekanism/powah/bigreactors/create/industrialforegoing/ars_nouveau/occultism/mysticalagriculture/productivebees/enderio are registered mods with real machines on every pad), expansion, storage, workshop, living, lab, hall. "
      "home=true adds a home wing. Personalise with attached details and multiblocks using returned world origins; keep aisles clear.",
      "input_schema": {"type": "object", "properties": {
          "layout": {"type": "string", "enum": ["spine", "radial", "cloister", "linear", "terraces"]},

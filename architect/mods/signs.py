@@ -101,14 +101,99 @@ def _industrialforegoing():
     return out
 
 
+def _line(cells, a, b, blk):
+    """Rasterise a straight line of blocks from cell a to cell b (u, v)."""
+    n = max(abs(b[0] - a[0]), abs(b[1] - a[1]), 1)
+    for i in range(n + 1):
+        u, v = round(a[0] + (b[0] - a[0]) * i / n), round(a[1] + (b[1] - a[1]) * i / n)
+        cells[(u, v)] = blk
+
+
+def _ars_nouveau():
+    # v27: purple disc, gold rim (gilded sourcestone), a six-point source star in source gem blocks, lit hub
+    cells = {}
+    for (u, v, b) in _ring(5, "minecraft:gold_block", "minecraft:black_concrete"):
+        cells[(u, v)] = b
+    pts = [(round(4 * math.cos(math.radians(90 + 60 * i))), round(4 * math.sin(math.radians(90 + 60 * i)))) for i in range(6)]
+    for i in range(6):
+        _line(cells, pts[i], pts[(i + 2) % 6], "ars_nouveau:source_gem_block")
+    cells[(0, 0)] = "minecraft:sea_lantern"
+    return [(u, v, b) for (u, v), b in cells.items()]
+
+
+def _occultism():
+    # v27: black disc, purple otherstone rim, red pentagram (inverted, point down) with a gold centre
+    cells = {}
+    for (u, v, b) in _ring(5, "occultism:otherstone_bricks", "minecraft:black_concrete"):
+        cells[(u, v)] = b
+    pts = [(round(4 * math.cos(math.radians(270 + 72 * i))), round(4 * math.sin(math.radians(270 + 72 * i)))) for i in range(5)]
+    for i in range(5):
+        _line(cells, pts[i], pts[(i + 2) % 5], "minecraft:red_concrete")
+    cells[(0, 0)] = "occultism:iesnium_block"
+    return [(u, v, b) for (u, v), b in cells.items()]
+
+
+def _mysticalagriculture():
+    # v27: green disc, inferium rim, a sprout: stem and two leaves in lime on dark green, prosperity hub at the base
+    cells = {}
+    for (u, v, b) in _ring(5, "mysticalagriculture:inferium_block", "minecraft:green_concrete"):
+        cells[(u, v)] = b
+    for v in range(-3, 3):
+        cells[(0, v)] = "minecraft:lime_concrete"
+    for (u, v) in ((1, 0), (2, 0), (2, 1), (3, 1), (3, 2), (1, 1), (2, 2), (1, 2), (2, 3), (1, 3)):  # two leaf blades
+        cells[(u, v)] = "minecraft:lime_concrete"
+        cells[(-u, v)] = "minecraft:lime_concrete"
+    cells[(0, -3)] = "mysticalagriculture:prosperity_block"
+    cells[(0, 3)] = "mysticalagriculture:prosperity_block"
+    return [(u, v, b) for (u, v), b in cells.items()]
+
+
+def _productivebees():
+    # v27: hexagon of honeycomb with black bee stripes and yellow/orange rim
+    out = []
+    for u in range(-5, 6):
+        for v in range(-5, 6):
+            d = max(abs(v) / 0.866, abs(u) + abs(v) * 0.5)
+            if d > 5.2:
+                continue
+            if d > 4.0:
+                b = "minecraft:orange_concrete"
+            elif v % 2 == 0:
+                b = "minecraft:black_concrete"
+            else:
+                b = "minecraft:yellow_concrete" if d > 1.0 else "minecraft:honeycomb_block"
+            out.append((u, v, b))
+    return out
+
+
+def _enderio():
+    # v27: dark steel disc, vibrant (green) ring, black field, end steel cross and a pearl hub (conduit look)
+    cells = {}
+    for (u, v, b) in _ring(5, "enderio:dark_steel_block", "minecraft:black_concrete"):
+        cells[(u, v)] = b
+    for (u, v, b) in _ring(3, "enderio:vibrant_alloy_block"):
+        cells[(u, v)] = b
+    for t in range(-2, 3):
+        cells[(t, 0)] = "enderio:end_steel_block"
+        cells[(0, t)] = "enderio:end_steel_block"
+    cells[(0, 0)] = "enderio:pulsating_alloy_block"
+    return [(u, v, b) for (u, v), b in cells.items()]
+
+
 EMBLEMS = {"create": _create, "mekanism": _mekanism, "powah": _powah, "bigreactors": _bigreactors,
-           "industrialforegoing": _industrialforegoing}
+           "industrialforegoing": _industrialforegoing, "ars_nouveau": _ars_nouveau, "occultism": _occultism,
+           "mysticalagriculture": _mysticalagriculture, "productivebees": _productivebees, "enderio": _enderio}
 # lintel band (three rows) in the mod colours
 BANDS = {"create": ("create:brass_block", "create:andesite_alloy_block"),
          "mekanism": ("minecraft:cyan_concrete", "minecraft:black_concrete"),
          "powah": ("minecraft:blue_concrete", "minecraft:sea_lantern"),
          "bigreactors": ("minecraft:yellow_concrete", "minecraft:black_concrete"),
-         "industrialforegoing": ("minecraft:orange_concrete", "minecraft:black_concrete")}
+         "industrialforegoing": ("minecraft:orange_concrete", "minecraft:black_concrete"),
+         "ars_nouveau": ("minecraft:gold_block", "minecraft:purple_concrete"),
+         "occultism": ("minecraft:red_concrete", "minecraft:black_concrete"),
+         "mysticalagriculture": ("mysticalagriculture:inferium_block", "minecraft:lime_concrete"),
+         "productivebees": ("minecraft:yellow_concrete", "minecraft:black_concrete"),
+         "enderio": ("enderio:vibrant_alloy_block", "enderio:dark_steel_block")}
 R = 5  # emblem radius of the two door flankers; the single emblem on each of the other three sides is RBIG
 RBIG = {"create": 7}
 
