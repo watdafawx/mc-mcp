@@ -43,6 +43,7 @@ sys.modules["arch_site"] = site
 _sp.loader.exec_module(site)
 FEATURE_MODS: list[str] = []  # --feature-mod: registered mod rooms the brief asks for
 SITE: dict | None = None  # set from --survey: {survey, plan, near, force}; None = the old flat behaviour
+FREECAM: bool = False  # --freecam: use client-only ghost_camera in view() instead of /gamemode spectator + /tp
 
 
 def _load_dotenv(path: Path) -> None:
@@ -492,6 +493,11 @@ class Architect:
 
     def restore_view(self):
         """After a run: undo the screenshot view modes (xray off unless it was on before, solid as before, HUD back)."""
+        if FREECAM:
+            try:
+                self.mcp.call("ghost_camera", {"off": True})
+            except Exception:
+                pass
         if self.prev_view is None:
             return
         prev, self.prev_view = self.prev_view, None
@@ -774,7 +780,7 @@ class Architect:
                 c[1] = int(cut_y) if cut_y is not None else lo[1] + 4
             eye = (c[0] + ox / norm * d, c[1] + oy / norm * d, c[2] + oz / norm * d)
             look = tuple(c)
-        if not self.spectator:
+        if not FREECAM and not self.spectator:
             # Daylight, no HUD, ghosts drawn over terrain and opaque: the screenshot shows the design, not the woods.
             for cmd in ("gamemode spectator", "time set noon", "gamerule doDaylightCycle false",
                         "weather clear"):
@@ -792,10 +798,19 @@ class Architect:
         else:
             show["clip_off"] = True
         self.mcp.call("ghost_show", show)
-        self.mcp.call("run_command", {"command": f"tp @s {eye[0]:.1f} {eye[1]:.1f} {eye[2]:.1f}"})
-        self.mcp.call("look_at", {"x": look[0], "y": look[1], "z": look[2]})
-        time.sleep(1.5)  # let chunks and the ghost mesh draw
-        shot = self.mcp.json("screenshot", {})
+        if FREECAM:
+            self.mcp.call("ghost_camera", {"x": eye[0], "y": eye[1], "z": eye[2],
+                                           "look_x": look[0], "look_y": look[1], "look_z": look[2]})
+            try:
+                time.sleep(0.5)  # let a frame render from the detached camera
+                shot = self.mcp.json("screenshot", {})
+            finally:
+                self.mcp.call("ghost_camera", {"off": True})
+        else:
+            self.mcp.call("run_command", {"command": f"tp @s {eye[0]:.1f} {eye[1]:.1f} {eye[2]:.1f}"})
+            self.mcp.call("look_at", {"x": look[0], "y": look[1], "z": look[2]})
+            time.sleep(1.5)  # let chunks and the ghost mesh draw
+            shot = self.mcp.json("screenshot", {})
         path = shot["path"].replace("\\.\\", "\\")
         if PATH_MAP:
             src, dst = PATH_MAP.split("=", 1)
@@ -807,15 +822,34 @@ class Architect:
                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}]
         ref = self.ref_thumb() if angle != "cut" else None
         if ref:
-            name, b64 = ref
-            out += [{"type": "text", "text": f"REFERENCE ({name}, the player's mood board). Before your next build "
-                     "step, compare the view above with this reference and write the 3 biggest gaps (silhouette, "
-                     "roofline, facade depth, palette, detail, light), then fix the worst one."},
-                    {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}]
+            name, b64, is_user_ref = ref
+            if is_user_ref:
+                out += [{"type": "text", "text": f"USER REFERENCE ({name}). Compare the view above with this reference "
+                         "and list the concrete differences (proportions, silhouette, roofline, palette, missing features), "
+                         "then fix the biggest ones."},
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}]
+            else:
+                out += [{"type": "text", "text": f"REFERENCE ({name}, the player's mood board). Before your next build "
+                         "step, compare the view above with this reference and write the 3 biggest gaps (silhouette, "
+                         "roofline, facade depth, palette, detail, light), then fix the worst one."},
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}]
         return out
 
     def ref_thumb(self):
-        """One small reference image of the session's kit, a different one each view (round robin)."""
+        """One small reference image for side-by-side comparison on view(). Prefers user-supplied refs in
+        sessions/<name>/refs/ over kit mood boards so reference-image runs get a real compare-and-fix loop."""
+        from PIL import Image
+        import io
+        user_refs_dir = self.dir / "refs"
+        user_refs = sorted(user_refs_dir.glob("*.jpg")) if user_refs_dir.exists() else []
+        if user_refs:
+            self.user_ref_i = getattr(self, "user_ref_i", -1) + 1
+            p = user_refs[self.user_ref_i % len(user_refs)]
+            im = Image.open(p).convert("RGB")
+            im.thumbnail((640, 640))
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=80)
+            return p.name, base64.standard_b64encode(buf.getvalue()).decode(), True
         kit = getattr(self, "kit", None)
         if not kit:
             return None
@@ -825,13 +859,11 @@ class Architect:
             return None
         self.ref_i = getattr(self, "ref_i", -1) + 1
         r = refs[self.ref_i % len(refs)]
-        from PIL import Image
-        import io
         im = Image.open(d / r["file"]).convert("RGB")
         im.thumbnail((640, 640))
         buf = io.BytesIO()
         im.save(buf, "JPEG", quality=80)
-        return r["file"], base64.standard_b64encode(buf.getvalue()).decode()
+        return r["file"], base64.standard_b64encode(buf.getvalue()).decode(), False
 
     # ---- loop
 
@@ -1031,6 +1063,25 @@ def generate_request(style: str, x: int, y: int, z: int, kit: str, layout: str, 
     return brief
 
 
+PROMPT_BRIEF = """Build the player's request as a focused structure or architectural component grounded at world coordinates ({x}, {y}, {z}), using ghost ids under "{id}/".
+- Unless the player explicitly asks for a full base or multi-wing campus, do NOT call campus: build ONE clean, well-proportioned structure or component using shapes + ghost_set (or image_to_3d for organic reference objects like statues/creatures/ships/trees).
+- Aim for a strong silhouette, clean proportions, and cheap survival-obtainable blocks so the player can either improve it by hand or ask you to iterate on it.{kit_hint}
+- Ground everything at y={y} (no floating parts). Check with view once and fix the worst issues, then give a brief 1-2 sentence summary of what you built.
+
+Player request: {text}"""
+
+
+def prompt_request(text: str, x: int, y: int, z: int, kit: str | None, ident: str, force_3d: bool = False) -> str:
+    kit_hint = f" Use palette kit '{kit}' as a starting point (or match the reference if one is attached)." if kit else ""
+    body = text.strip() or "Build what the reference image shows."
+    out = PROMPT_BRIEF.format(x=x, y=y, z=z, id=ident, kit_hint=kit_hint, text=body)
+    if force_3d:
+        out += (f"\nFORCE 3D MESH: call image_to_3d(image=\"ref\", ghost_id=\"{ident}/model\", "
+                f"origin=[{x}, {y}, {z}], size=32) FIRST to voxelize the reference image directly via Hunyuan3D, "
+                f"then optionally add a clean plinth, base, or lighting around it.")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-s", "--session", default="default")
@@ -1041,6 +1092,14 @@ def main():
     ap.add_argument("--max-cost", type=float, default=None, help="stop the run once the API cost reaches this many USD")
     ap.add_argument("--generate", metavar="STYLE", help="build a base in this style (steampunk, hextech, gothic, "
                                                          "station_white, solarpunk) at --x --y --z; ghosts go under <session>/")
+    ap.add_argument("--prompt", action="store_true",
+                    help="build a single structure or component from free-text/ref at --x --y --z under <session>/")
+    ap.add_argument("--iterate", action="store_true",
+                    help="continue an existing session with follow-up feedback (no new placement wrapper)")
+    ap.add_argument("--force-3d", action="store_true",
+                    help="force image_to_3d (Hunyuan3D photo->voxel) on the attached reference image")
+    ap.add_argument("--freecam", action="store_true",
+                    help="use client-side ghost_camera in view() instead of /gamemode spectator + /tp")
     ap.add_argument("--x", type=int, default=0)
     ap.add_argument("--y", type=int, default=66)
     ap.add_argument("--z", type=int, default=0)
@@ -1053,7 +1112,8 @@ def main():
     ap.add_argument("--site-rect", help="x,z,w,d,rot of a previewed /ghost area: build exactly there")
     ap.add_argument("request", nargs="*")
     args = ap.parse_args()
-    global MAX_COST, SITE
+    global MAX_COST, SITE, FREECAM
+    FREECAM = bool(args.freecam)
     FEATURE_MODS[:] = args.feature_mod
     if args.max_cost is not None:
         MAX_COST = args.max_cost
@@ -1077,6 +1137,9 @@ def main():
         print("SITE " + site.describe(plan), flush=True)
     if args.generate:
         args.request = [generate_request(args.generate, args.x, args.y, args.z, args.kit, args.layout, args.session)]
+    elif args.prompt and not args.iterate:
+        args.request = [prompt_request(" ".join(args.request), args.x, args.y, args.z, args.kit, args.session,
+                                       force_3d=args.force_3d)]
     arch = Architect(args.session)
     first_refs = list(args.ref)
 
@@ -1091,6 +1154,9 @@ def main():
             arch.restore_view()
             release_focus(arch.mcp, held)
         first_refs = []
+        summary = " ".join(out.split())
+        if summary:
+            print("REPLY " + summary[:260], flush=True)
         print(f"\n{out}\n  [{MODEL}, cost ~${arch.cost:.4f}, {getattr(arch, 'tokens_in', 0)} in / "
               f"{getattr(arch, 'tokens_out', 0)} out tokens, {getattr(arch, 'secs', 0):.0f}s model time]\n", flush=True)
         return out

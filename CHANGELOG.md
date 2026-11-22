@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0 (2026-11-23)
+
+- **Prompt / Image mode in Ghost Builder GUI (`/ghost gui`, `G`)**: switch between **Prompt / Image** (default) and **Base Style**. Type any free-text description for a single structure or component, attach an image path/URL or toggle **Clip: on** (reads clipboard image directly), optionally toggle **3D: on** (forces Hunyuan3D photo→voxel via `image_to_3d`), pick Position + Kit, then **Generate** (new session) or **Iterate** (continues latest session in place to refine the ghost).
+- **One-click Export**: **Export** button in `GhostScreen` and `/ghost export [name] [litematic|schem|nbt]` save the latest session's ghosts (or all ghosts) directly to `<gameDir>/schematics/`.
+- **FreeCam toggle (`FreeCam: on/off` / `/ghost freecam`)**: client-side detached screenshot camera (`GhostCamera` + `CameraMixin` + `ghost_camera` MCP tool) so `architect.py`'s `view()` can orbit and inspect builds without `/gamemode spectator`, `/tp`, or cheats, and never moves the player.
+- **New client commands & MCP tools**: `/ghost prompt <text>`, `/ghost ref <clip|url|path> [text]`, `/ghost ref3d <clip|url|path> [text]`, `/ghost iterate <change>`, `/ghost export [name] [format]`, `/ghost freecam [on|off]`, plus `ghost_prompt` and `ghost_camera` MCP tools.
+- **Architect improvements**: component-first `--prompt` wrapper (skips full `campus` unless requested, grounds at exact looked-at block `y+1`), `--iterate`, `--force-3d`, `--freecam`, in-game chat `REPLY` summary echo, and **user reference compare-and-fix** in `view()` (attaches the user's own reference image side-by-side with the screenshot).
+
 ## 0.6.0 (2026-11-22)
 
 - Ghost builder screen (`/ghost gui`, or the `G` keybind under Controls → MC MCP): a vanilla `Screen` with a style picker, position (look-at / here / coordinates), kit, layout and fit, plus Generate / Stop / Clear, a show/hide toggle, the xray/solid mode and an Idle / Generating... / Done / Stopped / Error status line. It runs the same `/ghost generate` code path and does not pause the game. New `ghost/GhostScreen.java`, `assets/mcmcp/lang/en_us.json`.

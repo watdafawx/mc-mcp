@@ -71,12 +71,46 @@ public final class GhostTools {
         return gone;
     }
 
+    /** Shared by ghost_export, /ghost export, and GhostScreen Export button. */
+    public static Map<String, Object> exportGhosts(String ids, String name, String format, String author, Path path) {
+        List<Ghost> gs = selectId(ids);
+        if (gs.isEmpty()) throw new McpServer.ToolError("no ghosts match " + ids);
+        return exportList(gs, name, format, author, path);
+    }
+
+    private static Map<String, Object> exportList(List<Ghost> gs, String name, String format, String author, Path path) {
+        Long2ObjectMap<BlockState> world = new Long2ObjectOpenHashMap<>();
+        synchronized (GhostStore.LOCK) {
+            for (Ghost g : gs)
+                for (var e : g.blocks.long2ObjectEntrySet())
+                    world.put(BlockPos.of(e.getLongKey()).offset(g.origin).asLong(), e.getValue());
+        }
+        String fmt = (format == null || format.isBlank()) ? "litematic" : format.toLowerCase(Locale.ROOT).trim();
+        String safe = name.replaceAll("[^A-Za-z0-9._ -]", "_");
+        Path out = path != null ? path : FMLPaths.GAMEDIR.get().resolve("schematics").resolve(safe + "." + fmt);
+        try {
+            var r = SchematicWriter.write(world, fmt, safe, author == null || author.isBlank() ? "mc-mcp" : author, out);
+            return J.obj("path", r.path().toAbsolutePath().toString(), "blocks", r.blocks(),
+                    "size", List.of(r.size()[0], r.size()[1], r.size()[2]), "ghosts", gs.stream().map(g -> g.id).toList());
+        } catch (java.io.IOException e) {
+            throw new McpServer.ToolError("export failed: " + e.getMessage());
+        }
+    }
+
+    private static List<Ghost> selectId(String id) {
+        List<Ghost> all = GhostStore.all();
+        if (id == null || id.equals("*")) return all;
+        if (id.endsWith("/")) return all.stream().filter(g -> g.id.startsWith(id)).toList();
+        return List.of(GhostStore.get(id));
+    }
+
     public static Map<String, Object> ghostSummary(Ghost g) {
         return summary(g);
     }
 
     public static void register(McpServer mcp) {
         GhostGenerate.registerTools(mcp);
+        GhostCamera.registerTools(mcp);
         WorldSurvey.registerTools(mcp);
         GhostArea.registerTools(mcp);
         GhostSuggest.registerTools(mcp);
@@ -273,19 +307,8 @@ public final class GhostTools {
                 false, a -> {
                     List<Ghost> gs = select(a.get("ids"));
                     if (gs.isEmpty()) throw new McpServer.ToolError("no ghosts match " + a.get("ids"));
-                    Long2ObjectMap<BlockState> world = new Long2ObjectOpenHashMap<>();
-                    synchronized (GhostStore.LOCK) {
-                        for (Ghost g : gs)
-                            for (var e : g.blocks.long2ObjectEntrySet())
-                                world.put(BlockPos.of(e.getLongKey()).offset(g.origin).asLong(), e.getValue());
-                    }
-                    String format = J.str(a, "format", "litematic");
-                    String name = J.req(a, "name").replaceAll("[^A-Za-z0-9._ -]", "_");
-                    Path out = a.has("path") ? FMLPaths.GAMEDIR.get().resolve(J.str(a, "path", ""))
-                            : FMLPaths.GAMEDIR.get().resolve("schematics").resolve(name + "." + format);
-                    var r = SchematicWriter.write(world, format, name, J.str(a, "author", "mc-mcp"), out);
-                    return J.obj("path", r.path().toAbsolutePath().toString(), "blocks", r.blocks(),
-                            "size", List.of(r.size()[0], r.size()[1], r.size()[2]), "ghosts", gs.stream().map(g -> g.id).toList());
+                    Path out = a.has("path") ? FMLPaths.GAMEDIR.get().resolve(J.str(a, "path", "")) : null;
+                    return exportList(gs, J.req(a, "name"), J.str(a, "format", "litematic"), J.str(a, "author", "mc-mcp"), out);
                 }));
 
         mcp.add(new Tool("registry_blocks",

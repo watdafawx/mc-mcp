@@ -110,6 +110,16 @@ public final class GhostCommands {
                 .then(Commands.literal("solid").executes(c -> mode(false, null))
                         .then(Commands.argument("state", StringArgumentType.word()).suggests(ON_OFF)
                                 .executes(c -> mode(false, StringArgumentType.getString(c, "state")))))
+                .then(Commands.literal("freecam").executes(c -> freeCam(null))
+                        .then(Commands.argument("state", StringArgumentType.word()).suggests(ON_OFF)
+                                .executes(c -> freeCam(StringArgumentType.getString(c, "state")))))
+                .then(Commands.literal("export").executes(c -> exportCmd(null, "litematic"))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(c -> exportCmd(StringArgumentType.getString(c, "name"), "litematic"))
+                                .then(Commands.argument("format", StringArgumentType.word())
+                                        .suggests((ctx, b) -> SharedSuggestionProvider.suggest(List.of("litematic", "schem", "nbt"), b))
+                                        .executes(c -> exportCmd(StringArgumentType.getString(c, "name"),
+                                                StringArgumentType.getString(c, "format"))))))
                 .then(Commands.literal("list").executes(c -> list()))
                 .then(Commands.literal("gui").executes(c -> gui()))
                 .then(Commands.literal("stop").executes(c -> stop()))
@@ -142,6 +152,26 @@ public final class GhostCommands {
                 .then(Commands.literal("suggest").executes(c -> suggest(""))
                         .then(Commands.argument("args", StringArgumentType.greedyString()).suggests(SUGGEST_TAIL)
                                 .executes(c -> suggest(StringArgumentType.getString(c, "args")))))
+                .then(Commands.literal("prompt")
+                        .then(Commands.argument("text", StringArgumentType.greedyString())
+                                .executes(c -> prompt(StringArgumentType.getString(c, "text"), null, false, false))))
+                .then(Commands.literal("iterate")
+                        .then(Commands.argument("text", StringArgumentType.greedyString())
+                                .executes(c -> prompt(StringArgumentType.getString(c, "text"), null, false, true))))
+                .then(Commands.literal("ref")
+                        .then(Commands.argument("source", StringArgumentType.string())
+                                .suggests((ctx, b) -> SharedSuggestionProvider.suggest(List.of("clip", "clipboard"), b))
+                                .executes(c -> refCmd(StringArgumentType.getString(c, "source"), "", false))
+                                .then(Commands.argument("text", StringArgumentType.greedyString())
+                                        .executes(c -> refCmd(StringArgumentType.getString(c, "source"),
+                                                StringArgumentType.getString(c, "text"), false)))))
+                .then(Commands.literal("ref3d")
+                        .then(Commands.argument("source", StringArgumentType.string())
+                                .suggests((ctx, b) -> SharedSuggestionProvider.suggest(List.of("clip", "clipboard"), b))
+                                .executes(c -> refCmd(StringArgumentType.getString(c, "source"), "", true))
+                                .then(Commands.argument("text", StringArgumentType.greedyString())
+                                        .executes(c -> refCmd(StringArgumentType.getString(c, "source"),
+                                                StringArgumentType.getString(c, "text"), true)))))
                 .then(Commands.literal("generate")
                         .then(Commands.literal("confirm").executes(c -> generateConfirm()))
                         .then(Commands.argument("style", StringArgumentType.word()).suggests(STYLES)
@@ -225,9 +255,8 @@ public final class GhostCommands {
                 + "            /ghost generate steampunk look cyber_dark radial\n"
                 + "            /ghost generate gothic 100 -200 nofit\n"
                 + "  note:     the words 'kit' and 'layout' are not typed; put the kit and layout names themselves.\n"
-                + "  free text: not through this command. Run the architect directly in the architect folder: "
-                + "python architect.py -s mine \"a gothic keep with a library\", or type '@claude <description>' in chat "
-                + "while architect.py is running with --chat. The ghost builder screen (/ghost gui) builds the command for you.";
+                + "  free text: use /ghost prompt <description>, /ghost ref <clip|url|path> [description], "
+                + "/ghost iterate <change>, or open the Ghost Builder screen (/ghost gui or G).";
     }
 
     private static int generate(String style, String tail) {
@@ -259,6 +288,56 @@ public final class GhostCommands {
             String fk = kit, fl = layout, ft = target, fs = style;
             boolean ff = fit, fu = useArea;
             runAsync("generate", () -> GhostGenerate.start(fs, fx, fz, fk, fl, ft, ff, fu));
+            return 1;
+        });
+    }
+
+    private static int prompt(String text, String ref, boolean clip, boolean iterate) {
+        return prompt(text, ref, clip, iterate, false);
+    }
+
+    private static int prompt(String text, String ref, boolean clip, boolean iterate, boolean force3d) {
+        return guard(() -> {
+            runAsync(iterate ? "iterate" : "prompt",
+                    () -> GhostGenerate.startPrompt(text, ref, clip, null, null, "look", null, iterate, force3d));
+            return 1;
+        });
+    }
+
+    private static int refCmd(String source, String text, boolean force3d) {
+        String s = source == null ? "" : source.trim();
+        boolean clip = s.equalsIgnoreCase("clip") || s.equalsIgnoreCase("clipboard") || s.equalsIgnoreCase("clipboard:");
+        return prompt(text, clip ? null : s, clip, false, force3d);
+    }
+
+    private static int freeCam(String arg) {
+        return guard(() -> {
+            boolean now;
+            if (arg == null) now = !GhostCamera.freeCam;
+            else switch (arg.toLowerCase(Locale.ROOT)) {
+                case "on", "true" -> now = true;
+                case "off", "false" -> now = false;
+                default -> throw new IllegalArgumentException("use on or off");
+            }
+            GhostCamera.freeCam = now;
+            if (!now) GhostCamera.clear();
+            say(ChatFormatting.GREEN, "freecam " + (now ? "on (architect views use detached camera, no cheats/tp)" : "off (architect views use spectator /tp)"));
+            return 1;
+        });
+    }
+
+    private static int exportCmd(String name, String format) {
+        return guard(() -> {
+            GhostGenerate.Job last = GhostGenerate.latest();
+            String ids = "*";
+            String defaultName = "ghost_" + java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HHmmss"));
+            if (last != null && !last.ghostIds().isEmpty()) {
+                ids = last.id + "/";
+                defaultName = last.id;
+            }
+            String outName = (name == null || name.isBlank()) ? defaultName : name;
+            var r = GhostTools.exportGhosts(ids, outName, format, "mc-mcp", null);
+            say(ChatFormatting.GREEN, "exported " + r.get("blocks") + " blocks -> " + r.get("path"));
             return 1;
         });
     }

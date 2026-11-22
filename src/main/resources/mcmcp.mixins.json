@@ -6,7 +6,8 @@
   "plugin": "dev.watdafawx.mcmcp.mixin.McMcpMixinPlugin",
   "mixins": [],
   "client": [
-    "ChatComponentMixin"
+    "ChatComponentMixin",
+    "CameraMixin"
   ],
   "injectors": {
     "defaultRequire": 0

@@ -21,6 +21,9 @@ import java.util.regex.Pattern;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.fml.loading.FMLPaths;
 
 import dev.watdafawx.mcmcp.Config;
@@ -57,6 +60,7 @@ public final class GhostGenerate {
         String status = "running"; // running | done | failed
         String error;
         String site; // one-line site fit summary the architect printed (survey mode)
+        String reply; // one-line summary the architect printed on completion
         double cost;
         Process proc;
         final Deque<String> log = new ArrayDeque<>();
@@ -73,6 +77,9 @@ public final class GhostGenerate {
             if (s.startsWith("SITE ")) {
                 site = s.substring(5).trim();
                 chat(ChatFormatting.AQUA, "site " + (site.length() > 150 ? site.substring(0, 150) : site));
+            } else if (s.startsWith("REPLY ")) {
+                reply = s.substring(6).trim();
+                chat(ChatFormatting.WHITE, reply.length() > 220 ? reply.substring(0, 220) + "..." : reply);
             }
             log.addLast(s);
             while (log.size() > 40) log.removeFirst();
@@ -100,6 +107,7 @@ public final class GhostGenerate {
                     "ghosts", ghostIds(), "log", lines);
             if (error != null) m.put("error", error);
             if (site != null) m.put("site", site);
+            if (reply != null) m.put("reply", reply);
             return m;
         }
     }
@@ -155,6 +163,7 @@ public final class GhostGenerate {
             t.setDaemon(true);
             t.start();
         }
+        GhostCamera.clear();
         McMcp.LOG.info("ghost generate {} stopped by user", job.id);
         chat(ChatFormatting.YELLOW, "Generation stopped");
         return true;
@@ -277,6 +286,7 @@ public final class GhostGenerate {
         if (layout != null && !layout.isBlank()) cmd.addAll(List.of("--layout", layout.toLowerCase(Locale.ROOT)));
         if (surveyFile != null) cmd.addAll(List.of("--survey", surveyFile.toString(), "--near=" + near));
         if (rect != null) cmd.addAll(List.of("--site-rect=" + rect));
+        if (GhostCamera.freeCam) cmd.add("--freecam");
         ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true);
         String bind = Config.CLIENT_BIND.get();
         String host = bind.equals("0.0.0.0") || bind.equals("::") ? "127.0.0.1" : bind;
@@ -299,6 +309,131 @@ public final class GhostGenerate {
         t.start();
         chat(ChatFormatting.AQUA, "generate " + style + (area != null ? " in area" : surveyFile != null ? " fitted" : "") + " at " + ox + " " + oz + " (job " + id + ", cap $"
                 + String.format(Locale.ROOT, "%.2f", Config.GEN_COST_CAP.get()) + ")");
+        return job;
+    }
+
+    /**
+     * Resolves (x, y, z) on the game thread for a free-text/image prompt: crosshair block top ("look"), player feet
+     * ("here"), or explicit (x, z) with ground height when loaded.
+     */
+    private static int[] resolvePoint(String target, Integer x, Integer z) {
+        Minecraft mc = Minecraft.getInstance();
+        return GameThread.call(mc, () -> {
+            var p = mc.player;
+            var level = mc.level;
+            if (p == null || level == null) throw new McpServer.ToolError("no player in a world");
+            var feet = p.blockPosition();
+            if (x != null && z != null) {
+                int y = level.hasChunk(x >> 4, z >> 4)
+                        ? level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
+                        : feet.getY();
+                return new int[] {x, y, z};
+            }
+            String t = target == null || target.isBlank() ? "look" : target.trim().toLowerCase(Locale.ROOT);
+            if (t.equals("here")) return new int[] {feet.getX(), feet.getY(), feet.getZ()};
+            if (t.equals("look")) {
+                HitResult hit = p.pick(256.0, 1.0F, false);
+                if (hit == null || hit.getType() != HitResult.Type.BLOCK) hit = mc.hitResult;
+                if (hit instanceof BlockHitResult b && hit.getType() == HitResult.Type.BLOCK) {
+                    var pos = b.getBlockPos();
+                    return new int[] {pos.getX(), pos.getY() + 1, pos.getZ()};
+                }
+                return new int[] {feet.getX(), feet.getY(), feet.getZ()};
+            }
+            WorldSurvey.Target wt = WorldSurvey.resolve(t, null, null);
+            int y = level.hasChunk(wt.x() >> 4, wt.z() >> 4)
+                    ? level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, wt.x(), wt.z())
+                    : feet.getY();
+            return new int[] {wt.x(), y, wt.z()};
+        });
+    }
+
+    /**
+     * Starts a free-text / reference-image build or iterates on the latest session. Safe to call from any thread.
+     */
+    public static Job startPrompt(String prompt, String ref, boolean clipboardRef, Integer x, Integer z, String target,
+            String kit, boolean iterate) {
+        return startPrompt(prompt, ref, clipboardRef, x, z, target, kit, iterate, false);
+    }
+
+    public static Job startPrompt(String prompt, String ref, boolean clipboardRef, Integer x, Integer z, String target,
+            String kit, boolean iterate, boolean force3d) {
+        String text = prompt == null ? "" : prompt.trim();
+        String refStr = ref == null ? "" : ref.trim();
+        if (text.isEmpty() && refStr.isEmpty() && !clipboardRef)
+            throw new McpServer.ToolError("give a prompt, an image ref, or enable clipboard");
+        if (force3d && refStr.isEmpty() && !clipboardRef)
+            throw new McpServer.ToolError("3D mesh mode needs an image ref or Clip: on");
+        if (kit != null && !kit.isBlank() && !KITS.contains(kit.toLowerCase(Locale.ROOT)))
+            throw new McpServer.ToolError("unknown kit '" + kit + "'. Kits: " + String.join(", ", KITS));
+        String problem = preflight();
+        if (problem != null) throw new McpServer.ToolError(problem);
+
+        String id;
+        int ox, oy, oz;
+        if (iterate) {
+            Job prev = latest();
+            if (prev == null)
+                throw new McpServer.ToolError("no previous session to iterate on: generate a build first");
+            id = prev.id;
+            ox = prev.x;
+            oy = prev.y;
+            oz = prev.z;
+        } else {
+            int[] pt = resolvePoint(target, x, z);
+            ox = pt[0];
+            oy = pt[1];
+            oz = pt[2];
+            id = "pr_" + LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss")) + "_" + SEQ.incrementAndGet();
+        }
+
+        Job job = new Job(id, iterate ? "iterate" : "prompt", ox, oy, oz);
+        synchronized (GhostGenerate.class) {
+            Job c = current;
+            if (c != null && c.running())
+                throw new McpServer.ToolError("a generate job is already running (" + c.id + ", " + c.style
+                        + "). Wait for it to finish; ghost_generate_status shows progress.");
+            current = job;
+        }
+
+        Path dir = architectDir();
+        List<String> cmd = new ArrayList<>(List.of(python(dir), "-u", "architect.py", "-s", id,
+                iterate ? "--iterate" : "--prompt",
+                "--x", String.valueOf(ox), "--y", String.valueOf(oy), "--z", String.valueOf(oz),
+                "--max-cost", String.valueOf(Config.GEN_COST_CAP.get())));
+        if (!iterate && kit != null && !kit.isBlank()) cmd.addAll(List.of("--kit", kit.toLowerCase(Locale.ROOT)));
+        if (!refStr.isEmpty()) cmd.addAll(List.of("--ref", refStr));
+        if (clipboardRef) cmd.addAll(List.of("--ref", "clipboard:"));
+        if (force3d) cmd.add("--force-3d");
+        if (GhostCamera.freeCam) cmd.add("--freecam");
+        if (!text.isEmpty()) {
+            cmd.add("--");
+            cmd.add(text);
+        }
+        ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true);
+        String bind = Config.CLIENT_BIND.get();
+        String host = bind.equals("0.0.0.0") || bind.equals("::") ? "127.0.0.1" : bind;
+        pb.environment().put("MCMCP_URL", "http://" + host + ":" + Config.CLIENT_PORT.get() + "/mcp");
+        pb.environment().put("PYTHONIOENCODING", "utf-8");
+        String token = Config.CLIENT_TOKEN.get();
+        if (!token.isEmpty()) pb.environment().put("MCMCP_TOKEN", token);
+        try {
+            job.proc = pb.start();
+        } catch (IOException e) {
+            synchronized (job) {
+                job.status = "failed";
+                job.error = "could not start " + cmd.get(0) + ": " + e.getMessage();
+            }
+            finish(job);
+            throw new McpServer.ToolError(job.error);
+        }
+        Thread t = new Thread(() -> watch(job), "mcmcp-ghost-generate");
+        t.setDaemon(true);
+        t.start();
+        String tag = iterate ? "iterate " + id : "prompt at " + ox + " " + oy + " " + oz + " (job " + id + ")";
+        String refNote = (clipboardRef ? " [clipboard]" : (!refStr.isEmpty() ? " [ref]" : "")) + (force3d ? " [3D]" : "");
+        chat(ChatFormatting.AQUA, tag + refNote + ", cap $"
+                + String.format(Locale.ROOT, "%.2f", Config.GEN_COST_CAP.get()));
         return job;
     }
 
@@ -337,6 +472,7 @@ public final class GhostGenerate {
     }
 
     private static void finish(Job job) {
+        GhostCamera.clear();
         synchronized (GhostGenerate.class) {
             last = job;
             if (current == job) current = null;
@@ -385,6 +521,24 @@ public final class GhostGenerate {
                             J.str(a, "kit", null), J.str(a, "layout", null), J.str(a, "target", null), J.b(a, "fit", true),
                             J.b(a, "use_area", false));
                     return J.obj("job", j.id, "status", "running", "style", j.style, "origin", List.of(j.x, j.y, j.z),
+                            "cost_cap_usd", Config.GEN_COST_CAP.get(), "hint", "poll ghost_generate_status with this job id");
+                }));
+        mcp.add(new Tool("ghost_prompt",
+                "Build a focused structure or component from a free-text prompt and/or reference image (or iterate on the latest session). "
+                        + "Async: returns a job id; poll ghost_generate_status. ref: image path, URL, YouTube link, or 'clipboard:'. "
+                        + "clipboard=true reads the clipboard image. iterate=true continues the latest session to tweak existing ghosts.",
+                J.Schema.of().str("prompt", "what to build or change").str("ref", "optional image/video path or URL")
+                        .bool("clipboard", "attach image from clipboard (default false)")
+                        .integer("x", "target x").integer("z", "target z")
+                        .str("target", "look | here | x,z (default look)").str("kit", "optional palette kit")
+                        .bool("iterate", "continue latest session (default false)")
+                        .bool("force_3d", "force Hunyuan3D photo->voxel via image_to_3d (default false)").build(),
+                false, a -> {
+                    Job j = startPrompt(J.str(a, "prompt", null), J.str(a, "ref", null), J.b(a, "clipboard", false),
+                            a.has("x") ? J.i(a, "x", 0) : null, a.has("z") ? J.i(a, "z", 0) : null,
+                            J.str(a, "target", null), J.str(a, "kit", null), J.b(a, "iterate", false),
+                            J.b(a, "force_3d", false));
+                    return J.obj("job", j.id, "status", "running", "mode", j.style, "origin", List.of(j.x, j.y, j.z),
                             "cost_cap_usd", Config.GEN_COST_CAP.get(), "hint", "poll ghost_generate_status with this job id");
                 }));
         mcp.add(new Tool("ghost_generate_status",

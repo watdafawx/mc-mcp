@@ -1,9 +1,13 @@
 # Architect
 
-LLM architect: designs themed bases as ghost builds in a running Minecraft client through mc-mcp. See `architect.py`
-(docstring) for the CLI. In game it is started with `/ghost generate <style> [look|here|x z] [kit] [layout]`, the ghost
-builder screen (`/ghost gui`, or the `G` keybind: style, position, kit, layout, fit, Generate/Stop/Clear, status) or the
-MCP tools `ghost_generate` / `ghost_generate_status`. `/ghost stop` cancels a running job (kills the process).
+LLM architect: designs themed bases, single structures, and architectural components as ghost builds in a running Minecraft client through mc-mcp. See `architect.py`
+(docstring) for the CLI. In game:
+- **Ghost Builder screen** (`/ghost gui`, or `G` keybind): two modes:
+  - **Prompt / Image**: free-text prompt + optional image path/URL, **Clip: on** (clipboard image), **3D: on** (force Hunyuan3D photo→voxel), Position, Kit, **Generate** (new session), **Iterate** (continue latest session), **Stop**.
+  - **Base Style**: full themed base (style, position, kit, layout, fit, Generate/Stop).
+  - **Utility bar** (both modes): **Export** (saves `.litematic` to `schematics/`), **Clear**, **Ghosts**, **X-ray**, **FreeCam** (detached client camera for `view()` without `/tp` or cheats).
+- **Commands**: `/ghost prompt <text>`, `/ghost ref <clip|url|path> [text]`, `/ghost ref3d <clip|url|path> [text]`, `/ghost iterate <change>`, `/ghost export [name] [litematic|schem|nbt]`, `/ghost freecam [on|off]`, `/ghost generate <style> [look|here|x z] [kit] [layout]`, `/ghost stop`.
+- **MCP tools**: `ghost_prompt`, `ghost_camera`, `ghost_generate`, `ghost_generate_status`. `/ghost stop` cancels a running job (kills the process).
 
 ## Setup on the machine that runs the client (rig)
 
