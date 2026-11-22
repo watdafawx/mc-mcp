@@ -1,12 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-11-22)
 
 - Ghost builder screen (`/ghost gui`, or the `G` keybind under Controls → MC MCP): a vanilla `Screen` with a style picker, position (look-at / here / coordinates), kit, layout and fit, plus Generate / Stop / Clear, a show/hide toggle, the xray/solid mode and an Idle / Generating... / Done / Stopped / Error status line. It runs the same `/ghost generate` code path and does not pause the game. New `ghost/GhostScreen.java`, `assets/mcmcp/lang/en_us.json`.
 - New `/ghost stop`: cancels the running generate job, kills the architect process (and its children) on a worker thread and marks the job `stopped`, so a new job can start immediately. `ghost_generate_status` reports `stopped` too.
 - Clearer `/ghost generate` errors: an unplaceable word now lists the valid styles, kits and layouts, gives three examples, says that the words "kit" and "layout" are not typed, and points at the architect CLI (`python architect.py -s mine "<description>"`) or `@claude <text>` in chat for a free-text description. An unknown kit fails with the same message instead of being accepted.
-
-- Architect tooling only (no Java change). Mod wings are sized from their machine count, and every style gets service infrastructure: a 3-wide, 2-deep trench from the hub under each wing (ME / power / fluid lanes, hatches, junction blocks), a port wall with labelled M/P/F/I bays facing the hub, and ceiling cable trays with drops to the machines (`architect/services.py`, `test_services.py`). Honest status: AE2 cables are invisible in a ghost, so ME runs are shown as coloured lanes with real AE2 end blocks; Mekanism cables only draw as core cubes; steampunk surface pipes not done. Ghost-render findings are in the architect README.
+- Architect tooling only (no Java change). Mod rooms and wings: each mod wing is now sized from its machine count, and every style gets service infrastructure: a 3-wide, 2-deep trench from the hub under each wing (ME / power / fluid lanes, hatches, junction blocks), a port wall with labelled M/P/F/I bays facing the hub, and ceiling cable trays with drops to the machines (`architect/services.py`, `test_services.py`). Honest status: AE2 cables are invisible in a ghost, so ME runs are shown as coloured lanes with real AE2 end blocks; Mekanism cables only draw as core cubes; steampunk surface pipes not done. Ghost-render findings are in the architect README.
 
 ## 0.5.1
 
