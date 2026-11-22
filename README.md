@@ -93,6 +93,8 @@ Client-side, ghosts exist only in this client's memory. Tab completion for ids a
 | `/ghost clear [id]` | delete one ghost, a `prefix/`, or all (same code as `ghost_clear`) |
 | `/ghost generate <style> [look\|here\|x z] [kit] [layout] [nofit]` | same as `ghost_generate`: no coordinates = the block you look at, `here` = your feet; surveys and fits the terrain; `nofit` = old flat build. Right after `/ghost area`, with no extra words, it builds in the previewed area. Chat: started / site fit / done / failed + API cost |
 | `/ghost generate confirm` | build in the previewed area (same as `ghost_generate use_area=true`) |
+| `/ghost stop` | cancel the running generate job: the architect process is killed and the job is marked `stopped` (a new one can start at once) |
+| `/ghost gui` | open the ghost builder screen (same as the `G` keybind, rebindable under Controls → MC MCP): style, position (look-at / here / x z), kit, layout, fit, Generate / Stop / Clear, show/hide, xray, and a status line. Does not pause the game |
 | `/ghost suggest [look\|here\|x z] [r=8..40] [nooverlay]` | same as `ghost_suggest`: survey the built blocks around the looked-at spot, chat 3-6 suggestions (e.g. "roof is flat: add gables", "no light on the east wall") and draw the additions as ghost `suggest` (`/ghost clear suggest` removes it). Costs API money, capped at $0.10 |
 | `/ghost area <style> [look\|here\|x z] [layout]` | preview the site as a coloured outline (lime fits / yellow needs foundations / red blocked) plus one chat line: fit score, fill/cut, obstacles, layout. No LLM call, no cost |
 | `/ghost area move <dx> <dz>` / `rotate` / `clear` | nudge the previewed area (re-scored on the same survey), turn it 90 degrees, or drop it |

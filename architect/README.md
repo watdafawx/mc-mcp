@@ -1,8 +1,9 @@
 # Architect
 
 LLM architect: designs themed bases as ghost builds in a running Minecraft client through mc-mcp. See `architect.py`
-(docstring) for the CLI. In game it is started with `/ghost generate <style> [look|here|x z] [kit] [layout]` or the MCP tools
-`ghost_generate` / `ghost_generate_status`.
+(docstring) for the CLI. In game it is started with `/ghost generate <style> [look|here|x z] [kit] [layout]`, the ghost
+builder screen (`/ghost gui`, or the `G` keybind: style, position, kit, layout, fit, Generate/Stop/Clear, status) or the
+MCP tools `ghost_generate` / `ghost_generate_status`. `/ghost stop` cancels a running job (kills the process).
 
 ## Setup on the machine that runs the client (rig)
 

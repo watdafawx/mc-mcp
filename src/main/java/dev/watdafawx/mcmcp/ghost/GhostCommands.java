@@ -111,6 +111,8 @@ public final class GhostCommands {
                         .then(Commands.argument("state", StringArgumentType.word()).suggests(ON_OFF)
                                 .executes(c -> mode(false, StringArgumentType.getString(c, "state")))))
                 .then(Commands.literal("list").executes(c -> list()))
+                .then(Commands.literal("gui").executes(c -> gui()))
+                .then(Commands.literal("stop").executes(c -> stop()))
                 .then(Commands.literal("clear").executes(c -> clear("*"))
                         .then(Commands.argument("id", StringArgumentType.greedyString()).suggests(IDS)
                                 .executes(c -> clear(StringArgumentType.getString(c, "id")))))
@@ -209,6 +211,25 @@ public final class GhostCommands {
         });
     }
 
+    /**
+     * What /ghost generate accepts, said plainly: the style list is the one the architect knows, the words after it are
+     * kit/layout names (not the words "kit"/"layout"), and a free-text description belongs to the architect CLI, not here.
+     */
+    private static String generateUsage(String word) {
+        return "unexpected '" + word + "'. /ghost generate builds one of the known styles; it does not take a free-text description.\n"
+                + "  style:    " + String.join(" | ", GhostGenerate.STYLES) + "\n"
+                + "  words:    look | here | <x> <z> | <kit name> | <layout name> | nofit\n"
+                + "            kits: " + String.join(" | ", GhostGenerate.KITS) + "\n"
+                + "            layouts: " + String.join(" | ", GhostGenerate.LAYOUTS) + "\n"
+                + "  examples: /ghost generate gothic here\n"
+                + "            /ghost generate steampunk look cyber_dark radial\n"
+                + "            /ghost generate gothic 100 -200 nofit\n"
+                + "  note:     the words 'kit' and 'layout' are not typed; put the kit and layout names themselves.\n"
+                + "  free text: not through this command. Run the architect directly in the architect folder: "
+                + "python architect.py -s mine \"a gothic keep with a library\", or type '@claude <description>' in chat "
+                + "while architect.py is running with --chat. The ghost builder screen (/ghost gui) builds the command for you.";
+    }
+
     private static int generate(String style, String tail) {
         return guard(() -> {
             Integer x = null, z = null;
@@ -221,15 +242,15 @@ public final class GhostCommands {
                 z = Integer.parseInt(t[1]);
                 i = 2;
             } else if (t.length >= 1 && isInt(t[0])) {
-                throw new McpServer.ToolError("give both x and z, or neither");
+                throw new McpServer.ToolError("give both x and z, or neither. Example: /ghost generate gothic 100 -200");
             }
             for (; i < t.length; i++) {
                 String w = t[i].toLowerCase(Locale.ROOT);
                 if (w.equals("here") || w.equals("look")) target = w;
                 else if (w.equals("nofit")) fit = false;
                 else if (GhostGenerate.LAYOUTS.contains(w) && layout == null) layout = w;
-                else if (kit == null) kit = w;
-                else throw new McpServer.ToolError("unexpected '" + t[i] + "'. Usage: /ghost generate <style> [look|here|x z] [kit] [layout] [nofit]");
+                else if (GhostGenerate.KITS.contains(w) && kit == null) kit = w;
+                else throw new McpServer.ToolError(generateUsage(t[i]));
             }
             // no placement words and an area preview is up: build in that area
             boolean useArea = t.length == 0 && GhostArea.current() != null;
@@ -245,6 +266,24 @@ public final class GhostCommands {
     private static int generateConfirm() {
         return guard(() -> {
             runAsync("generate", () -> GhostGenerate.start(null, null, null, null, null, null, true, true));
+            return 1;
+        });
+    }
+
+    /** /ghost gui: the ghost builder screen (same commands, buttons instead of typing). */
+    private static int gui() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(GhostScreen::open);
+        return 1;
+    }
+
+    /** /ghost stop: cancels the running generate job and kills its architect process. */
+    private static int stop() {
+        return guard(() -> {
+            if (!GhostGenerate.stop()) {
+                say(ChatFormatting.YELLOW, "no generate job running");
+                return 0;
+            }
             return 1;
         });
     }

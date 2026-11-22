@@ -124,6 +124,42 @@ public final class GhostGenerate {
         return null;
     }
 
+    /**
+     * Cancels the running job: marks it stopped (so a new one can start at once) and kills the architect process with
+     * its children on a short-lived worker, so the game thread never waits. Returns false when nothing was running.
+     */
+    public static boolean stop() {
+        Job job;
+        synchronized (GhostGenerate.class) {
+            job = current;
+        }
+        if (job == null) return false;
+        Process p;
+        synchronized (job) {
+            if (!job.status.equals("running")) return false;
+            job.status = "stopped";
+            job.error = null;
+            p = job.proc;
+        }
+        if (p != null) {
+            Thread t = new Thread(() -> {
+                p.descendants().forEach(ProcessHandle::destroy);
+                p.destroy();
+                try {
+                    if (!p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) p.destroyForcibly();
+                } catch (InterruptedException e) {
+                    p.destroyForcibly();
+                    Thread.currentThread().interrupt();
+                }
+            }, "mcmcp-ghost-generate-stop");
+            t.setDaemon(true);
+            t.start();
+        }
+        McMcp.LOG.info("ghost generate {} stopped by user", job.id);
+        chat(ChatFormatting.YELLOW, "Generation stopped");
+        return true;
+    }
+
     // ------------------------------------------------------------------ paths and preflight
 
     static Path architectDir() {
@@ -271,7 +307,7 @@ public final class GhostGenerate {
         Thread killer = new Thread(() -> {
             try {
                 if (!p.waitFor(MAX_MINUTES, java.util.concurrent.TimeUnit.MINUTES)) {
-                    synchronized (job) { job.error = "timed out after " + MAX_MINUTES + " min"; }
+                    synchronized (job) { if (job.status.equals("running")) job.error = "timed out after " + MAX_MINUTES + " min"; }
                     p.destroyForcibly();
                 }
             } catch (InterruptedException ignored) {
@@ -292,8 +328,10 @@ public final class GhostGenerate {
         }
         killer.interrupt();
         synchronized (job) {
-            if (job.error == null && code != 0) job.error = "architect exited with code " + code;
-            job.status = job.error == null ? "done" : "failed";
+            if (!job.status.equals("stopped")) {
+                if (job.error == null && code != 0) job.error = "architect exited with code " + code;
+                job.status = job.error == null ? "done" : "failed";
+            }
         }
         finish(job);
     }
@@ -304,13 +342,18 @@ public final class GhostGenerate {
             if (current == job) current = null;
         }
         String cost = String.format(Locale.ROOT, "$%.4f", job.cost);
-        boolean ok;
+        boolean ok, stopped;
         String err;
-        synchronized (job) { ok = job.status.equals("done"); err = job.error; }
-        if (ok) chat(ChatFormatting.GREEN, "generate done: " + job.ghostIds().size() + " ghosts under " + job.id + "/, cost " + cost
+        synchronized (job) {
+            ok = job.status.equals("done");
+            stopped = job.status.equals("stopped");
+            err = job.error;
+        }
+        if (stopped) chat(ChatFormatting.GRAY, "generate stopped at " + cost + "; ghosts placed so far stay (/ghost clear " + job.id + "/)");
+        else if (ok) chat(ChatFormatting.GREEN, "generate done: " + job.ghostIds().size() + " ghosts under " + job.id + "/, cost " + cost
                 + ". /ghost list, /ghost hide, /ghost clear " + job.id + "/");
         else chat(ChatFormatting.RED, "generate failed: " + err + " (cost " + cost + "). ghost_generate_status job=" + job.id + " has the log.");
-        McMcp.LOG.info("ghost generate {} {} cost {}", job.id, ok ? "done" : "failed", cost);
+        McMcp.LOG.info("ghost generate {} {} cost {}", job.id, stopped ? "stopped" : ok ? "done" : "failed", cost);
     }
 
     /** Chat line in this client only. */
@@ -345,7 +388,7 @@ public final class GhostGenerate {
                             "cost_cap_usd", Config.GEN_COST_CAP.get(), "hint", "poll ghost_generate_status with this job id");
                 }));
         mcp.add(new Tool("ghost_generate_status",
-                "Status of a ghost_generate job: running | done | failed, ghost ids so far, API cost so far, last log lines. "
+                "Status of a ghost_generate job: running | done | failed | stopped, ghost ids so far, API cost so far, last log lines. "
                         + "job omitted = the latest job.",
                 J.Schema.of().str("job", "job id from ghost_generate").integer("lines", "log lines to return (default 12)").build(),
                 true, a -> {
