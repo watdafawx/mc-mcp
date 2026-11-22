@@ -49,11 +49,21 @@ class ModRoom:
 REGISTRY: dict[str, ModRoom] = {}
 
 
+def register_signage(theme: str, emblem, band: tuple):
+    """v28: facade signage for a batch-3 mod, registered by its own module file (signs.py keeps the batch-1/2 tables):
+    `emblem` is a signs-style emblem cell function, `band` the (a, b) block ids of the three-row lintel band."""
+    from .signs import BANDS, EMBLEMS
+    EMBLEMS.setdefault(theme, emblem)
+    BANDS.setdefault(theme, band)
+
+
 def _load():
     from . import (mekanism, powah, bigreactors, create, industrialforegoing, ars_nouveau, occultism,
-                   mysticalagriculture, productivebees, enderio)
+                   mysticalagriculture, productivebees, enderio, modern_industrialization, immersiveengineering,
+                   draconicevolution, evilcraft, functionalstorage)
     for m in (mekanism, powah, bigreactors, create, industrialforegoing, ars_nouveau, occultism, mysticalagriculture,
-              productivebees, enderio):
+              productivebees, enderio, modern_industrialization, immersiveengineering, draconicevolution, evilcraft,
+              functionalstorage):
         REGISTRY[m.ROOM.theme] = m.ROOM
 
 

@@ -104,6 +104,22 @@ looks at them, gives feedback, and you change them until they like it; ghost_exp
 - Stairs: facing=<dir> is the side of the tall back. half=top flips them upside down (good for eaves and trims).
 - Logs/pillars: axis=x|y|z. Slabs: type=bottom|top|double. Use full block-state strings in the palette.
 
+## Ghost-renderable mod blocks & cables (from the live client test: do not guess, these are what actually draw)
+- AE2 cables do NOT exist as blocks: every `ae2:cable_glass/covered/smart/dense_smart` is a part of `ae2:cable_bus`,
+  which is INVISIBLE in a ghost. Draw ME runs as coloured concrete/glass lanes plus real AE2 end blocks that do draw:
+  `ae2:interface`, `ae2:pattern_provider`, `ae2:controller[state=online,type=block|column_y]`,
+  `ae2:energy_acceptor`, `ae2:drive[facing=...]`, `ae2:molecular_assembler`, `ae2:crafting_unit[formed=true]`,
+  `ae2:crafting_accelerator`, `ae2:crafting_storage`, `ae2:energy_cell`, `ae2:io_port`.
+- Mekanism transmitters (universal_cable, pressurized_tube, mechanical_pipe, logistical_transporter,
+  thermodynamic_conductor) draw only as isolated core cubes: fine as node markers, never as connected runs.
+- Powah `powah:energy_cable_*` and Create `create:fluid_pipe` draw connected ONLY with all six direction states
+  (`north/east/south/west/up/down=true|false`); without them each block is a dot. `create:glass_fluid_pipe[axis]`,
+  `create:encased_fluid_pipe` (states), `create:copper_casing`, `create:mechanical_pump[facing]` and
+  `create:fluid_tank` draw normally.
+- Vanilla fallbacks that always draw cleanly: `minecraft:iron_bars` (states for lines), `minecraft:chain[axis=...]`,
+  `minecraft:end_rod`, copper grates, `minecraft:lightning_rod`, `minecraft:tinted_glass`, `minecraft:waxed_copper_bulb`.
+  Ceiling trays and pipe runs: opaque concrete, never translucent glass (glass conduits look like torn sheets).
+
 ## Workflow
 1. Read the request. Call plan(action=get). For a new area, write a plan first with plan(action=set): areas,
    rooms (name, theme, purpose, world origin, size), how rooms connect (doors, corridors), and the overall style.

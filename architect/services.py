@@ -6,10 +6,12 @@ draw in a ghost and say "ME" at a glance, see README "Service infrastructure"):
   1. size_for(clusters): wing footprint from the machine-cluster count (cluster pitch x clusters + services), not a fixed size.
   2. trench: a 3-wide, 2-deep channel (three coloured lanes: ME purple, power red, fluid teal) from the hub under every mod wing,
      grate / glass hatches in the paving so it can be seen, a junction block where each wing branches off.
-  3. ceiling trays (interiors -> install): dark gantry frames with three coloured conduit runs over the room, feed lines
-     dropping onto the machine clusters.
+  3. ceiling trays (interiors -> install): dark gantry frames with two or three coloured conduit runs spread across
+     the room, hung off wall-to-wall cross beams, with a three-lane branch and a drop onto every machine cluster.
   4. port wall (interiors -> install): the wall of the room facing the hub, labelled bays (M = ME interface / pattern provider,
-     P = power input, F = fluid in/out, I = item in/out), fed from the trench through floor risers.
+     P = power input, F = fluid in/out, I = item in/out), fed from the trench through floor risers. Bays are 5 wide on a
+     pitch of 6, packed 3 wide on a tighter pitch when the wall is short (small machine wings, gothic cloister rooms), so
+     a wing never ends up with a single lonely bay.
 
 Interiors work in wing-local cells; install() records the risers and the manifold line (take() hands them to campus, which
 converts them to world cells and routes the trench to them).
@@ -58,11 +60,11 @@ def size_for(clusters: int) -> tuple[int, int]:
 
 
 # ------------------------------------------------------------------------- interiors side (wing-local cells)
-_REC = {"risers": [], "manifold": [], "bays": [], "port": None}
+_REC = {"risers": [], "manifold": [], "bays": [], "port": None, "drops": []}
 
 
 def reset():
-    _REC.update(risers=[], manifold=[], bays=[], port=None)
+    _REC.update(risers=[], manifold=[], bays=[], port=None, drops=[])
 
 
 def take() -> dict:
@@ -120,6 +122,66 @@ def _conduit(kind, axis, theme):
     return base
 
 
+def _pack_bays(vs, cu, cells, keep, u0, width, pitch):
+    """Bay centres along the port wall for a bay `width` wide on a `pitch`, sweeping the start offset so a doorway or a
+    short wall doesn't waste the whole wall. Best = most bays, then the most centred set. A bay needs its wall row and
+    the floor strip in front of it entirely inside the room and out of the aisles/doorway (keep)."""
+    half = width // 2
+    lo, hi = vs[0] + half, vs[-1] - half
+    if lo > hi:
+        return []
+    mid = (lo + hi) / 2.0
+    best, best_key = [], (-1, 0.0)
+    for off in range(pitch):
+        out, v = [], lo + off
+        while v <= hi:
+            span = [(u0 + du, v + dv) for du in (0, 1) for dv in range(-half, half + 1)]
+            if all(cu(a, b) in cells and cu(a, b) not in keep for a, b in span):
+                out.append(v)
+                v += pitch
+            else:
+                v += 1
+        if out:
+            key = (len(out), -abs(sum(out) / len(out) - mid))
+            if key > best_key:
+                best, best_key = out, key
+        if len(best) >= 3:
+            break                                        # enough: the widest bay is tried first, stop early
+    return best
+
+
+def _bay_layout(vs, cu, cells, keep, u0):
+    """(bay width, centres) for the port wall. Widest bay that still reads (>= 3 bays), else the widest that gives the
+    two bays a narrow gothic cloister room can hold, else 3-wide on a tight pitch. Short machine wings and the cloister
+    got one lonely bay from the old fixed 5-wide/pitch-6 march; this packs the wall at the door gaps instead."""
+    best = (0, [])
+    for width, pitch, want in ((5, 6, 3), (3, 5, 3), (3, 4, 2)):
+        pos = _pack_bays(vs, cu, cells, keep, u0, width, pitch)
+        if len(pos) >= want:
+            return width, pos
+    for width, pitch in ((5, 6), (3, 5), (3, 4)):        # really short wall: take whichever packs most
+        pos = _pack_bays(vs, cu, cells, keep, u0, width, pitch)
+        if len(pos) > len(best[1]):
+            best = (width, pos)
+    return best
+
+
+def _tray_lines(bays, vs, want):
+    """Up to `want` trunk runs spread evenly across the port wall. Trays used to be a single 3-wide line over the middle
+    bay: with the doorway in the middle of the wall that line landed over the aisle and the room read as bare."""
+    lo, hi = vs[0] + 2, vs[-1] - 2
+    if hi < lo:
+        lo = hi = (vs[0] + vs[-1]) // 2
+    if want <= 1:
+        return [bays[len(bays) // 2][0] if bays else (lo + hi) // 2]
+    lines = []
+    for i in range(want):
+        v = lo + round(i * (hi - lo) / (want - 1))
+        if all(abs(v - q) >= 5 for q in lines):
+            lines.append(v)
+    return lines or [bays[len(bays) // 2][0]]
+
+
 def install(theme, cells, keep, fy, h, K, put, door, pads, seed=0):
     """Port wall + ceiling trays for one registered mod room. cells: room floor cells (local), keep: aisle/doorway cells,
     pads: machine cluster centres, door: side of the wing facing the hub (n/s/e/w). Needs h >= 9 (one tall floor)."""
@@ -130,38 +192,31 @@ def install(theme, cells, keep, fy, h, K, put, door, pads, seed=0):
     u0 = min(u for u, _ in uvs.values())
     umax = max(u for u, _ in uvs.values())
     row = {v: p for p, (u, v) in uvs.items() if u == u0}
-    if len(row) < 8:
+    if len(row) < 5:
         return
     vs = sorted(row)
     cu = lambda u, v: _xz(u, v, nv, tv)
     face = FACING[(-nv[0], -nv[1])]                      # blocks on the port wall face into the room
-    # ---- bays: 5 wide on a pitch of 6, along the wall, skipping the doorway and anything not entirely in the room
-    bays, k = [], 0
-    v = vs[0] + 3
-    while v + 3 <= vs[-1]:
-        span = [(u0 + du, v + dv) for du in (0, 1, 2) for dv in (-2, -1, 0, 1, 2)]
-        pts = [cu(a, b) for a, b in span]
-        if all(p in cells for p in pts) and not any(cu(a, b) in keep for a, b in span if a <= u0 + 1):
-            bays.append((v, BAYS[k % len(BAYS)]))
-            k += 1
-            v += 6
-        else:
-            v += 1
+    # ---- bays: packed along the wall (5 wide on a pitch of 6, 3 wide + tighter pitch when the wall is short),
+    # skipping the doorway and anything not entirely in the room
+    bw, centres = _bay_layout(vs, cu, cells, keep, u0)
+    bays = [(v, BAYS[k % len(BAYS)]) for k, v in enumerate(centres)]
+    half = max(1, bw // 2)
     fy_ = fy
-    for v, (letter, col, (blk, side), upper) in bays:
+    for v, (letter, col, (blk, side), _upper) in bays:
         concrete = f"minecraft:{col}_concrete"
-        for dv in (-2, -1, 0, 1, 2):                       # lit floor strip + the riser grate in front of the bay
+        for dv in range(-half, half + 1):                  # lit floor strip + the riser grate in front of the bay
             x, z = cu(u0 + 1, v + dv)
             put(x, fy_, z, concrete)
         rx, rz = cu(u0 + 1, v)
         put(rx, fy_, rz, "minecraft:waxed_oxidized_copper_grate")
         _REC["risers"].append((rx, rz))
-        for dv in (-2, -1, 0, 1, 2):
+        for dv in range(-half, half + 1):
             for dy in (1, 2):                                # machines on the wall: side pieces and the centre block
                 x, z = cu(u0, v + dv)
                 b = blk if dv == 0 or (abs(dv) == 1 and dy == 2) else side
                 put(x, fy_ + dy, z, b.replace("{f}", face))
-        for dv in (-2, -1, 0, 1, 2):                         # coloured panel + white letter
+        for dv in range(-half, half + 1):                    # coloured panel + white letter
             for dy in range(3, 10):
                 x, z = cu(u0, v + dv)
                 put(x, fy_ + dy, z, concrete)
@@ -171,50 +226,62 @@ def install(theme, cells, keep, fy, h, K, put, door, pads, seed=0):
                 if ch == "X":
                     x, z = cu(u0, v + c - 1)
                     put(x, fy_ + 8 - r, z, "minecraft:white_concrete")
-        for dv in (-3, 3):                                    # pilaster between bays
+        for dv in (-(half + 1), half + 1):                    # pilaster between bays
+            if cu(u0, v + dv) not in cells:
+                continue
             x, z = cu(u0, v + dv)
             for dy in range(1, 10):
                 put(x, fy_ + dy, z, DARK)
         x, z = cu(u0 + 1, v)                                  # conduit stub from the header down to the bay lamp
-        for dy in range(10, h):                               # feed stub: header down to the top of the panel
+        for dy in range(min(10, max(3, h - 1)), h):            # feed stub: header down to the top of the panel
             put(x, fy_ + dy, z, concrete)
-    # ---- header beam along the wall under the ceiling, the three tray runs from the header to the far wall, cross beams
     if not bays:
         return
+    # ---- header beam along the wall under the ceiling, the tray trunk runs from the header to the far wall, cross beams
     yt = fy_ + h - 1
     for dv in vs:
         x, z = row[dv]
         put(x, fy_ + h, z, DARK)
-    vc = bays[len(bays) // 2][0]
     axis = "x" if nv[0] else "z"
-    for u in range(u0 + 1, umax + 1):
-        for dv, (kind, _) in zip((-1, 0, 1), TRAY):
-            p = cu(u, vc + dv)
-            if p in cells:
-                put(p[0], yt, p[1], _conduit(kind, axis, theme))
-        if (u - u0) % 6 == 3:                                # gantry cross beam, hung from the ceiling, wall to wall
+    vcross = "z" if axis == "x" else "x"
+    span = vs[-1] - vs[0] + 1
+    want = 1 if span < 12 else 2 if span < 30 else 3                # trunk runs: at least two in a normal room
+    lines = _tray_lines(bays, vs, want)
+    for vc in lines:
+        for u in range(u0 + 1, umax + 1):
+            for dv, (kind, _) in zip((-1, 0, 1), TRAY):
+                p = cu(u, vc + dv)
+                if p in cells:
+                    put(p[0], yt, p[1], _conduit(kind, axis, theme))
+            if (u - u0) % 6 != 3:                            # gantry cross beam, hung from the ceiling, wall to wall
+                continue
             for p, (uu, vv) in uvs.items():
                 if uu == u:
                     put(p[0], fy_ + h, p[1], DARK)
-            for dv in (-2, 2):
+            for dv in (-2, 2):                               # hangers: the tray hangs off the beam
                 p = cu(u, vc + dv)
                 if p in cells:
                     put(p[0], yt, p[1], "minecraft:chain[axis=y]")
-    # ---- feed lines: from the tray along the cross direction to each cluster, then a drop onto the machines
+    # ---- feed lines: from the nearest trunk to every machine cluster, three lanes wide, then a drop onto the machines
     drops = 0
     for c in pads:
         u, vv = _uv(c, nv, tv)
-        if abs(vv - vc) < 2 or u <= u0 + 4:
+        if u <= u0 + 4:
             continue
-        step = 1 if vv > vc else -1
+        vc = min(lines, key=lambda q: abs(q - vv))
         kind = TRAY[drops % 3]
-        for w in range(vc + 2 * step, vv + step, step):
-            p = cu(u, w)
-            if p in cells:
-                put(p[0], yt, p[1], kind[1] if kind[0] != "power" else _conduit("power", "z" if axis == "x" else "x", theme))
+        if abs(vv - vc) >= 2:                               # branch run (three lanes) from the trunk to the pad row
+            step = 1 if vv > vc else -1
+            for dv, (k2, _) in zip((-1, 0, 1), TRAY):
+                b = _conduit(k2, vcross, theme)
+                for w in range(vc + step, vv + step, step):
+                    p = cu(u, w + dv)
+                    if p in cells:
+                        put(p[0], yt, p[1], b)
         for dy in range(fy_ + 8, yt):
-            put(c[0], dy, c[1], kind[1])
+            put(c[0], dy, c[1], kind[1] if kind[0] != "power" else _conduit("power", "y", theme))
         put(c[0], fy_ + 7, c[1], "minecraft:lightning_rod[facing=down]")
+        _REC["drops"].append((c[0], c[1]))
         drops += 1
     # ---- manifold line under the bays' riser row (the trench ends here)
     for dv in vs:
@@ -222,7 +289,8 @@ def install(theme, cells, keep, fy, h, K, put, door, pads, seed=0):
         if p in cells:
             _REC["manifold"].append(p)
     _REC["bays"] = [(cu(u0, v), letter) for v, (letter, *_r) in bays]
-    _REC["port"] = {"u0": u0, "nv": nv, "door": door, "tray_v": vc}
+    _REC["port"] = {"u0": u0, "nv": nv, "door": door, "tray_v": lines[0], "tray_lines": lines, "tray_y": yt,
+                    "tray_drops": drops, "bay_width": bw}
 
 
 # ------------------------------------------------------------------------------- campus side (world cells)
