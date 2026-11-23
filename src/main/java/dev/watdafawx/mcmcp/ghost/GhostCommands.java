@@ -121,6 +121,7 @@ public final class GhostCommands {
                                         .executes(c -> exportCmd(StringArgumentType.getString(c, "name"),
                                                 StringArgumentType.getString(c, "format"))))))
                 .then(Commands.literal("list").executes(c -> list()))
+                .then(Commands.literal("undo").executes(c -> undo()))
                 .then(Commands.literal("gui").executes(c -> gui()))
                 .then(Commands.literal("stop").executes(c -> stop()))
                 .then(Commands.literal("clear").executes(c -> clear("*"))
@@ -217,6 +218,19 @@ public final class GhostCommands {
             say(gone.isEmpty() ? ChatFormatting.YELLOW : ChatFormatting.GREEN,
                     "cleared " + gone.size() + " ghost" + (gone.size() == 1 ? "" : "s"));
             return gone.size();
+        });
+    }
+
+    /** /ghost undo: puts the ghosts back the way they were before the last iterate (one step, in memory). */
+    private static int undo() {
+        return guard(() -> {
+            int n = GhostStore.undo();
+            if (n == 0) {
+                say(ChatFormatting.YELLOW, "nothing to undo");
+                return 0;
+            }
+            say(ChatFormatting.GREEN, "undid last edit (restored " + n + " ghost" + (n == 1 ? "" : "s") + ")");
+            return n;
         });
     }
 

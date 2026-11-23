@@ -28,8 +28,10 @@ import anthropic
 import blocklib
 import campus
 import floaters
+import llm_client
 import mods
 import multiblocks
+import postcheck
 import refs as refs_mod
 import shapes
 
@@ -383,6 +385,12 @@ LOCAL_TOOLS = [
      "- arch {w=3, h=4, along x|z, depth (wall thickness), block, stair, frame=true}: arched doorway carved "
      "through a wall; at = opening's bottom-left.\n"
      "- pillar_row {count, spacing, h, along, block, base, cap, size 1|2}.\n"
+     "- square_tower {w=5, d=5, h=14, block, hollow=true, floor, floors_every, windows=true, window_every=4, machicolations=true, crenel=true}.\n"
+     "- dormer {w=3, h=4, depth=4, facing=south, wall, roof, window}: projecting roof dormer with gable rooflet.\n"
+     "- buttress_row {length=15, h=9, depth=3, spacing=4, axis=x, side=south, block, cap_stairs}: stepped wall buttresses.\n"
+     "- spiral_stair {r=2, h=10, block, stair_block, pillar, clockwise=true}: helical staircase around central pillar.\n"
+     "- arch_bridge (or bridge without kit) {length=15, width=5, arch_rise=3, axis=x, deck, arch_block, rail, lanterns=true}.\n"
+     "- wall_segment {length=15, h=7, thickness=3, axis=x, block, walkway, crenel=true, crenel_side=both}: fortified wall.\n"
      "Returns each part's block count and world-local bounds.",
      "input_schema": {"type": "object", "properties": {
          "ghost_id": {"type": "string"},
@@ -453,8 +461,8 @@ class Architect:
         self.msgs_file = self.dir / "messages.json"
         self.plan_file = self.dir / "plan.json"
         self.messages: list[dict] = json.loads(self.msgs_file.read_text("utf-8")) if self.msgs_file.exists() else []
-        self.client = (anthropic.Anthropic(base_url=BASE_URL, api_key="local", timeout=900) if LOCAL
-                       else anthropic.Anthropic())
+        self.client, self.llm_info = llm_client.make_client()
+        self.is_local = bool(self.llm_info.get("local")) or self.llm_info.get("provider") != "anthropic"
         self.mcp = Mcp(MCP_URL)
         mcp_tools = {t["name"]: t for t in self.mcp.tools()}
         missing = [n for n in FORWARD if n not in mcp_tools]
@@ -463,7 +471,7 @@ class Architect:
         # Fixed order keeps the tool list byte-identical between calls, so the prompt cache hits.
         self.tools = [{"name": n, "description": mcp_tools[n]["description"], "input_schema": mcp_tools[n]["inputSchema"]}
                       for n in FORWARD] + LOCAL_TOOLS
-        if not LOCAL:
+        if not self.is_local:
             self.tools.append({"type": "web_search_20250305", "name": "web_search", "max_uses": 5})
         self._guides: Guides | None = None
         self.guard = floaters.Guard()
@@ -833,8 +841,11 @@ class Architect:
             if path.upper().startswith(src.upper()):
                 path = dst + path[len(src):]
         data = base64.standard_b64encode(Path(path).read_bytes()).decode()
+        plan = json.loads(self.plan_file.read_text("utf-8")) if self.plan_file.exists() else {}
+        pwarns = postcheck.proportion_check(plan, sel)
+        warn_txt = ("\nPROPORTION WARNINGS: " + "; ".join(pwarns)) if pwarns else ""
         out = [{"type": "text", "text": f"view {angle} of {target}: bounds {lo}..{hi}, camera at "
-                                        f"{[round(v) for v in eye]}"},
+                                        f"{[round(v) for v in eye]}{warn_txt}"},
                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}]
         ref = self.ref_thumb() if angle != "cut" else None
         if ref:
@@ -950,7 +961,7 @@ class Architect:
         final = ""
         for step in range(MAX_STEPS):
             t0 = time.time()
-            if LOCAL:
+            if self.is_local:
                 resp = self.client.messages.create(model=MODEL, max_tokens=8000, system=SYSTEM,
                                                    tools=self.tools, messages=self.messages)
             else:
@@ -965,7 +976,7 @@ class Architect:
             self.tokens_in = getattr(self, "tokens_in", 0) + u.input_tokens
             self.tokens_out = getattr(self, "tokens_out", 0) + u.output_tokens
             self.secs = getattr(self, "secs", 0.0) + time.time() - t0
-            if not LOCAL:
+            if not self.llm_info.get("local"):
                 self.cost += usage_cost(u)
             self.messages.append({"role": "assistant",
                                   "content": [b.model_dump(mode="json", exclude_none=True) for b in resp.content]})
@@ -1081,7 +1092,7 @@ def generate_request(style: str, x: int, y: int, z: int, kit: str, layout: str, 
 
 PROMPT_BRIEF = """Build the player's request as a focused structure or architectural component grounded at world coordinates ({x}, {y}, {z}), using ghost ids under "{id}/".
 - Unless the player explicitly asks for a full base or multi-wing campus, do NOT call campus: build ONE clean, well-proportioned structure or component using shapes + ghost_set (or image_to_3d for organic reference objects like statues/creatures/ships/trees).
-- Aim for a strong silhouette, clean proportions, and cheap survival-obtainable blocks so the player can either improve it by hand or ask you to iterate on it.{kit_hint}
+- Aim for a strong silhouette, clean proportions, and cheap survival-obtainable blocks so the player can either improve it by hand or ask you to iterate on it. Prefer the `shapes` tool (square_tower, round_tower, gable_roof, cone_roof, dormer, arch, buttress_row, arch_bridge, wall_segment, spiral_stair) plus contrasting roof/trim/wood accents over plain monochrome stone boxes.{kit_hint}
 - Ground everything at y={y} (no floating parts). Check with view once and fix the worst issues, then give a brief 1-2 sentence summary of what you built.
 
 Player request: {text}"""
@@ -1159,11 +1170,49 @@ def main():
     arch = Architect(args.session)
     first_refs = list(args.ref)
 
+    def auto_foundation(prefix: str) -> int:
+        """For --prompt builds: survey a small patch under the generated ghosts and add stone-brick retaining walls /
+        cobble pillars where the structure hangs above sloped ground. Zero LLM tokens."""
+        try:
+            ghosts = [g for g in arch.mcp.json("ghost_list", {}).get("ghosts", [])
+                      if g["id"].startswith(prefix) and not g["id"].endswith("/foundation") and "world_min" in g]
+            if not ghosts:
+                return 0
+            lo = [min(g["world_min"][i] for g in ghosts) for i in range(3)]
+            hi = [max(g["world_max"][i] for g in ghosts) for i in range(3)]
+            cx, cz = (lo[0] + hi[0]) // 2, (lo[2] + hi[2]) // 2
+            rad = max(12, min(48, max(hi[0] - lo[0], hi[2] - lo[2]) // 2 + 4))
+            sv_raw = arch.mcp.json("world_survey", {"x": cx, "z": cz, "radius": rad, "step": 1})
+            sv = site.Survey.from_json(sv_raw)
+            blocks = []
+            for g in ghosts:
+                info = arch.mcp.json("ghost_info", {"id": g["id"], "blocks": True, "limit": 20000})
+                ox, oy, oz = g["origin"]
+                for b in info.get("block_list") or []:
+                    blocks.append([b["x"] + ox - lo[0], b["y"] + oy - lo[1], b["z"] + oz - lo[2], b["state"]])
+            def ground_fn(wx, wz):
+                if sv.flag_at(wx, wz) in ("w", "l", "?"):
+                    return None
+                y = sv.height_at(wx, wz)
+                return None if y is None else int(y)
+            fblocks = postcheck.local_foundation(blocks, (lo[0], lo[1], lo[2]), ground_fn)
+            if not fblocks:
+                return 0
+            arch.mcp.json("ghost_set", {"id": prefix + "foundation", "origin": [lo[0], lo[1], lo[2]],
+                                        "mode": "replace", "blocks": fblocks})
+            print(f"  (auto-foundation: {len(fblocks)} blocks under {prefix})", flush=True)
+            return len(fblocks)
+        except Exception as e:
+            print(f"  (auto-foundation skipped: {e})", flush=True)
+            return 0
+
     def run(text: str) -> str:
         nonlocal first_refs
         held = hold_focus(arch.mcp)
         try:
             out = arch.turn(text, first_refs)
+            if args.prompt and not args.iterate:
+                auto_foundation(args.session + "/")
         except Exception as e:  # a bad reference shouldn't kill the REPL or chat loop
             out = f"error: {e}"
         finally:

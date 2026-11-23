@@ -56,7 +56,7 @@ public final class GhostScreen extends Screen {
     private static final int PANEL = 280, PAD = 10, TITLE_H = 16, STATUS_H = 14, MARGIN = 6;
 
     private CycleButton<String> modeBtn, styleBtn, positionBtn, kitBtn, layoutBtn;
-    private Button clipBtn, force3dBtn, fitBtn, generateBtn, iterateBtn, stopBtn, exportBtn, clearBtn, showBtn, xrayBtn, freeCamBtn;
+    private Button clipBtn, force3dBtn, fitBtn, generateBtn, iterateBtn, stopBtn, undoBtn, exportBtn, clearBtn, showBtn, xrayBtn, freeCamBtn;
     private EditBox promptBox, refBox, xBox, zBox;
     private boolean shown = true;
     private Component status = Component.empty();
@@ -257,16 +257,21 @@ public final class GhostScreen extends Screen {
             y += step;
         }
 
-        int third = (w - 8) / 3;
+        // Utility row: Undo | Export | Clear | Ghosts: shown/hidden (Undo keeps the widest label readable).
+        int undoW = 52, exportW = 56, clearW = 52;
+        undoBtn = Button.builder(Component.translatable("mcmcp.ghost.gui.undo"), b -> run("ghost undo"))
+                .bounds(left, y, undoW, hgt).build();
         exportBtn = Button.builder(Component.translatable("mcmcp.ghost.gui.export"), b -> run("ghost export"))
-                .bounds(left, y, third, hgt).build();
+                .bounds(left + undoW + 4, y, exportW, hgt).build();
         clearBtn = Button.builder(Component.translatable("mcmcp.ghost.gui.clear"), b -> run("ghost clear"))
-                .bounds(left + third + 4, y, third, hgt).build();
+                .bounds(left + undoW + exportW + 8, y, clearW, hgt).build();
+        int showX = left + undoW + exportW + clearW + 12;
         showBtn = Button.builder(showLabel(), b -> {
             shown = !shown;
             b.setMessage(showLabel());
             run(shown ? "ghost show" : "ghost hide");
-        }).bounds(left + 2 * (third + 4), y, w - 2 * (third + 4), hgt).build();
+        }).bounds(showX, y, left + w - showX, hgt).build();
+        addRenderableWidget(undoBtn);
         addRenderableWidget(exportBtn);
         addRenderableWidget(clearBtn);
         addRenderableWidget(showBtn);
@@ -308,6 +313,7 @@ public final class GhostScreen extends Screen {
         generateBtn.active = !running;
         stopBtn.active = running;
         if (iterateBtn != null) iterateBtn.active = !running && GhostGenerate.latest() != null;
+        if (undoBtn != null) undoBtn.active = !running && GhostStore.canUndo();
         if (exportBtn != null) exportBtn.active = !GhostStore.all().isEmpty();
         xrayBtn.setMessage(xrayLabel());
         freeCamBtn.setMessage(freeCamLabel());

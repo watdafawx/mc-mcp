@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -25,6 +27,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.fml.loading.FMLPaths;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+
 import dev.watdafawx.mcmcp.McMcp;
 import dev.watdafawx.mcmcp.mcp.McpServer;
 
@@ -33,6 +37,9 @@ public final class GhostStore {
     public static final Object LOCK = new Object();
     private static final Map<String, Ghost> GHOSTS = new LinkedHashMap<>();
     private static final int MAX_BLOCKS = 2_000_000;
+    /** Undo points: deep copies of the ghosts matching a prefix, newest last. In memory only. */
+    private static final Deque<Snapshot> UNDO = new ArrayDeque<>();
+    private static final int MAX_UNDO = 10;
     private static boolean loaded;
 
     private GhostStore() {}
@@ -76,6 +83,111 @@ public final class GhostStore {
             }
             return had;
         }
+    }
+
+    // ------------------------------------------------------------------ undo
+
+    /** One ghost's state at snapshot time (blocks copied, so later edits cannot reach it). */
+    private static final class Copy {
+        final String id;
+        final BlockPos origin;
+        final String dimension;
+        final boolean visible;
+        final float alpha;
+        final Map<String, String> tags;
+        final Long2ObjectOpenHashMap<BlockState> blocks;
+
+        Copy(Ghost g) {
+            this.id = g.id;
+            this.origin = g.origin;
+            this.dimension = g.dimension;
+            this.visible = g.visible;
+            this.alpha = g.alpha;
+            this.tags = new LinkedHashMap<>(g.tags);
+            this.blocks = new Long2ObjectOpenHashMap<>(g.blocks);
+        }
+    }
+
+    /** An undo point: the ghosts that matched one prefix, by id. */
+    private static final class Snapshot {
+        final String prefix;
+        final Map<String, Copy> ghosts;
+
+        Snapshot(String prefix, Map<String, Copy> ghosts) {
+            this.prefix = prefix;
+            this.ghosts = ghosts;
+        }
+    }
+
+    /** "*" / empty matches everything, a trailing "/" matches a prefix, anything else matches one id. */
+    private static boolean matches(String prefix, String id) {
+        if (prefix == null || prefix.isEmpty() || prefix.equals("*")) return true;
+        return prefix.endsWith("/") ? id.startsWith(prefix) : id.equals(prefix);
+    }
+
+    /**
+     * Remembers the current ghosts matching {@code prefix} so {@link #undo()} can bring them back. Same prefix rules as
+     * {@link #undo()}. Does nothing when no ghost matches. Keeps the last 10 undo points.
+     */
+    public static void snapshot(String prefix) {
+        synchronized (LOCK) {
+            loadOnce();
+            String p = prefix == null ? "*" : prefix.trim();
+            Map<String, Copy> copies = new LinkedHashMap<>();
+            for (Ghost g : GHOSTS.values()) if (matches(p, g.id)) copies.put(g.id, new Copy(g));
+            if (copies.isEmpty()) return;
+            UNDO.addLast(new Snapshot(p, copies));
+            while (UNDO.size() > MAX_UNDO) UNDO.removeFirst();
+            McMcp.LOG.info("ghost undo point for '{}' ({} ghosts, {} kept)", p, copies.size(), UNDO.size());
+        }
+    }
+
+    public static boolean canUndo() {
+        synchronized (LOCK) {
+            return !UNDO.isEmpty();
+        }
+    }
+
+    /**
+     * Restores the newest undo point: ghosts added under its prefix since then are removed, the rest get their saved
+     * blocks, origin, tags, visibility and alpha back. Returns how many ghosts were restored (0 = nothing to undo).
+     */
+    public static int undo() {
+        List<String> removed = new ArrayList<>();
+        List<Ghost> restored = new ArrayList<>();
+        synchronized (LOCK) {
+            loadOnce();
+            Snapshot s = UNDO.pollLast();
+            if (s == null) return 0;
+            for (String id : new ArrayList<>(GHOSTS.keySet()))
+                if (!s.ghosts.containsKey(id) && matches(s.prefix, id)) {
+                    GHOSTS.remove(id);
+                    removed.add(id);
+                }
+            for (Copy c : s.ghosts.values()) {
+                Ghost g = GHOSTS.computeIfAbsent(c.id, k -> new Ghost(c.id, c.origin, c.dimension));
+                g.origin = c.origin;
+                g.dimension = c.dimension;
+                g.visible = c.visible;
+                g.alpha = c.alpha;
+                g.tags.clear();
+                g.tags.putAll(c.tags);
+                g.blocks.clear();
+                g.blocks.putAll(c.blocks);
+                g.version++;
+                restored.add(g);
+            }
+        }
+        for (String id : removed) {
+            try {
+                Files.deleteIfExists(file(id));
+            } catch (IOException e) {
+                McMcp.LOG.warn("could not delete ghost file {}", id, e);
+            }
+        }
+        for (Ghost g : restored) save(g);
+        McMcp.LOG.info("ghost undo: {} restored, {} removed", restored.size(), removed.size());
+        return restored.size();
     }
 
     /**

@@ -396,6 +396,9 @@ public final class GhostGenerate {
             current = job;
         }
 
+        // 1-click Undo: remember this session's ghosts as they are before the architect iterates on them.
+        if (iterate) GhostStore.snapshot(id + "/");
+
         Path dir = architectDir();
         List<String> cmd = new ArrayList<>(List.of(python(dir), "-u", "architect.py", "-s", id,
                 iterate ? "--iterate" : "--prompt",

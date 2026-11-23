@@ -14,6 +14,7 @@
   "mcmcp.ghost.gui.force3d": "3D: %s",
   "mcmcp.ghost.gui.iterate": "Iterate",
   "mcmcp.ghost.gui.export": "Export",
+  "mcmcp.ghost.gui.undo": "Undo",
   "mcmcp.ghost.gui.freecam": "FreeCam: %s",
   "mcmcp.ghost.gui.style": "Style",
   "mcmcp.ghost.gui.position": "Position",
