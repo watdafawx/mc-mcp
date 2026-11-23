@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.1 (2026-11-23)
+
+- **One-click Ghost Undo**: 10-step in-memory undo stack in `GhostStore` (`snapshot`, `canUndo`, `undo`), auto-snapshot before every `Iterate` run in `GhostGenerate`, `/ghost undo` command, and `Undo` button on the Ghost Builder GUI (`Undo | Export | Clear | Ghosts`).
+- **Architect upgrades**:
+  - 6 new shape generators in `shapes.py` (`square_tower` with machicolations, `dormer`, `buttress_row`, `spiral_stair`, `arch_bridge`/`bridge`, `wall_segment`) + smoothed crow-stepped gables and small domes (`r <= 5`).
+  - `postcheck.py`: proportion sanity warnings wired into `view()` + automatic local hillside foundations (`auto_foundation`) on `--prompt` builds (zero LLM tokens).
+  - `llm_client.py`: stdlib-only OpenAI-compatible LLM backend (DeepSeek API, OpenRouter, Ollama `/v1`, LM Studio, vLLM) alongside Anthropic.
+  - `services.py` & prompt: live-tested AE2/Mekanism/Powah/Create ghost block IDs in `SYSTEM` prompt; Gothic port-wall bay packer (4–6 bays) + multi-trunk ceiling trays (`drops == pads`).
+  - Mods batch 3: room kits for Modern Industrialization, Immersive Engineering, Draconic Evolution, EvilCraft, and Functional Storage (`architect/mods/`).
+- **CI**: bumped `actions/checkout@v5` and `actions/setup-java@v5` in `.github/workflows/release.yml`.
+
 ## 0.7.0 (2026-11-23)
 
 - **Prompt / Image mode in Ghost Builder GUI (`/ghost gui`, `G`)**: switch between **Prompt / Image** (default) and **Base Style**. Type any free-text description for a single structure or component, attach an image path/URL or toggle **Clip: on** (reads clipboard image directly), optionally toggle **3D: on** (forces Hunyuan3D photo→voxel via `image_to_3d`), pick Position + Kit, then **Generate** (new session) or **Iterate** (continues latest session in place to refine the ghost).
