@@ -1,0 +1,20 @@
+{
+ "factory": {
+  "A": "nh",
+  "B": "oh",
+  "C": "ns",
+  "D": "os"
+ },
+ "lotus": {
+  "A": "ns",
+  "B": "os",
+  "C": "oh",
+  "D": "nh"
+ },
+ "station": {
+  "A": "oh",
+  "B": "nh",
+  "C": "os",
+  "D": "ns"
+ }
+}

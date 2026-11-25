@@ -1,0 +1,24 @@
+DESIGN claude-haiku-5-5 (server-side refusal fallbacks on): a white research station with an orange stripe, a ring lab around a core tower, glass labs and a landing pad
+  spec in 23s, ~$0.0032
+  saved X:\Dev\Minecraft\mc-mcp\architect\designs\ab\station_nh-20261125-093408.json
+  [texture] shaded 67 cells in ghost_set ab/station_nh/core
+  ghost ab/station_nh/core: 2391 blocks
+  [texture] shaded 314 cells in ghost_set ab/station_nh/ring
+  ghost ab/station_nh/ring: 3538 blocks
+  [texture] shaded 100 cells in ghost_set ab/station_nh/glass_lab
+  ghost ab/station_nh/glass_lab: 1632 blocks
+  [texture] shaded 110 cells in ghost_set ab/station_nh/pad_hall
+  ghost ab/station_nh/pad_hall: 1184 blocks
+  [texture] shaded 1059 cells in ghost_set ab/station_nh/platform
+  ghost ab/station_nh/platform: 5634 blocks
+  [pipes] set explicit connections on 20 fluid_pipe entries in ghost_set ab/station_nh/features
+  ghost ab/station_nh/features: 157 blocks
+CONCEPT Research station in white and light-grey concrete with one orange stripe. Landmark: the octagonal core lab tower, 4 floors of 7 blocks (about 28 tall), roughly twice the ring lab's 14, with a spire and a crown roof. Supporting volumes: a 23x23 L-shaped ring lab wrapped around the core's south face at the same two-storey height, a glass lab east of the ring across a 3-block yard that a sky-bridge c
+  core: octagon 13x13 h30 floors [7, 7, 7, 7] ['lab', 'lab', 'lab', 'hall'] roof crown, clear inside 9x9
+  ring: L 23x23 h16 floors [7, 7] ['workshop', 'lab'] roof flat, clear inside 19x19
+  glass_lab: rect 14x12 h16 floors [7, 7] ['lab', 'lab'] roof flat, clear inside 10x8
+  pad_hall: rect 16x14 h8 floors [6] ['hall'] roof flat, clear inside 12x10
+  fix: porch on core s: something else is in front of that doorway, skipped
+  fix: landing_pad on pad_hall: roof deck too small, skipped
+DONE 14536 blocks, 2 doorways, cost ~$0.0032
+exit=0 wall=25s

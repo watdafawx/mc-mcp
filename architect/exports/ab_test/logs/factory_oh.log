@@ -1,0 +1,29 @@
+  -> blocks {"kw": "red brick", "shape": "block", "max_cost": 3, "n": 12}
+  -> blocks {"kw": "brick", "shape": "stairs", "colour": "red", "max_cost": 3, "n": 8}
+  -> blocks {"kw": "iron", "shape": "block", "max_cost": 6, "n": 8}
+  -> ghost_set {"id": "ab/factory_oh/hall", "origin": [0, 120, 0], "palette": {"B": "minecraft:bricks", "S": "minecraft:stone_bricks"}, "boxes": [[2, 0, 6,
+  [texture] shaded 301 cells in ghost_set ab/factory_oh/hall
+  -> ghost_set {"id": "ab/factory_oh/annex", "origin": [0, 120, 0], "palette": {"B": "minecraft:bricks", "S": "minecraft:stone_bricks"}, "boxes": [[-8, 0, 
+  [texture] shaded 99 cells in ghost_set ab/factory_oh/annex
+  -> ghost_set {"id": "ab/factory_oh/clock_tower", "origin": [0, 120, 0], "palette": {"K": "minecraft:black_concrete", "W": "minecraft:white_concrete"}, "b
+  -> shapes {"ghost_id": "ab/factory_oh/clock_tower", "origin": [0, 120, 0], "parts": [{"kind": "square_tower", "at": [25, 0, 4], "w": 5, "d": 5, "h": 3
+  [texture] shaded 24 cells in ghost_set ab/factory_oh/clock_tower
+  -> shapes {"ghost_id": "ab/factory_oh/stacks", "origin": [0, 120, 0], "parts": [{"kind": "round_tower", "at": [6, 0, 0], "r": 2, "h": 30, "block": "mi
+  [texture] shaded 78 cells in ghost_set ab/factory_oh/stacks
+  -> shapes {"ghost_id": "ab/factory_oh/hall", "origin": [0, 120, 0], "parts": [{"kind": "gable_roof", "at": [2, 11, 6], "w": 23, "d": 11, "axis": "x", 
+  [texture] shaded 27 cells in ghost_set ab/factory_oh/hall
+  -> shapes {"ghost_id": "ab/factory_oh/annex", "origin": [0, 120, 0], "parts": [{"kind": "gable_roof", "at": [-8, 7, 6], "w": 10, "d": 11, "axis": "x",
+  [texture] shaded 13 cells in ghost_set ab/factory_oh/annex
+  -> shapes {"ghost_id": "ab/factory_oh/clock_tower", "origin": [0, 120, 0], "parts": [{"kind": "pyramid_roof", "at": [24, 34, 3], "w": 7, "d": 7, "bloc
+  [texture] shaded 20 cells in ghost_set ab/factory_oh/clock_tower
+  -> view {"target": "ab/factory_oh/", "angle": "iso"}
+  -> view {"target": "ab/factory_oh/", "angle": "front"}
+REPLY I built a red-brick factory block at (0, 120, 0) with a clock tower, two smoke stacks, a boiler annex and a long gabled hall, all in ghost ids under `ab/factory_oh/`. I checked it from the front and iso views, but the clock faces are small and hard to read fro
+
+I built a red-brick factory block at (0, 120, 0) with a clock tower, two smoke stacks, a boiler annex and a long gabled hall, all in ghost ids under `ab/factory_oh/`. I checked it from the front and iso views, but the clock faces are small and hard to read from there, and the grey-and-white roof texture looks unfinished, so the next pass should enlarge the dials and dress the roof.
+
+- **Ghost ids:** `ab/factory_oh/hall` (main hall with gable roof and glass windows on both long sides), `ab/factory_oh/clock_tower` (7×7 brick tower, 34 tall, with a dark pyramid cap, lightning-rod tip and clock faces on the north and east sides), `ab/factory_oh/stacks` (two hollow brick smoke stacks, 31 and 37 tall, with crenellated tops), and `ab/factory_oh/annex` (a smaller boiler house on the west side).
+- **Ideas for next steps:** make the dials 7×7 with hands and a dark roof band, or add Create and Mekanism machine pads inside the hall.
+  [claude-haiku-5-5, cost ~$0.0104, 14 in / 10976 out tokens, 57s model time]
+
+exit=0 wall=65s
