@@ -536,6 +536,30 @@ def test_ring():
     print()
 
 
+def test_spire_grounded():
+    """A spire on a hip / dome roof stands on the roof, not on the roof's finial (it used to float 5+ blocks up)."""
+    import collections
+    for roof in ("hip", "dome", "flat"):
+        sp = spec([vol(id="t", shape="round" if roof == "dome" else "rect", w=13, d=13, r=7, floor_hs=[6, 6],
+                       program=["lab", "lab"], roof=roof)], features=[feature("spire", "t", size=16)])
+        ghosts, _ = design.compose(sp)
+        cells = {(x, y, z) for g in ghosts for x, y, z, b in g["blocks"] if b != design.AIR}
+        y0 = min(c[1] for c in cells)
+        seen = {c for c in cells if c[1] == y0}
+        q = collections.deque(seen)
+        nb = [(a, b, c) for a in (-1, 0, 1) for b in (-1, 0, 1) for c in (-1, 0, 1) if (a, b, c) != (0, 0, 0)]
+        while q:
+            x, y, z = q.popleft()
+            for a, b, c in nb:
+                n = (x + a, y + b, z + c)
+                if n in cells and n not in seen:
+                    seen.add(n)
+                    q.append(n)
+        fl = cells - seen
+        check(f"spire on {roof} roof: every block connects to the ground", not fl, f"{len(fl)} floating, highest {max(fl, key=lambda c: c[1]) if fl else None}")
+    print()
+
+
 def main():
     import time
     t0 = time.time()
@@ -550,6 +574,7 @@ def main():
     test_platform()
     test_blocks()
     test_ring()
+    test_spire_grounded()
     print()
     print("FAILED" if check.failed else "ALL OK", check.failed, f"({time.time() - t0:.1f}s)")
     return 1 if check.failed else 0

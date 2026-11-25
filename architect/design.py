@@ -960,7 +960,14 @@ def _feature(site: Site, f: dict, by_id: dict, K: dict, kit: str, roles: dict, r
         h = max(8, min(40, size or 16))
         base = 5 if min(x1 - x0, z1 - z0) >= 10 else 3
         cx, cz = (x0 + x1) // 2 - base // 2, (z0 + z1) // 2 - base // 2
-        y = max(site.top(cx + a, cz + c) for a in range(base) for c in range(base)) + 1
+        cols = [(cx + a, cz + c) for a in range(base) for c in range(base)]
+        for x, z in cols:  # the roof's own finial/antenna under the spire would hold it up in the air: drop it
+            for (fx, fy, fz), b in list(site.cells.items()):
+                if (fx, fz) == (x, z) and b in (K["antenna"], K["tip"]):
+                    site.cells[(fx, fy, fz)] = AIR
+        # sit on the lowest roof cell under the base (a hip/dome peak would otherwise leave it perched on one
+        # block); roof blocks inside the base stay, the spire fills the air around them
+        y = min(site.top(x, z) for x, z in cols) + 1
         for x, yy, z, b in massing.spire(h=h, base=base, kit=kit, roles=roles):
             put(cx + x, y + yy, cz + z, b)
     elif kind == "chimney":

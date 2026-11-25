@@ -1198,7 +1198,7 @@ def run_design(arch, args) -> None:
         out.parent.mkdir(exist_ok=True)
         out.write_text(json.dumps(spec, indent=1), "utf-8")
         print(f"  saved {out}", flush=True)
-    rounds = args.critique if args.critique is not None else (0 if args.spec else 1)
+    rounds = args.critique or 0  # opt-in: one round ~doubles the cost and lands about half its fixes
     rep = _design_build(arch, args, spec, cost)
     save = Path(args.save_shots) if args.save_shots else None
     tag = args.session.replace("/", "_")
@@ -1265,7 +1265,7 @@ def main():
                     help="step 3: Sonnet designs the build as a spec, the composer builds it (no Haiku loop)")
     ap.add_argument("--spec", help="build a saved design spec JSON (no API call)")
     ap.add_argument("--critique", type=int, default=None, metavar="N",
-                    help="step 5: N rounds of screenshots -> critic -> rebuild after --design (default 1; 0 = off; "
+                    help="step 5: N rounds of screenshots -> critic -> rebuild after --design (default 0 = off; "
                          "needs a running client)")
     ap.add_argument("--save-shots", metavar="DIR", help="with --critique: also save the round shots here as PNG")
     ap.add_argument("--seed", type=int, default=1)

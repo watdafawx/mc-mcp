@@ -767,7 +767,7 @@ def spire(h: int = 20, base: int = 5, kit: str | dict | None = None, roles: dict
             for x in range(size):
                 for z in range(size):
                     shell = x in (0, size - 1) or z in (0, size - 1)
-                    if shell or size <= 2:
+                    if shell or size <= 2 or yy in (0, sh - 1):  # solid sole + cap: each stage stands on the last
                         b = K["glow"] if yy == sh // 2 and s == stages // 2 else (K["trim"] if (x in (0, size - 1) and z in (0, size - 1)) else K["wall"])
                         out[(o + x, y + yy, o + z)] = b
         y += sh
