@@ -24,6 +24,7 @@ from pathlib import Path
 import shapes  # noqa: F401  (must load before massing: circular import)
 import massing
 import campus
+import motifs
 import palette
 
 HERE = Path(__file__).resolve().parent
@@ -39,7 +40,8 @@ SHAPES = ["rect", "octagon", "round", "L"]
 SIDES = ["n", "s", "e", "w"]
 ROLES = ["base", "wall", "wall2", "trim", "pillar", "accent", "glass", "glow", "rail", "roof", "detail", "antenna", "tip"]
 PROGRAM = ["machine_hall", "expansion", "workshop", "lab", "storage", "hall", "living"]
-FEATURES = ["spire", "chimney", "gear", "pipes", "buttresses", "bridge", "platform"]
+FEATURES = ["spire", "chimney", "buttresses", "bridge", "platform"] + [m for m in motifs.ALL if m not in ("spire",)]
+ALIAS = {"pipes": "pipe_rack"}
 # minimum clear floor height per room kind: modded setups are pipe/cable heavy or big multiblocks
 MIN_H = {"machine_hall": 9, "expansion": 9, "workshop": 6, "lab": 6, "storage": 5, "hall": 6, "living": 4}
 BIG = {"machine_hall", "expansion"}
@@ -131,8 +133,10 @@ wall = bands and parapet, accent = stripe floor, glass, glow = light bands, roof
 antenna, tip. Keep ~3 main materials (60/30/10). Per-volume roles override for one volume (e.g. a copper roof on the tower).
 
 Features: spire (on top of `on`, size = height), chimney (2x2 stack against `on`'s `side` wall at pos 0-1, size =
-height above the roof), gear (decorative gear disc on a wall face, size = radius 2-6, level = floor index),
-pipes (copper pipe runs along the walls of `on`, side = first wall), buttresses (gothic flying buttresses on `side`),
+height above the roof), gear (gear disc on a blank stretch of wall, size = radius 2-5, level = floor index), clock (clock face on the
+landmark's `side`, top floor unless level is set, size = radius 3-6), pipe_rack (thin pipe run with risers and valves
+along `on`'s `side` wall), pagoda (stacked flared-eave pagoda roof over `on`, size = tiers 1-4; replaces its roof),
+buttresses (gothic flying buttresses on `side`),
 bridge (enclosed sky-bridge from `on` to `to` at floor `level`; only across a gap), platform (terraced base under the
 whole site, size = steps 1-3). Use 3-10 features.
 
@@ -434,8 +438,100 @@ def _side_cells(v: Vol, side: str) -> list:
     return out
 
 
+def _flat_side(v: Vol, side: str) -> list:
+    """Edge cells (u=0) of v's flat face on `side`, in +v order (v grows to the right seen from outside)."""
+    if side in "ns":
+        zz = max(z for _, z in v.fp) if side == "s" else min(z for _, z in v.fp)
+        cells = sorted((x, z) for x, z in v.fp if z == zz)
+        return cells if side == "s" else cells[::-1]
+    xx = max(x for x, _ in v.fp) if side == "e" else min(x for x, _ in v.fp)
+    cells = sorted((x, z) for x, z in v.fp if x == xx)
+    return cells[::-1] if side == "e" else cells
+
+
+def _glassy(b) -> bool:
+    return bool(b) and ("glass" in b or "pane" in b)
+
+
+def _wall_spot(site: Site, v: Vol, side: str, hw: int, h: int, ylo: int, yhi: int, pos: float, relaxed=False):
+    """A stretch of v's `side` wall, 2*hw+1 wide and h high, with no window or doorway behind it (relaxed: windows ok,
+    doorways never). Returns (edge cell at the centre, base y) nearest to pos / the top of [ylo, yhi], or None."""
+    cells = _flat_side(v, side)
+    n = len(cells)
+    if n < 2 * hw + 1:
+        return None
+    o = {"s": (0, 1), "n": (0, -1), "e": (1, 0), "w": (-1, 0)}[side]
+    want = pos * (n - 1)
+    for c in sorted(range(hw, n - hw), key=lambda c: abs(c - want)):
+        for yb in sorted(range(v.y0 + 2, yhi - h + 1), key=lambda y: (y < ylo, -y)):
+            ok = True
+            for k in range(c - hw, c + hw + 1):
+                ex, ez = cells[k]
+                wx, wz = ex - o[0], ez - o[1]
+                for y in range(yb, yb + h):
+                    wb, eb = site.cells.get((wx, y, wz)), site.cells.get((ex, y, ez))
+                    if wb in (None, AIR) and y <= v.y0 + 4 or (not relaxed and (_glassy(wb) or _glassy(eb))):
+                        ok = False
+                        break
+                if not ok:
+                    break
+            if ok:
+                return c, yb
+    return None
+
+
+def _motif(site: Site, v: Vol, kind: str, side: str, pos: float, size: int, f: dict, K: dict, report: list):
+    if kind in motifs.TOP:
+        x0, z0, x1, z1 = v.bbox()
+        cells = motifs.TOP[kind](K, x1 - x0 + 1, z1 - z0 + 1, **({"tiers": size} if size else {}))
+        y = v.y0 + v.ry + 1
+        for (x, yy, z), b in cells.items():
+            site.put_feature(x0 + x, y + yy, z0 + z, b, True)
+        return
+    if side == "top":
+        side = "s"
+    if kind in motifs.LINE:
+        cells = _flat_side(v, side)
+        if not cells:
+            return
+        for x, y, z, b in motifs.frame(motifs.LINE[kind](K, len(cells), v.hs), side, *cells[0], v.y0):
+            site.put_feature(x, y, z, b, True)
+        return
+    lv = int(f.get("level") or 0)
+    top = len(v.hs) - 1 if kind == "clock" and not lv else max(0, min(len(v.hs) - 1, lv))
+    ylo = v.y0 + 1 + sum(v.hs[:top])
+    yhi = v.y0 + v.ry
+    spot, p, blind = None, {}, False
+    for blind in (False, True):  # blank wall first; else a blind panel (windows behind become wall), like a clock tower
+        for r in range(size or 4, 1, -1):  # shrink the motif until it fits
+            p = {"r": r}
+            hw, h = motifs.SIZE[kind](p)
+            spot = _wall_spot(site, v, side, hw, h, ylo, yhi, pos, relaxed=blind)
+            if spot:
+                break
+        if spot:
+            break
+    if spot and blind:
+        cells = _flat_side(v, side)
+        o = {"s": (0, 1), "n": (0, -1), "e": (1, 0), "w": (-1, 0)}[side]
+        c, yb = spot
+        for k in range(max(0, c - hw - 1), min(len(cells), c + hw + 2)):
+            ex, ez = cells[k]
+            for y in range(yb - 1, yb + h + 1):
+                for q in ((ex - o[0], y, ez - o[1]), (ex, y, ez)):
+                    if _glassy(site.cells.get(q)):
+                        site.cells[q] = K.get("wall2", K["trim"])
+    if not spot:
+        report.append(f"{kind} on {v.id} {side}: no blank wall, skipped")
+        return
+    c, yb = spot
+    ax, az = _flat_side(v, side)[c]
+    for x, y, z, b in motifs.frame(motifs.WALL[kind](K, **p), side, ax, az, yb):
+        site.put_feature(x, y, z, b, True)
+
+
 def _feature(site: Site, f: dict, by_id: dict, K: dict, kit: str, roles: dict, report: list, i: int):
-    kind, v = f.get("kind"), by_id.get(f.get("on"))
+    kind, v = ALIAS.get(f.get("kind"), f.get("kind")), by_id.get(f.get("on"))
     if kind == "platform":
         return
     if v is None:
@@ -447,6 +543,9 @@ def _feature(site: Site, f: dict, by_id: dict, K: dict, kit: str, roles: dict, r
     x0, z0, x1, z1 = v.bbox()
     H = sum(v.hs)
     put = site.put_feature
+    if kind in motifs.WALL or kind in motifs.LINE or kind in motifs.TOP:
+        _motif(site, v, kind, side, pos, size, f, K, report)
+        return
     if kind == "spire":
         h = max(8, min(40, size or 16))
         base = 5 if min(x1 - x0, z1 - z0) >= 10 else 3
@@ -470,32 +569,6 @@ def _feature(site: Site, f: dict, by_id: dict, K: dict, kit: str, roles: dict, r
         campus._chimney(tmp, x, z, v.y0 + 1, h, K)
         for bx, by, bz, b in tmp:
             put(bx, by, bz, b)
-    elif kind == "gear":
-        if side == "top":
-            side = "s"
-        cells = _side_cells(v, side)
-        if not cells:
-            return
-        r = max(2, min(6, size or 3))
-        lv = max(0, min(len(v.hs) - 1, int(f.get("level") or 0)))
-        cy = v.y0 + 1 + sum(v.hs[:lv]) + v.hs[lv] // 2
-        cy = max(cy, v.y0 + r + 2)
-        if cy + r + 1 >= v.y0 + v.ry:
-            r = max(2, v.y0 + v.ry - cy - 2)
-        ax, az = cells[int(pos * (len(cells) - 1))]
-        tmp = []
-        campus._gear(tmp, 0, cy, 0, r, K)
-        for gx, gy, _gz, b in tmp:
-            if side in "ns":
-                put(ax + gx, gy, az, b, True)
-            else:
-                put(ax, gy, az + gx, b, True)
-    elif kind == "pipes":
-        sides = [side if side in SIDES else "s"] + [s for s in SIDES if s != side][:1]
-        tmp = []
-        campus._pipes(tmp, x0, z0, x1 - x0 + 1, z1 - z0 + 1, H, v.y0, sides, K, i)
-        for bx, by, bz, b in tmp:
-            put(bx, by, bz, b, True)
     elif kind == "buttresses":
         tmp = []
         campus._buttresses(tmp, x0, z0, x1 - x0 + 1, z1 - z0 + 1, H, v.y0 + 1, K, [side if side in SIDES else "s"])
@@ -580,6 +653,9 @@ def compose(spec: dict, seed: int = 1) -> tuple[list, dict]:
         v.fp = {(x - mx, z - mz) for x, z in v.fp}
         v.x0 -= mx
         v.z0 -= mz
+    for f in spec.get("features") or []:  # top motifs sit on a flat deck
+        if f.get("kind") in motifs.TOP and f.get("on") in by_id:
+            by_id[f["on"]].stacked_on_me = True
     for i, v in enumerate(vols):
         _build_vol(v, kit, roles, seed + i)
     site = Site(vols)
