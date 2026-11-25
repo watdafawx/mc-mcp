@@ -1,0 +1,17 @@
+  [texture] shaded 844 cells in ghost_set bench4/motifs/hall
+  ghost bench4/motifs/hall: 4652 blocks
+  [texture] shaded 248 cells in ghost_set bench4/motifs/tower
+  ghost bench4/motifs/tower: 2507 blocks
+  [texture] shaded 436 cells in ghost_set bench4/motifs/annex
+  ghost bench4/motifs/annex: 1865 blocks
+  [texture] shaded 326 cells in ghost_set bench4/motifs/store
+  ghost bench4/motifs/store: 1629 blocks
+  [pipes] set explicit connections on 31 fluid_pipe entries in ghost_set bench4/motifs/features
+  [texture] shaded 117 cells in ghost_set bench4/motifs/features
+  ghost bench4/motifs/features: 2038 blocks
+CONCEPT motif bench 2: all 12 set pieces. A brick foundry hall with a tower crane, a porch on its door and half-timber on its west wall; a red timber pagoda tower with a balcony and clock; a south annex with a helipad, a blade sign and a brick smokestack; a storage shed with a water tank.
+  hall: rect 33x21 h20 floors [11, 7] ['machine_hall', 'workshop'] roof flat, clear inside 29x17
+  tower: rect 15x15 h21 floors [7, 6, 6] ['workshop', 'lab', 'living'] roof flat, clear inside 11x11
+  annex: rect 21x17 h11 floors [9] ['expansion'] roof flat, clear inside 17x13
+  store: rect 17x15 h11 floors [9] ['storage'] roof flat, clear inside 13x11
+DONE 12691 blocks, 3 doorways, cost ~$0.0000
