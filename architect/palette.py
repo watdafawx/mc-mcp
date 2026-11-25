@@ -27,6 +27,7 @@ _LIB: dict | None = None
 
 # base block -> [(member, weight)]. The base itself should carry the biggest weight. Order does not matter (sorted by
 # luminance at load). Every member is a cheap survival block in ATM10 (see blocklib cost).
+# Clean kits (concrete, quartz-white station look) are left out on purpose: shading reads as noise there.
 RAMPS: dict[str, list[tuple[str, int]]] = {
     "minecraft:stone_bricks": [("minecraft:stone_bricks", 6), ("minecraft:cracked_stone_bricks", 2),
                                ("minecraft:mossy_stone_bricks", 1), ("minecraft:stone", 1)],
@@ -51,24 +52,15 @@ RAMPS: dict[str, list[tuple[str, int]]] = {
                                              ("minecraft:polished_blackstone", 1), ("minecraft:blackstone", 1)],
     "minecraft:polished_blackstone": [("minecraft:polished_blackstone", 6), ("minecraft:polished_blackstone_bricks", 2),
                                       ("minecraft:blackstone", 1)],
-    "minecraft:bricks": [("minecraft:bricks", 6), ("minecraft:granite", 1), ("minecraft:terracotta", 1),
-                         ("minecraft:polished_granite", 1)],
+    "minecraft:bricks": [("minecraft:bricks", 8), ("minecraft:granite", 1)],
     "minecraft:mud_bricks": [("minecraft:mud_bricks", 6), ("minecraft:packed_mud", 2)],
     "minecraft:quartz_bricks": [("minecraft:quartz_bricks", 6), ("minecraft:smooth_quartz", 2), ("minecraft:calcite", 1),
                                 ("create:polished_cut_calcite", 1)],
     "minecraft:smooth_quartz": [("minecraft:smooth_quartz", 6), ("minecraft:quartz_bricks", 2), ("minecraft:calcite", 1)],
-    "minecraft:white_concrete": [("minecraft:white_concrete", 6), ("chisel:large_tile/white_concrete", 1),
-                                 ("minecraft:calcite", 1), ("minecraft:white_concrete_powder", 1)],
-    "minecraft:light_gray_concrete": [("minecraft:light_gray_concrete", 6), ("minecraft:polished_andesite", 1),
-                                      ("minecraft:stone", 1)],
-    "minecraft:gray_concrete": [("minecraft:gray_concrete", 6), ("minecraft:polished_deepslate", 1),
-                                ("minecraft:deepslate_tiles", 1)],
     "minecraft:smooth_sandstone": [("minecraft:smooth_sandstone", 6), ("minecraft:cut_sandstone", 2),
                                    ("minecraft:sandstone", 1)],
-    "minecraft:cut_copper": [("minecraft:cut_copper", 5), ("minecraft:exposed_cut_copper", 2),
-                             ("minecraft:weathered_cut_copper", 1)],
-    "minecraft:exposed_cut_copper": [("minecraft:exposed_cut_copper", 5), ("minecraft:cut_copper", 1),
-                                     ("minecraft:weathered_cut_copper", 2)],
+    "minecraft:cut_copper": [("minecraft:cut_copper", 7), ("minecraft:exposed_cut_copper", 2)],
+    "minecraft:exposed_cut_copper": [("minecraft:exposed_cut_copper", 6), ("minecraft:cut_copper", 2)],
     "minecraft:weathered_cut_copper": [("minecraft:weathered_cut_copper", 5), ("minecraft:exposed_cut_copper", 1),
                                        ("minecraft:oxidized_cut_copper", 2)],
     "minecraft:oxidized_cut_copper": [("minecraft:oxidized_cut_copper", 6), ("minecraft:weathered_cut_copper", 2)],
@@ -173,7 +165,7 @@ def _seed(gid: str) -> int:
     return int(_h(*[ord(c) for c in (gid or "ghost")]) * 1e9)
 
 
-GRADIENT = 0.35  # how much height shifts the pick (bottom darker, top lighter)
+GRADIENT = 0.50  # how much height shifts the pick (bottom darker, top lighter)
 
 
 def pick(base: str, x: int, y: int, z: int, t: float, seed: int, grad: float = GRADIENT) -> str:
