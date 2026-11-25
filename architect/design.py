@@ -120,6 +120,10 @@ Unused numeric fields: 0. roof: flat | mansard | dome | crown | gable(_steep/_lo
 sawtooth (factory north-light) | spire | garden. windows: band | grid | slit | none. rhythm 0-3 = bay rhythm variety.
 accent_floor: floor index carrying the accent stripe, -1 none. entrances: sides with a 3-wide door on the ground floor.
 
+Colour fidelity (hard): the visible facade is mostly pillar (piers, ~40%) + wall2 (infill) + base + trim, so the main
+colour the brief names (red brick, red timber, white panels) goes on BOTH pillar and wall2; trim/base are a contrasting
+secondary, the kit's dark stones only where the brief allows. Sci-fi briefs: replace gothic-looking piers with smooth
+or concrete blocks.
 Materials: pick the kit closest to the brief, then override roles where the brief needs it (role -> vanilla or listed
 block id that really exists; e.g. a brick factory: wall2 minecraft:bricks, pillar minecraft:stone_bricks). Roles:
 base = plinth and skirt, wall2 = main wall infill, pillar = piers between bays, trim = ledges, sills, cornice,
@@ -570,8 +574,8 @@ def compose(spec: dict, seed: int = 1) -> tuple[list, dict]:
     for v in vols:
         v.y0 += lift
     # normalise so the site starts at 0,0
-    mx = min(p[0] for v in vols for p in v.fp) - (lift * 2 + 2 if plat else 3)
-    mz = min(p[1] for v in vols for p in v.fp) - (lift * 2 + 2 if plat else 3)
+    mx = min(p[0] for v in vols for p in v.fp) - (lift + 2 if plat else 3)
+    mz = min(p[1] for v in vols for p in v.fp) - (lift + 2 if plat else 3)
     for v in vols:
         v.fp = {(x - mx, z - mz) for x, z in v.fp}
         v.x0 -= mx
@@ -590,7 +594,7 @@ def compose(spec: dict, seed: int = 1) -> tuple[list, dict]:
     if plat:
         xs = [x for (x, _, _) in site.cells]
         zs = [z for (_, _, z) in site.cells]
-        pw, pd = max(xs) + 3, max(zs) + 3
+        pw, pd = max(xs) + lift + 3, max(zs) + lift + 3
         for x, y, z, b in massing.platform(shape="rect", w=pw, d=pd, steps=lift, kit=kit, roles=roles):
             if (x, y, z) not in site.cells:
                 site.cells[(x, y, z)] = b
