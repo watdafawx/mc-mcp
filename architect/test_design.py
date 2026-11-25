@@ -97,6 +97,8 @@ def build(spec_: dict, seed: int = 1):
         v = design.Vol(dict(s), fixes)  # same clamps as compose: only the footprint is used
         cx, cy, cz = rv["corner"]
         v.x0, v.y0, v.z0 = cx, cy, cz
+        if rv.get('ring'):  # a ring's radii come from the core it goes around (set by the composer)
+            v.r, v.r_in = rv['ring']['r'], rv['ring']['r_in']
         v.fp = {(x + cx, z + cz) for x, z in v.footprint()}
         fps[rv["id"]] = v.fp
         inner[rv["id"]] = (design._interior(v), cy, cy + v.ry, v)
@@ -408,6 +410,132 @@ def test_blocks():
         print()
 
 
+# ------------------------------------------------------------------------------------------------ 11. ring
+
+def ring_spec(gap=0, ring_over=None, core_over=None, features=None):
+    core = vol(id="core", shape="round", r=9, w=0, d=0, floor_hs=[8, 6, 6, 6], program=["hall", "lab", "lab", "lab"],
+               roof="flat", windows="band")
+    core.update(core_over or {})
+    ring = vol(id="labs", shape="ring", w=10, d=0, r=0, floor_hs=[6, 6], program=["lab", "lab"], windows="grid",
+               place={"mode": "around", "to": "core", "gap": gap})
+    ring.update(ring_over or {})
+    return spec([core, ring], features=features)
+
+
+def centre_of(cells):
+    xs = [c[0] for c in cells]
+    zs = [c[1] for c in cells]
+    return (min(xs) + max(xs)) // 2, (min(zs) + max(zs)) // 2
+
+
+def axis_run(fp_core, fp_ring, cx, cz, dx, dz):
+    """(last core cell k, first ring cell k) walking out from the centre along one cardinal direction."""
+    ks = range(1, 80)
+    kc = max(k for k in ks if (cx + k * dx, cz + k * dz) in fp_core)
+    kr = min(k for k in ks if (cx + k * dx, cz + k * dz) in fp_ring)
+    return kc, kr
+
+
+DIRS4 = {"e": (1, 0), "w": (-1, 0), "s": (0, 1), "n": (0, -1)}
+
+
+def test_ring():
+    s = ring_spec(0)
+    ghosts, rep, fps, inner = build(s)
+    by = {v["id"]: v for v in rep["volumes"]}
+    core, ring = by["core"], by["labs"]
+    cx, cz = centre_of(fps["core"])
+    check("ring: concentric with the core", centre_of(fps["labs"]) == (cx, cz), f"{centre_of(fps['labs'])} vs {(cx, cz)}")
+    check("ring: footprint never touches the core footprint", not (fps["labs"] & fps["core"]),
+          f"{len(fps['labs'] & fps['core'])} shared")
+    check("ring: it is a real annulus around the core", len(fps["labs"]) > 400, len(fps["labs"]))
+    check_disjoint_fps(s, fps, rep, "ring")
+    labs_blocks = [b for g in ghosts if g["id"] == "labs" for b in g["blocks"]]
+    inside = [b for b in labs_blocks if (b[0], b[2]) in fps["core"]]
+    check("ring: no ring block inside the core volume", not inside, f"{len(inside)}, e.g. {inside[:1]}")
+    check("ring: the ghost has blocks", len(labs_blocks) > 2000, len(labs_blocks))
+    check("ring: the fix list is empty for a legal ring", not rep["fixes"], rep["fixes"])
+    check("ring: band >= 9", ring["ring"]["band"] >= 9, ring["ring"])
+    check("ring: top is lower than the core top", ring["size"][1] < core["size"][1], f"{ring['size'][1]} vs {core['size'][1]}")
+    # gap 0: touching walls, doorways on the 4 cardinal points
+    y0 = ring["corner"][1]
+    full = merged(ghosts)
+    for name, (dx, dz) in DIRS4.items():
+        kc, kr = axis_run(fps["core"], fps["labs"], cx, cz, dx, dz)
+        check(f"ring gap 0 {name}: walls touch", kr == kc + 1, (kc, kr))
+        cells = [(cx + k * dx + t * dz, y, cz + k * dz + t * dx) for k in range(kc - 1, kr + 2) for t in (-1, 0, 1)
+                 for y in range(y0 + 1, y0 + 4)]
+        bad = {c: full[c] for c in cells if full.get(c) not in (None, AIR)}
+        check(f"ring gap 0 {name}: 3 wide x 3 high doorway open through both walls (y0+1..y0+3)", not bad,
+              f"{len(bad)} of {len(cells)} filled, e.g. {first(bad)}")
+        side = [(cx + kr * dx + t * dz, y0 + 2, cz + kr * dz + t * dx) for t in (-3, 3)]
+        check(f"ring gap 0 {name}: the wall beside the doorway is still there",
+              all(full.get(c) not in (None, AIR) for c in side), [full.get(c) for c in side])
+    check("ring gap 0: four doorways are reported", rep["doorways"] == 4, rep["doorways"])
+    # gap 3: a courtyard with a clear ground and doors into it from the ring
+    ghosts3, rep3, fps3, _ = build(ring_spec(3))
+    by3 = {v["id"]: v for v in rep3["volumes"]}
+    r3 = by3["labs"]["ring"]
+    check("ring gap 3: inner radius grew by the gap", r3["r_in"] == ring["ring"]["r_in"] + 3, (r3, ring["ring"]))
+    cx3, cz3 = centre_of(fps3["core"])
+    full3 = merged(ghosts3)
+    y03 = by3["labs"]["corner"][1]
+    yard = [(x, y, z) for (x, y, z) in full3 if y > y03 and y <= y03 + 6
+            and 10.5 < ((x - cx3) ** 2 + (z - cz3) ** 2) ** 0.5 < r3["r_in"] - 1.5]
+    check("ring gap 3: the courtyard ground stays clear", not yard, f"{len(yard)}, e.g. {yard[:2]}")
+    for name, (dx, dz) in DIRS4.items():
+        kc, kr = axis_run(fps3["core"], fps3["labs"], cx3, cz3, dx, dz)
+        cells = [(cx3 + k * dx + t * dz, y, cz3 + k * dz + t * dx) for k in range(kr, kr + 3) for t in (-1, 0, 1)
+                 for y in range(y03 + 1, y03 + 4)]
+        bad = {c: full3[c] for c in cells if full3.get(c) not in (None, AIR)}
+        check(f"ring gap 3 {name}: doorway open from the courtyard into the ring", not bad,
+              f"{len(bad)} of {len(cells)} filled")
+    check("ring gap 1: made a courtyard of 2", design.compose(ring_spec(1))[1]["volumes"][1]["ring"]["gap"] == 2, "")
+    # minimum band: small w is raised, big programs get 13
+    rep_s = design.compose(ring_spec(0, ring_over={"w": 4}))[1]
+    check("ring: band 4 raised to 9", rep_s["volumes"][1]["ring"]["band"] == 9 and any("band 4 -> 9" in f for f in rep_s["fixes"]),
+          rep_s["fixes"])
+    rep_b = design.compose(ring_spec(0, ring_over={"w": 10, "program": ["machine_hall", "machine_hall"], "floor_hs": [9, 9]},
+                                     core_over={"floor_hs": [10, 8, 8, 8, 8], "program": ["hall"] * 5}))[1]
+    check("ring: a machine_hall ring gets band >= 13", rep_b["volumes"][1]["ring"]["band"] >= 13, rep_b["volumes"][1]["ring"])
+    check("ring: machine halls keep their 9 high floors under the core", rep_b["volumes"][1]["floors"] == [9, 9],
+          rep_b["volumes"][1]["floors"])
+    # a ring taller than the core is capped, with a fix note
+    rep_c = design.compose(ring_spec(0, ring_over={"floor_hs": [7, 7, 7, 7, 7], "program": ["lab"] * 5}))[1]
+    c_core, c_ring = rep_c["volumes"][0], rep_c["volumes"][1]
+    check("ring: a taller ring is capped under the core", c_ring["size"][1] < c_core["size"][1],
+          f"{c_ring['size'][1]} vs {c_core['size'][1]}")
+    check("ring: the cap is reported", any("labs" in f and "ring height" in f for f in rep_c["fixes"]), rep_c["fixes"])
+    check("ring: capped floors still respect the lab minimum", all(h >= 6 for h in c_ring["floors"]), c_ring["floors"])
+    # features: walls skip, roof motifs fit the band, nothing crashes
+    feats = [feature("gear", "labs", side="s", size=4), feature("spire", "labs", side="top", size=12),
+             feature("buttresses", "labs", side="s"), feature("pagoda", "labs", side="top", size=2),
+             feature("clock", "labs", side="n", size=4), feature("landing_pad", "labs", side="top", pos=0.5),
+             feature("chimney", "labs", side="e", size=6), feature("pipe_rack", "labs", side="w"),
+             feature("bridge", "labs", to="core", side="e", level=0)]
+    gf, rf, fpsf, innerf = build(ring_spec(0, features=feats))
+    check("ring features: compose survives every feature kind", rf["blocks"] > 5000, rf["blocks"])
+    check("ring features: unsupported ones are reported, not silent",
+          sum(1 for n in rf["notes"] if "labs" in n) >= 3, rf["notes"])
+    padc = {(x, z) for g in gf if g["id"] == "features" for x, y, z, b in g["blocks"] if b == "minecraft:light_gray_concrete"}
+    check("ring features: the landing pad is on the band", len(padc) > 20 and padc <= fpsf["labs"], f"{len(padc)} cells")
+    fc = merged(gf, skip=tuple(g["id"] for g in gf if g["id"] != "features"))
+    core_top = rf["volumes"][0]["corner"][1] + rf["volumes"][0]["size"][1]
+    in_core = [c for c in fc if (c[0], c[2]) in fpsf["core"] and c[1] <= core_top]
+    check("ring features: nothing lands inside the core volume", not in_core, f"{len(in_core)}, e.g. {in_core[:2]}")
+    check_features(ring_spec(0, features=feats), "ring")
+    # without a core the ring falls back to a round volume instead of crashing
+    lone = spec([vol(id="labs", shape="ring", w=10, r=0, floor_hs=[6], program=["lab"],
+                     place={"mode": "around", "to": "nope"})])
+    gl, rl = design.compose(lone)
+    check("ring: without a core it still builds (as a round volume)", rl["volumes"][0]["shape"] == "round" and rl["blocks"] > 500
+          and any("needs a placed core" in f for f in rl["fixes"]), rl["fixes"])
+    a, _ = design.compose(ring_spec(0, features=feats))
+    b, _ = design.compose(ring_spec(0, features=feats))
+    check("ring: compose is deterministic", a == b, "")
+    print()
+
+
 def main():
     import time
     t0 = time.time()
@@ -421,6 +549,7 @@ def main():
     test_unknown_target()
     test_platform()
     test_blocks()
+    test_ring()
     print()
     print("FAILED" if check.failed else "ALL OK", check.failed, f"({time.time() - t0:.1f}s)")
     return 1 if check.failed else 0

@@ -18,6 +18,7 @@ from __future__ import annotations
 import base64
 import copy
 import json
+import math
 import os
 from pathlib import Path
 
@@ -36,7 +37,9 @@ PRICES = {"claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50)}
 
 KITS = sorted(massing.KITS)
 ROOFS = ["flat", "mansard", "dome", "crown"] + sorted(massing.HF_ROOFS)
-SHAPES = ["rect", "octagon", "round", "L"]
+SHAPES = ["rect", "octagon", "round", "L", "ring"]
+RING_ROOFS = ("flat", "mansard", "garden", "crown")  # roofs that make sense on an annulus (no centre finial / dome)
+MAX_RING_R = 40
 SIDES = ["n", "s", "e", "w"]
 ROLES = ["base", "wall", "wall2", "trim", "pillar", "accent", "glass", "glow", "rail", "roof", "detail", "antenna", "tip"]
 PROGRAM = ["machine_hall", "expansion", "workshop", "lab", "storage", "hall", "living"]
@@ -47,6 +50,7 @@ INDUSTRIAL = ("steampunk", "rust_industrial", "cyber_dark", "station_white", "ae
 MIN_H = {"machine_hall": 9, "expansion": 9, "workshop": 6, "lab": 6, "storage": 5, "hall": 6, "living": 4}
 BIG = {"machine_hall", "expansion"}
 MAX_VOLUMES, MAX_SIDE, MAX_R, MAX_H = 12, 64, 24, 60
+MIN_BAND, MAX_BAND = 9, 24  # ring band thickness (radial blocks); big programs use 13
 AIR = "minecraft:air"
 
 
@@ -79,7 +83,7 @@ SCHEMA = _obj({
         "entrances": {"type": "array", "items": {"type": "string", "enum": SIDES}},
         "roles": _ROLEPAIRS,
         "place": _obj({
-            "mode": {"type": "string", "enum": ["at", "attach", "stack"]},
+            "mode": {"type": "string", "enum": ["at", "attach", "stack", "around"]},
             "to": _STR,
             "side": {"type": "string", "enum": SIDES},
             "align": {"type": "string", "enum": ["start", "center", "end"]},
@@ -122,6 +126,14 @@ gap >= 3 leaves a yard a bridge can cross) or "stack" (sits on the roof of `to`,
 Unused numeric fields: 0. roof: flat | mansard | dome | crown | gable(_steep/_low) | hip(_steep/_low) | barrel |
 sawtooth (factory north-light) | spire | garden. windows: band | grid | slit | none. rhythm 0-3 = bay rhythm variety.
 accent_floor: floor index carrying the accent stripe, -1 none. entrances: sides with a 3-wide door on the ground floor.
+Ring: shape "ring" is a band built AROUND another volume: place.mode "around", place.to = the core's id (list the core first).
+w = band thickness in blocks (>= 9, >= 13 for machine_hall/expansion; interiors stay big, detail goes outward), r/d/cut_* 0.
+place.gap 0 = the ring's inner wall sits against the core, with doorways at N/E/S/W; gap >= 2 = an open courtyard
+(1 is bumped to 2). The engine keeps the ring LOWER than its core, so make the core the tall landmark (a round or
+octagon core hugs best). Wall features need a flat stretch the ring does not have (skipped); landing_pad / crane / water_tank
+fit on the roof only where the band is wide enough. Example, a ring of labs around a round core tower: volume `core`
+{shape round, r 9, floor_hs [8,6,6,6], program [hall,lab,lab,lab], roof dome, place at 0,0} + volume `labs` {shape ring, w 10,
+floor_hs [6,6], program [lab,lab], roof flat, windows grid, entrances [s], place {mode around, to core, gap 0}}.
 
 Colour fidelity (hard): the visible facade is mostly pillar (piers, ~40%) + wall2 (infill) + base + trim, so the main
 colour the brief names (red brick, red timber, white panels) goes on BOTH pillar and wall2; trim/base are a contrasting
@@ -261,10 +273,21 @@ class Vol:
         self.w = max(lo, min(MAX_SIDE, int(s.get("w") or lo)))
         self.d = max(lo, min(MAX_SIDE, int(s.get("d") or lo)))
         self.r = max(8 if big else 5, min(MAX_R, int(s.get("r") or 0) or self.w // 2))
+        self.r_in = 0
+        self.big = big
+        if self.shape == "ring":  # w = band thickness; r / r_in are set by _place from the core
+            lo = 13 if big else MIN_BAND
+            self.band = max(lo, min(MAX_BAND, int(s.get("w") or 0) or lo))
+            if int(s.get("w") or 0) != self.band:
+                fixes.append(f"{self.id}: ring band {s.get('w')} -> {self.band}")
+            self.w = self.d = self.band
         for k, v in (("w", self.w), ("d", self.d)):
-            if self.shape != "round" and int(s.get(k) or 0) != v:
+            if self.shape not in ("round", "ring") and int(s.get(k) or 0) != v:
                 fixes.append(f"{self.id}: {k} {s.get(k)} -> {v}")
         self.roof = s.get("roof") if s.get("roof") in ROOFS else "flat"
+        if self.shape == "ring" and self.roof not in RING_ROOFS:
+            fixes.append(f"{self.id}: roof {self.roof} -> flat (a ring has no centre for it)")
+            self.roof = "flat"
         self.place = dict(s.get("place") or {})
         self.x0 = self.z0 = self.y0 = 0
         self.fp: set = set()
@@ -274,6 +297,8 @@ class Vol:
     def footprint(self) -> set:
         if self.shape == "round":
             fp = massing.footprint("round", r=self.r)
+        elif self.shape == "ring":
+            fp = massing.footprint("ring", r=self.r, r_in=self.r_in)
         elif self.shape == "L":
             cw = int(self.s.get("cut_w") or 0) or self.w // 2
             cd = int(self.s.get("cut_d") or 0) or self.d // 2
@@ -287,6 +312,19 @@ class Vol:
     def ry(self) -> int:
         return sum(self.hs) + 1
 
+    @property
+    def is_ring(self) -> bool:
+        return self.shape == "ring"
+
+    @property
+    def around(self) -> str | None:
+        return self.place.get("to") if self.place.get("mode") == "around" else None
+
+    def centre(self) -> tuple:
+        """Integer centre cell of the footprint's bounding box (the round core's own centre cell)."""
+        x0, z0, x1, z1 = self.bbox()
+        return (x0 + x1) // 2, (z0 + z1) // 2
+
     def bbox(self):
         xs = [p[0] for p in self.fp]
         zs = [p[1] for p in self.fp]
@@ -295,7 +333,7 @@ class Vol:
 
 def _overlaps(v: Vol, others: list) -> Vol | None:
     for o in others:
-        if o is v or not o.fp or v.place.get("mode") == "stack" and o.id == v.place.get("to"):
+        if o is v or not o.fp or v.place.get("mode") in ("stack", "around") and o.id == v.place.get("to"):
             continue
         y_ok = v.y0 <= o.y0 + o.ry and o.y0 <= v.y0 + v.ry
         if y_ok and v.fp & o.fp:
@@ -303,7 +341,77 @@ def _overlaps(v: Vol, others: list) -> Vol | None:
     return None
 
 
+def _cap_ring(v: Vol, core: Vol, fixes: list):
+    """The core is the landmark: a ring stays >= 2 blocks lower (>= 1 when the program's minimum floor heights leave
+    no room), by dropping top floors, then shrinking the only floor; programs keep their minimum floor height."""
+    def fit(tgt):
+        hs, prog = list(v.hs), list(v.prog)
+        while sum(hs) + 1 > tgt and len(hs) > 1:
+            hs.pop()
+            prog.pop()
+        if sum(hs) + 1 > tgt:
+            need = max(MIN_H.get(k.strip(), 4) for k in prog[0].split("+"))
+            if tgt - 1 < need:
+                return None
+            hs[0] = tgt - 1
+        return hs, prog
+    if v.ry <= core.ry - 3:
+        return
+    got = fit(core.ry - 3) or (fit(core.ry - 1) if v.ry > core.ry - 1 else (v.hs, v.prog))
+    if got is None:
+        fixes.append(f"{v.id}: cannot be kept lower than its core {core.id} (minimum floor heights), core is {core.ry}, ring {v.ry}")
+        return
+    old = list(v.hs)
+    v.hs, v.prog = got
+    if v.hs != old:
+        fixes.append(f"{v.id}: ring height {sum(old) + 1} >= core {core.id} {core.ry}: floors {old} -> {v.hs} so the core stays the landmark")
+
+
+def _place_ring(v: Vol, core: Vol, placed: list, fixes: list):
+    pl = v.place
+    gap = max(0, int(pl.get("gap") or 0))
+    if gap == 1:
+        fixes.append(f"{v.id}: gap 1 is an unusable alley, made 2 (courtyard)")
+        gap = 2
+    pl["gap"] = gap
+    cx, cz = core.centre()
+    rc = max(math.hypot(x - cx, z - cz) for x, z in core.fp)
+    v.r_in = int(rc + 0.45) + 1 + gap
+    band = v.band
+    if v.r_in + band > MAX_RING_R:
+        band = max(MIN_BAND, MAX_RING_R - v.r_in)
+        fixes.append(f"{v.id}: ring too wide for the site, band {v.band} -> {band}")
+    v.r = v.r_in + band
+    for _ in range(4):  # never touch the core: grow the inner radius until the footprints are apart
+        loc = v.footprint()
+        v.fp = {(x + cx - v.r, z + cz - v.r) for x, z in loc}
+        if not (v.fp & core.fp):
+            break
+        v.r_in += 1
+        v.r += 1
+    v.x0, v.z0, v.y0 = cx - v.r, cz - v.r, core.y0
+    _cap_ring(v, core, fixes)
+    hit = _overlaps(v, placed)
+    if hit:
+        fixes.append(f"{v.id}: ring overlaps {hit.id} (a ring cannot be moved off its core)")
+    placed.append(v)
+
+
 def _place(v: Vol, by_id: dict, placed: list, fixes: list):
+    pl0 = v.place
+    if v.is_ring:
+        core = by_id.get(pl0.get("to")) if pl0.get("mode") == "around" else None
+        if core is not None and core is not v and core in placed and not core.is_ring:
+            _place_ring(v, core, placed, fixes)
+            return
+        fixes.append(f"{v.id}: a ring needs a placed core volume to go around ({pl0.get('to')!r}); built as a round volume")
+        v.shape, v.r = "round", max(8 if v.big else 5, min(MAX_R, v.band))
+        pl0["mode"] = "at" if not placed else "attach"
+        pl0.setdefault("side", "e")
+        pl0["to"] = pl0.get("to") if by_id.get(pl0.get("to")) in placed else (placed[-1].id if placed else "")
+    elif pl0.get("mode") == "around":
+        fixes.append(f"{v.id}: mode around only works for a ring, attached instead")
+        pl0["mode"] = "attach"
     loc = v.footprint()
     W = max(p[0] for p in loc) + 1
     D = max(p[1] for p in loc) + 1
@@ -362,15 +470,16 @@ def _build_vol(v: Vol, kit: str, roles: dict, seed: int):
     roof = "flat" if v.stacked_on_me else v.roof
     ents = [e for e in (v.s.get("entrances") or ["s"]) if e in SIDES] or ["s"]
     af = int(v.s.get("accent_floor") if v.s.get("accent_floor") is not None else 0)
+    rin = v.r_in if v.is_ring else None
     blocks = massing.structure(
-        shape=v.shape, w=v.w, d=v.d, r=v.r,
+        shape=v.shape, w=v.w, d=v.d, r=v.r, r_in=rin,
         cut_w=min(int(v.s.get("cut_w") or 0) or v.w // 2, v.w - 9), cut_d=min(int(v.s.get("cut_d") or 0) or v.d // 2, v.d - 9),
         floor_hs=v.hs, program=[p.split("+") if "+" in p else p for p in v.prog], kit=kit, roles=r or None,
         windows=v.s.get("windows") or "band", rhythm=int(v.s.get("rhythm") or 0) % 4, roof=roof,
         accent_floor=af if 0 <= af < len(v.hs) else None, open_ground=bool(v.s.get("open_ground")),
         entrances=ents, seed=seed, antennas=0 if v.stacked_on_me else 1, roof_details=0 if v.stacked_on_me else 2)
     # massing normalises the footprint to start at 0,0 (depth adds -1 outward); shift by the volume's corner
-    fp0 = massing.footprint(v.shape, v.w, v.d, v.r, cut_w=min(int(v.s.get("cut_w") or 0) or v.w // 2, v.w - 9),
+    fp0 = massing.footprint(v.shape, v.w, v.d, v.r, rin, cut_w=min(int(v.s.get("cut_w") or 0) or v.w // 2, v.w - 9),
                             cut_d=min(int(v.s.get("cut_d") or 0) or v.d // 2, v.d - 9))
     mx, mz = min(p[0] for p in fp0), min(p[1] for p in fp0)
     v.blocks = [[x - mx + v.x0, y + v.y0, z - mz + v.z0, b] for x, y, z, b in blocks]
@@ -445,12 +554,75 @@ def _doorway(site: Site, a: Vol, b: Vol, side: str):
     return True
 
 
+def _ring_doors(site: Site, ring: Vol, core: Vol, notes: list) -> int:
+    """3-wide doorways through the ring's inner wall on the 4 cardinal points: gap 0 also through the core's outer wall
+    (walls touch), gap >= 2 into the courtyard. Open from y0+1 up to min(4, floor heights - 1)."""
+    cx, cz = ring.centre()
+    gap0 = int(ring.place.get("gap") or 0) == 0
+    hgt = min(4, ring.hs[0] - 1, core.hs[0] - 1 if gap0 else 9)
+    n = 0
+    for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        line = [((cx + k * dx, cz + k * dz)) for k in range(1, ring.r + 2)]
+        kr = next((k for k, p in enumerate(line, 1) if p in ring.fp), None)
+        if kr is None:
+            continue
+        if gap0:
+            kc = max((k for k, p in enumerate(line, 1) if p in core.fp and k < kr), default=None)
+            if kc is None or kr != kc + 1:
+                notes.append(f"{ring.id}: ring wall does not touch {core.id} on {'e' if dx > 0 else 'w' if dx < 0 else 's' if dz > 0 else 'n'} "
+                             f"(non-round core), no doorway there")
+                continue
+            ks = range(kc - 1, kr + 3)
+        else:
+            ks = range(kr, kr + 3)
+        for k in ks:
+            for t in (-1, 0, 1):
+                x, z = cx + k * dx + t * dz, cz + k * dz + t * dx
+                for y in range(ring.y0 + 1, ring.y0 + 1 + hgt):
+                    site.cells.pop((x, y, z), None)
+                    site.doors.add((x, y, z))
+        n += 1
+    return n
+
+
+def _ring_top(site: Site, v: Vol, kind: str, pos: float, size: int, K: dict, report: list):
+    """A roof motif on a ring: slide it round the band until every cell of it stands on the deck (inside the parapet),
+    nearest the point `pos` (0..1 = the way round, 0 = east, clockwise) on the band's mid line. Bigger variants first."""
+    if kind not in motifs.ON_DECK:
+        report.append(f"{kind} on {v.id}: needs a whole roof, not a ring, skipped")
+        return
+    deck = massing._shrink(v.fp)
+    sizes = {"landing_pad": [(21, 21), (19, 19), (17, 17), (15, 15), (13, 13)], "crane": [(26, 13), (22, 12), (17, 11)],
+             "water_tank": [(15, 15), (11, 11)]}[kind]
+    cx, cz = v.centre()
+    ang = 2 * math.pi * pos
+    rm = (v.r_in + v.r) / 2
+    tx, tz = cx + rm * math.cos(ang), cz + rm * math.sin(ang)
+    x0, z0, x1, z1 = v.bbox()
+    y = v.y0 + v.ry + 1
+    for w, d in sizes:
+        cells = motifs.TOP[kind](K, w, d, **({"size": size} if size else {}))
+        if not cells:
+            continue
+        flat = [(a, c) for (a, _, c) in cells]
+        anchors = sorted(((ax, az) for ax in range(x0, x1 - w + 2) for az in range(z0, z1 - d + 2)),
+                         key=lambda p: math.hypot(p[0] + w / 2 - tx, p[1] + d / 2 - tz))
+        for ax, az in anchors:
+            if all((ax + a, az + c) in deck for a, c in flat):
+                for (a, yy, c), b in cells.items():
+                    site.put_feature(ax + a, y + yy, az + c, b, True)
+                return
+    report.append(f"{kind} on {v.id}: the ring band is too narrow for it, skipped")
+
+
 def _side_cells(v: Vol, side: str) -> list:
     """(x, z) just outside v's footprint along a side, ordered west->east / north->south."""
     d = {"e": (1, 0), "w": (-1, 0), "s": (0, 1), "n": (0, -1)}[side]
-    out = sorted({(x + d[0], z + d[1]) for x, z in v.fp if (x + d[0], z + d[1]) not in v.fp},
-                 key=lambda p: (p[1], p[0]) if side in "ew" else (p[0], p[1]))
-    return out
+    cells = {(x + d[0], z + d[1]) for x, z in v.fp if (x + d[0], z + d[1]) not in v.fp}
+    if v.is_ring:  # only the outer side: not the hole / courtyard
+        cx, cz = v.centre()
+        cells = {c for c in cells if math.hypot(c[0] - cx, c[1] - cz) > (v.r_in + v.r) / 2}
+    return sorted(cells, key=lambda p: (p[1], p[0]) if side in "ew" else (p[0], p[1]))
 
 
 def _flat_side(v: Vol, side: str) -> list:
@@ -544,6 +716,13 @@ def _place_cells(site: Site, cells: dict, side: str, ax: int, az: int, y0: int, 
 
 
 def _motif(site: Site, v: Vol, kind: str, side: str, pos: float, size: int, f: dict, K: dict, report: list):
+    if v.is_ring:
+        if kind in motifs.TOP:
+            _ring_top(site, v, kind, pos, size, K, report)
+            return
+        if len(_flat_side(v, "s" if side == "top" else side)) < 7:
+            report.append(f"{kind} on {v.id} {side}: a ring has no flat stretch on that side, skipped")
+            return
     if kind in motifs.TOP:
         x0, z0, x1, z1 = v.bbox()
         cells = motifs.TOP[kind](K, x1 - x0 + 1, z1 - z0 + 1, **({"tiers": size, "size": size} if size else {}))
@@ -676,6 +855,12 @@ def _feature(site: Site, f: dict, by_id: dict, K: dict, kit: str, roles: dict, r
     if kind in motifs.WALL or kind in motifs.LINE or kind in motifs.TOP:
         _motif(site, v, kind, side, pos, size, {**f, "_kit": kit}, K, report)
         return
+    if v.is_ring and kind in ("spire", "buttresses", "bridge"):
+        report.append(f"{kind} on {v.id}: not for a ring, skipped")
+        return
+    if kind == "bridge" and by_id.get(f.get("to")) is not None and by_id[f["to"]].is_ring:
+        report.append(f"bridge {v.id}->{f.get('to')}: not onto a ring, skipped")
+        return
     if kind == "spire":
         h = max(8, min(40, size or 16))
         base = 5 if min(x1 - x0, z1 - z0) >= 10 else 3
@@ -761,7 +946,7 @@ def compose(spec: dict, seed: int = 1) -> tuple[list, dict]:
         rest = []
         for v in todo:
             t = v.place.get("to")
-            if v.place.get("mode") in ("attach", "stack") and t in by_id and by_id[t] not in placed and by_id[t] is not v:
+            if v.place.get("mode") in ("attach", "stack", "around") and t in by_id and by_id[t] not in placed and by_id[t] is not v:
                 rest.append(v)
             else:
                 _place(v, by_id, placed, fixes)
@@ -792,11 +977,13 @@ def compose(spec: dict, seed: int = 1) -> tuple[list, dict]:
     for v in vols:
         site.put_vol(v)
     doors = 0
+    report: list = []
     for v in vols:
         t = by_id.get(v.place.get("to"))
-        if v.place.get("mode") == "attach" and t and int(v.place.get("gap") or 0) == 0 and t.y0 == v.y0:
+        if v.is_ring and v.around and t is not None:
+            doors += _ring_doors(site, v, t, report)
+        elif v.place.get("mode") == "attach" and t and int(v.place.get("gap") or 0) == 0 and t.y0 == v.y0:
             doors += _doorway(site, t, v, v.place.get("side") or "e")
-    report: list = []
     if plat:
         xs = [x for (x, _, _) in site.cells]
         zs = [z for (_, _, z) in site.cells]
@@ -818,6 +1005,8 @@ def compose(spec: dict, seed: int = 1) -> tuple[list, dict]:
            "volumes": [{"id": v.id, "shape": v.shape, "corner": [v.x0, v.y0, v.z0], "size": list(map(int, (
                v.bbox()[2] - v.bbox()[0] + 1, v.ry + 1, v.bbox()[3] - v.bbox()[1] + 1))), "floors": v.hs,
                "program": v.prog, "roof": "flat" if v.stacked_on_me else v.roof,
-               "clear_inside": [v.bbox()[2] - v.bbox()[0] - 3, v.bbox()[3] - v.bbox()[1] - 3]} for v in vols],
+               "clear_inside": [v.bbox()[2] - v.bbox()[0] - 3, v.bbox()[3] - v.bbox()[1] - 3] if not v.is_ring
+               else [v.r - v.r_in - 4] * 2, **({"ring": {"around": v.around, "r_in": v.r_in, "r": v.r, "band": v.r - v.r_in,
+                                               "gap": int(v.place.get("gap") or 0)}} if v.is_ring else {})} for v in vols],
            "blocks": sum(len(g["blocks"]) for g in out)}
     return out, rep
