@@ -785,7 +785,9 @@ class Architect:
                                                         "data": base64.standard_b64encode((d / r["file"]).read_bytes()).decode()}})
         return content
 
-    def view(self, target: str, angle: str, zoom: float, cut_y=None):
+    def view(self, target: str, angle: str, zoom: float, cut_y=None, xray: bool = True):
+        """angle: iso | iso_ne | front | back | side | top | inside | cut, plus the critique-loop framings (as the A/B
+        shots): se / nw (isometric, camera fitted to the bounding sphere) and street (south face, eye height 2.6)."""
         ghosts = self.mcp.json("ghost_list", {})["ghosts"]
         sel = [g for g in ghosts if "world_min" in g and (target == "*" or g["id"] == target
                                                          or (target.endswith("/") and g["id"].startswith(target)))]
@@ -800,11 +802,18 @@ class Architect:
         d = (size * 0.95 + 6) * zoom
         offsets = {"iso": (-0.7, 0.55, 0.7), "iso_ne": (0.7, 0.55, -0.7), "front": (0, 0.25, 1), "back": (0, 0.25, -1),
                    "side": (1, 0.25, 0), "top": (0.01, 1, 0.01), "inside": (0, 0, 0), "cut": (-0.35, 1, 0.45)}
+        offsets.update({"se": (0.7, 0.55, 0.7), "nw": (-0.7, 0.55, -0.7)})
         ox, oy, oz = offsets.get(angle, offsets["iso"])
         if angle == "inside":
             eye = (c[0], lo[1] + 1.6, c[2])
             look = (c[0], lo[1] + 1.6, lo[2] - 100)
+        elif angle == "street":
+            ext = [hi[i] - lo[i] for i in range(3)]
+            eye = (c[0], lo[1] + 2.6, hi[2] + max(ext[0], ext[2]) * 0.6 + 10)
+            look = (c[0], lo[1] + ext[1] * 0.3, c[2])
         else:
+            if angle in ("se", "nw"):  # bounding-sphere fit at FOV 70, the same rule the A/B shots used
+                d = 0.5 * math.sqrt(sum((hi[i] - lo[i]) ** 2 for i in range(3))) / math.tan(math.radians(35)) * zoom
             norm = math.sqrt(ox * ox + oy * oy + oz * oz)
             if angle == "cut":
                 c[1] = int(cut_y) if cut_y is not None else lo[1] + 4
@@ -822,7 +831,7 @@ class Architect:
                 self.prev_view = self.mcp.json("ghost_show", {"id": "*"})
             except Exception:
                 self.prev_view = {}
-        show = {"id": "*", "xray": True, "solid": True, "hud": False}
+        show = {"id": "*", "xray": bool(xray), "solid": True, "hud": False}
         if angle == "cut":
             show["clip_y"] = int(cut_y) if cut_y is not None else lo[1] + 4
         else:
@@ -832,7 +841,7 @@ class Architect:
             self.mcp.call("ghost_camera", {"x": eye[0], "y": eye[1], "z": eye[2],
                                            "look_x": look[0], "look_y": look[1], "look_z": look[2]})
             try:
-                time.sleep(0.5)  # let a frame render from the detached camera
+                time.sleep(1.5 if angle in ("se", "nw", "street") else 0.5)  # let a frame render from the detached camera
                 shot = self.mcp.json("screenshot", {})
             finally:
                 self.mcp.call("ghost_camera", {"off": True})
@@ -1115,23 +1124,8 @@ def prompt_request(text: str, x: int, y: int, z: int, kit: str | None, ident: st
     return out
 
 
-def run_design(arch, args) -> None:
-    """--design / --spec: one Sonnet design call (or a saved spec), the deterministic composer, ghosts. No Haiku loop."""
-    cost = 0.0
-    if args.spec:
-        spec = json.loads(Path(args.spec).read_text("utf-8"))
-    else:
-        req = " ".join(args.request).strip()
-        if not req:
-            raise SystemExit("--design needs a request")
-        print(f"DESIGN {design.MODEL} (server-side refusal fallbacks on): {req}", flush=True)
-        t0 = time.time()
-        spec, cost = design.design(arch.client, req, kit=args.kit)
-        print(f"  spec in {time.time() - t0:.0f}s, ~${cost:.4f}", flush=True)
-        out = HERE / "designs" / f"{args.session}-{time.strftime('%Y%m%d-%H%M%S')}.json"
-        out.parent.mkdir(exist_ok=True)
-        out.write_text(json.dumps(spec, indent=1), "utf-8")
-        print(f"  saved {out}", flush=True)
+def _design_build(arch, args, spec: dict, cost: float) -> dict:
+    """Compose a spec and (re)place its ghosts under <session>/: the session's old ghosts are cleared first."""
     ghosts, rep = design.compose(spec, seed=args.seed)
     if rep["kit"] == "hextech":
         arch.mcp.nogold = True
@@ -1149,10 +1143,94 @@ def run_design(arch, args) -> None:
     print("CONCEPT " + " ".join(str(rep["concept"]).split())[:400], flush=True)
     for v in rep["volumes"]:
         print(f"  {v['id']}: {v['shape']} {v['size'][0]}x{v['size'][2]} h{v['size'][1]} floors {v['floors']} "
-              f"{v['program']} roof {v['roof']}, clear inside {v['clear_inside'][0]}x{v['clear_inside'][1]}", flush=True)
+              f"{v['program']} roof {v['roof']}, clear inside {v['clear_inside'][0]}x{v['clear_inside'][1]}"
+              + (f", ring around {v['ring']['around']} r_in {v['ring']['r_in']} band {v['ring']['band']}" if v.get("ring") else ""),
+              flush=True)
     for f in rep["fixes"] + rep["notes"]:
         print("  fix: " + f, flush=True)
     print(f"DONE {rep['blocks']} blocks, {rep['doorways']} doorways, cost ~${cost:.4f}", flush=True)
+    return rep
+
+
+def _design_shots(arch, prefix: str, save: Path | None = None, tag: str = "") -> list:
+    """The critic's eyes: SE + NW isometric and a street-level view of the session's ghosts (xray off, solid, no HUD).
+    Returns [(label, base64 png)]; with save, also writes <save>/<tag>_<angle>.png."""
+    held = hold_focus(arch.mcp)
+    out = []
+    try:
+        for angle in ("se", "nw", "street"):
+            try:
+                got = arch.view(prefix, angle, 1.0, xray=False)
+            except Exception as e:
+                print(f"  (shot {angle} failed: {e})", flush=True)
+                continue
+            img = next((b for b in got if b.get("type") == "image"), None)
+            if img is None:
+                continue
+            data = img["source"]["data"]
+            out.append((f"{angle} view" + (" (street level, south face)" if angle == "street" else " (isometric)"), data))
+            if save:
+                save.mkdir(parents=True, exist_ok=True)
+                (save / f"{tag}_{angle}.png").write_bytes(base64.standard_b64decode(data))
+    finally:
+        arch.restore_view()
+        release_focus(arch.mcp, held)
+    return out
+
+
+def run_design(arch, args) -> None:
+    """--design / --spec: one Sonnet design call (or a saved spec), the deterministic composer, ghosts, then up to
+    --critique N rounds of screenshots -> critic -> corrected spec -> rebuild. No Haiku loop."""
+    cost = 0.0
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    req = " ".join(args.request).strip()
+    if args.spec:
+        spec = json.loads(Path(args.spec).read_text("utf-8"))
+        req = req or str(spec.get("concept", ""))[:400]
+    else:
+        if not req:
+            raise SystemExit("--design needs a request")
+        print(f"DESIGN {design.MODEL} (server-side refusal fallbacks on): {req}", flush=True)
+        t0 = time.time()
+        spec, cost = design.design(arch.client, req, kit=args.kit)
+        print(f"  spec in {time.time() - t0:.0f}s, ~${cost:.4f}", flush=True)
+        out = HERE / "designs" / f"{args.session.replace('/', '_')}-{stamp}.json"
+        out.parent.mkdir(exist_ok=True)
+        out.write_text(json.dumps(spec, indent=1), "utf-8")
+        print(f"  saved {out}", flush=True)
+    rounds = args.critique if args.critique is not None else (0 if args.spec else 1)
+    rep = _design_build(arch, args, spec, cost)
+    save = Path(args.save_shots) if args.save_shots else None
+    tag = args.session.replace("/", "_")
+    ccost = 0.0
+    for k in range(1, rounds + 1):
+        shots = _design_shots(arch, args.session + "/", save, f"{tag}_r{k - 1}")
+        if not shots:
+            print(f"CRITIQUE r{k}: no screenshots (is the client up?), stopped", flush=True)
+            break
+        t0 = time.time()
+        try:
+            new, flaws, c = design.critique(arch.client, req, spec, rep, shots)
+        except Exception as e:  # a refusal or an API hiccup keeps the build we have
+            print(f"CRITIQUE r{k} failed ({e}); keeping the current build", flush=True)
+            break
+        ccost += c
+        print(f"CRITIQUE r{k} {design.CRITIC_MODEL}: {len(flaws)} flaws in {time.time() - t0:.0f}s, ~${c:.4f}", flush=True)
+        for f in flaws:
+            print("  flaw: " + " ".join(f["what"].split())[:240], flush=True)
+            print("    fix: " + " ".join(f["fix"].split())[:240], flush=True)
+        if new == spec:
+            print("  spec unchanged: done", flush=True)
+            break
+        spec = new
+        out = HERE / "designs" / f"{args.session.replace('/', '_')}-{stamp}-r{k}.json"
+        out.parent.mkdir(exist_ok=True)
+        out.write_text(json.dumps(spec, indent=1), "utf-8")
+        print(f"  saved {out}", flush=True)
+        rep = _design_build(arch, args, spec, cost + ccost)
+        if save and k == rounds:  # the build after the last critique, for the record
+            _design_shots(arch, args.session + "/", save, f"{tag}_r{k}")
+    print(f"TOTAL ~${cost + ccost:.4f} (design ${cost:.4f}, critique ${ccost:.4f})", flush=True)
 
 
 def main():
@@ -1186,6 +1264,10 @@ def main():
     ap.add_argument("--design", action="store_true",
                     help="step 3: Sonnet designs the build as a spec, the composer builds it (no Haiku loop)")
     ap.add_argument("--spec", help="build a saved design spec JSON (no API call)")
+    ap.add_argument("--critique", type=int, default=None, metavar="N",
+                    help="step 5: N rounds of screenshots -> critic -> rebuild after --design (default 1; 0 = off; "
+                         "needs a running client)")
+    ap.add_argument("--save-shots", metavar="DIR", help="with --critique: also save the round shots here as PNG")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("request", nargs="*")
     args = ap.parse_args()

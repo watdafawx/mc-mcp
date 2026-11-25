@@ -223,18 +223,113 @@ def design(client, request: str, kit: str | None = None, extra: list | None = No
     kw = dict(model=MODEL, max_tokens=16000, system=SYSTEM, messages=[{"role": "user", "content": content}],
               thinking={"type": "adaptive"},
               output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": SCHEMA}})
-    try:
-        with client.beta.messages.stream(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **kw) as s:
-            resp = s.get_final_message()
-    except Exception as e:  # local / proxied endpoints without the beta: plain call
-        if "fallback" not in str(e).lower() and "beta" not in str(e).lower():
-            raise
-        with client.messages.stream(**kw) as s:
-            resp = s.get_final_message()
+    resp = _ask(client, kw)
     if resp.stop_reason == "refusal":
         raise RuntimeError("designer refused the brief")
     text = next(b.text for b in resp.content if b.type == "text")
     return json.loads(text), cost_of(resp.usage, getattr(resp, "model", MODEL) or MODEL)
+
+
+def _ask(client, kw: dict):
+    """One streamed call with server-side refusal fallbacks; plain stream on endpoints without the beta."""
+    try:
+        with client.beta.messages.stream(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **kw) as s:
+            return s.get_final_message()
+    except Exception as e:  # local / proxied endpoints without the beta: plain call
+        if "fallback" not in str(e).lower() and "beta" not in str(e).lower():
+            raise
+        with client.messages.stream(**kw) as s:
+            return s.get_final_message()
+
+
+# ---------------------------------------------------------------- the critique call (step 5)
+
+CRITIC_MODEL = os.environ.get("ARCHITECT_CRITIC_MODEL", "claude-sonnet-5-5")
+CRITIC_EFFORT = os.environ.get("ARCHITECT_CRITIC_EFFORT", "medium")
+CRITIC_SCHEMA = _obj({"flaws": {"type": "array", "items": _obj({"what": _STR, "fix": _STR})}, "spec": SCHEMA})
+
+CRITIC_RUBRIC = """
+
+You are now the CRITIC. You get the brief, the current design spec, the composer's report (what it fixed or skipped) and
+screenshots of the build as the engine made it (SE and NW isometric, plus a street-level view). The bar is the user's own:
+"they have a theme they follow, every block looks intentional, and they are not just basic shapes".
+Judge only what you can see and what the report says. Check, in this order:
+1. Theme and colour fidelity: do the visible materials match the brief (the colour it names on the facade, not the kit's default
+   stone)? One theme followed everywhere?
+2. Silhouette: one clear landmark, clearly taller than the rest, roof lines stepping down from it. A ring (shape ring, mode
+   around) is the right answer when the brief says "around a core"; boxes standing next to it are not.
+3. Composition: volumes hug each other (attached, stacked, around); nothing scattered in boxes with yards between, nothing
+   floating, clipped or poking through another volume.
+4. Facade depth and motifs: porches, balconies, clocks, timber frames, signs, pipe runs, a pad or crane where they read in the
+   pictures; plain flat walls with nothing on them are a flaw.
+5. The report's notes: every feature it SKIPPED ("no blank wall", "no spot", "too narrow", "no flat stretch"...) is a feature the
+   designer wanted: move it to a volume / side / size where it fits (a blank end wall, a windowless volume, a wider roof), or
+   replace it with one that fits. Every composer fix is a hint of a bad number in the spec.
+Hard rules: never shrink floor heights or footprints (w, d, r, ring band) of machine_hall / expansion volumes or of any volume
+with big interiors: modded machines and multiblocks need the room; detail goes outward. You may enlarge them. Keep volume ids
+stable so placements still resolve.
+Return `flaws`: the 0-6 real problems you see (what = the visible problem, fix = the concrete spec change you made for it), and
+`spec`: the complete corrected spec (same schema as always, every field). If the build is already good, return flaws = []
+and the spec exactly as given: do not change things for the sake of it."""
+
+
+def _keep_big(old: dict, new: dict) -> list:
+    """Undo any shrink of a big-program volume (machine_hall / expansion floors, footprint, ring band). Returns notes."""
+    notes = []
+    olds = {str(v.get("id")): v for v in old.get("volumes") or []}
+    for v in new.get("volumes") or []:
+        o = olds.get(str(v.get("id")))
+        if o is None:
+            continue
+        prog = [str(p or "") for p in o.get("program") or []]
+        if not any(k.strip() in BIG for p in prog for k in p.split("+")):
+            continue
+        hs_old = [int(h) for h in o.get("floor_hs") or []]
+        hs = [int(h) for h in v.get("floor_hs") or []]
+        if len(hs) < len(hs_old):  # dropped floors of a big program: put the old ones back
+            notes.append(f"{v.get('id')}: floors restored to {hs_old} (big program)")
+            hs, v["program"] = hs_old, list(o.get("program") or [])
+        else:
+            for i, h in enumerate(hs_old):
+                kinds = prog[min(i, len(prog) - 1)]
+                if any(k.strip() in BIG for k in kinds.split("+")) and hs[i] < h:
+                    notes.append(f"{v.get('id')}: floor {i} height kept at {h} (big program)")
+                    hs[i] = h
+        v["floor_hs"] = hs
+        if o.get("shape") == v.get("shape"):
+            for k in ("w", "d", "r"):
+                if int(v.get(k) or 0) < int(o.get(k) or 0):
+                    notes.append(f"{v.get('id')}: {k} kept at {o.get(k)} (big program)")
+                    v[k] = o.get(k)
+    return notes
+
+
+def critique(client, request: str, spec: dict, report: dict, shots: list) -> tuple[dict, list, float]:
+    """One critic call: brief + spec + compose report + screenshots -> (new spec, flaws [{what, fix}], cost USD).
+    shots: [(label, base64 png)]. No flaws -> the spec comes back exactly as given."""
+    rep = {k: report.get(k) for k in ("kit", "fixes", "notes", "doorways", "volumes", "blocks")}
+    content = [{"type": "text", "text": f"Brief: {request}\n\nCurrent spec:\n{json.dumps(spec, indent=1)}\n\n"
+                                        f"Composer report:\n{json.dumps(rep, indent=1)}\n\nScreenshots follow."}]
+    for label, b64 in shots:
+        content.append({"type": "text", "text": f"Screenshot: {label}"})
+        content.append({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}})
+    content.append({"type": "text", "text": "Critique the build against the rubric and return flaws + the corrected spec."})
+    kw = dict(model=CRITIC_MODEL, max_tokens=16000, system=SYSTEM + CRITIC_RUBRIC,
+              messages=[{"role": "user", "content": content}], thinking={"type": "adaptive"},
+              output_config={"effort": CRITIC_EFFORT, "format": {"type": "json_schema", "schema": CRITIC_SCHEMA}})
+    resp = _ask(client, kw)
+    if resp.stop_reason == "refusal":
+        raise RuntimeError("critic refused")
+    cost = cost_of(resp.usage, getattr(resp, "model", CRITIC_MODEL) or CRITIC_MODEL)
+    got = json.loads(next(b.text for b in resp.content if b.type == "text"))
+    flaws = [{"what": str(f.get("what", "")), "fix": str(f.get("fix", ""))} for f in got.get("flaws") or []]
+    new = got.get("spec")
+    if not flaws or not isinstance(new, dict) or not new.get("volumes"):
+        return spec, flaws, cost
+    new = copy.deepcopy(new)
+    for note in _keep_big(spec, new):
+        flaws.append({"what": "(guard) " + note, "fix": "restored"})
+    return new, flaws, cost
 
 
 # ---------------------------------------------------------------- the composer
