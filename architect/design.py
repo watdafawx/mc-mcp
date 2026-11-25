@@ -42,6 +42,7 @@ ROLES = ["base", "wall", "wall2", "trim", "pillar", "accent", "glass", "glow", "
 PROGRAM = ["machine_hall", "expansion", "workshop", "lab", "storage", "hall", "living"]
 FEATURES = ["spire", "chimney", "buttresses", "bridge", "platform"] + [m for m in motifs.ALL if m not in ("spire",)]
 ALIAS = {"pipes": "pipe_rack"}
+INDUSTRIAL = ("steampunk", "rust_industrial", "cyber_dark", "station_white", "ae_sky")  # porch default style
 # minimum clear floor height per room kind: modded setups are pipe/cable heavy or big multiblocks
 MIN_H = {"machine_hall": 9, "expansion": 9, "workshop": 6, "lab": 6, "storage": 5, "hall": 6, "living": 4}
 BIG = {"machine_hall", "expansion"}
@@ -137,6 +138,16 @@ height above the roof), gear (gear disc on a blank stretch of wall, size = radiu
 landmark's `side`, top floor unless level is set, size = radius 3-6), pipe_rack (thin pipe run with risers and valves
 along `on`'s `side` wall), pagoda (stacked flared-eave pagoda roof over `on`, size = tiers 1-4; replaces its roof),
 buttresses (gothic flying buttresses on `side`),
+porch (entrance canopy over the ground-floor doorway on `on`'s `side`; size 1 = classic columns + pediment, 2 = industrial
+steel canopy, 0 = by kit; skipped if that side has no entrance), balcony (slab balcony with rail and stair brackets over
+a window of `on`'s `side`, upper floors only; level = floor index, size = half-width 1-3), blade_sign (vertical projecting
+glow sign on `on`'s `side` at head height, pos along the wall; shopfront / cyberpunk streets), timber_frame (half-timber
+overlay on `on`'s whole `side` wall: posts at the piers, floor beams, diagonal braces in blank panels; replaces wall blocks
+only), smokestack (round tapering brick stack standing on the ground beside `on`'s `side` wall, pos along it, size = height
+above its roof), water_tank (stilted wooden tank with ladder on the roof of `on`, near a corner; side top; size = height
+6-14), landing_pad (round helipad with H, edge lights and windsock on the flat roof of `on`; side top; roof >= 13 wide),
+crane (tower crane with cab, jib and counterweight on the roof of `on`; side top; size = mast height 8-30; roof >= 17 x 11;
+use another roof than the water tank),
 bridge (enclosed sky-bridge from `on` to `to` at floor `level`; only across a gap), platform (terraced base under the
 whole site, size = steps 1-3). Use 3-10 features.
 
@@ -453,9 +464,11 @@ def _glassy(b) -> bool:
     return bool(b) and ("glass" in b or "pane" in b)
 
 
-def _wall_spot(site: Site, v: Vol, side: str, hw: int, h: int, ylo: int, yhi: int, pos: float, relaxed=False):
+def _wall_spot(site: Site, v: Vol, side: str, hw: int, h: int, ylo: int, yhi: int, pos: float, relaxed=False, ys=None, fits=None):
     """A stretch of v's `side` wall, 2*hw+1 wide and h high, with no window or doorway behind it (relaxed: windows ok,
-    doorways never). Returns (edge cell at the centre, base y) nearest to pos / the top of [ylo, yhi], or None."""
+    doorways never). Returns (edge cell at the centre, base y) nearest to pos / the top of [ylo, yhi], or None.
+    ys: explicit base heights to try, in that order (floor lines for a balcony, head height for a sign).
+    fits: optional filter fits(edge cell, base y) on a candidate (e.g. free ground and no other feature in front of it)."""
     cells = _flat_side(v, side)
     n = len(cells)
     if n < 2 * hw + 1:
@@ -463,7 +476,7 @@ def _wall_spot(site: Site, v: Vol, side: str, hw: int, h: int, ylo: int, yhi: in
     o = {"s": (0, 1), "n": (0, -1), "e": (1, 0), "w": (-1, 0)}[side]
     want = pos * (n - 1)
     for c in sorted(range(hw, n - hw), key=lambda c: abs(c - want)):
-        for yb in sorted(range(v.y0 + 2, yhi - h + 1), key=lambda y: (y < ylo, -y)):
+        for yb in (ys if ys is not None else sorted(range(v.y0 + 2, yhi - h + 1), key=lambda y: (y < ylo, -y))):
             ok = True
             for k in range(c - hw, c + hw + 1):
                 ex, ez = cells[k]
@@ -475,17 +488,70 @@ def _wall_spot(site: Site, v: Vol, side: str, hw: int, h: int, ylo: int, yhi: in
                         break
                 if not ok:
                     break
-            if ok:
+            if ok and (not fits or fits(cells[c], yb)):
                 return c, yb
     return None
+
+
+def _door_spot(site: Site, v: Vol, side: str, pos: float = 0.5):
+    """The ground-floor doorway on v's `side`: a run of 3-5 wall-plane cells that are empty at y0+1..y0+3 (massing
+    cuts entrances as air; windows, the sill course and open-ground colonnades do not qualify). Returns (index of the
+    centre cell in _flat_side, ground y) nearest to pos, or None."""
+    cells = _flat_side(v, side)
+    o = {"s": (0, 1), "n": (0, -1), "e": (1, 0), "w": (-1, 0)}[side]
+    if len(cells) < 7:
+        return None
+    gap = [all(site.cells.get((ex - o[0], y, ez - o[1])) in (None, AIR) for y in range(v.y0 + 1, v.y0 + 4))
+           for ex, ez in cells]
+    runs, i = [], 0
+    while i < len(cells):
+        if gap[i]:
+            j = i
+            while j + 1 < len(cells) and gap[j + 1]:
+                j += 1
+            if 3 <= j - i + 1 <= 5:
+                runs.append((i + j) // 2)
+            i = j + 1
+        else:
+            i += 1
+    want = pos * (len(cells) - 1)
+    return (min(runs, key=lambda c: abs(c - want)), v.y0) if runs else None
+
+
+def _clear(site: Site, side: str, ax: int, az: int, u0: int, u1: int, hw: int, ys=()) -> bool:
+    """True when the outside strip u0..u1 x v -hw..hw in front of edge cell (ax, az) touches no volume footprint and,
+    over the heights `ys`, no feature block already placed there (another motif, a pipe riser, a chimney; the depth
+    pass's pier feet and skirt are part of the volume and may be overwritten)."""
+    for u in range(u0, u1 + 1):
+        for vv in range(-hw, hw + 1):
+            x, z = motifs.to_world(side, ax, az, u, vv)
+            if any((x, z) in v.fp for v in site.vols) or any(site.src.get((x, y, z)) == "features" and site.cells.get((x, y, z), AIR) != AIR for y in ys):
+                return False
+    return True
+
+
+def _place_cells(site: Site, cells: dict, side: str, ax: int, az: int, y0: int, soft: bool):
+    """Frame a wall motif and put it; with soft, u=0 cells (the pier / ledge layer) never overwrite volume blocks."""
+    edge = {k: b for k, b in cells.items() if soft and k[0] == 0}
+    for x, y, z, b in motifs.frame({k: b for k, b in cells.items() if k not in edge}, side, ax, az, y0):
+        site.put_feature(x, y, z, b, True)
+    for x, y, z, b in motifs.frame(edge, side, ax, az, y0):
+        site.put_feature(x, y, z, b, False)
 
 
 def _motif(site: Site, v: Vol, kind: str, side: str, pos: float, size: int, f: dict, K: dict, report: list):
     if kind in motifs.TOP:
         x0, z0, x1, z1 = v.bbox()
-        cells = motifs.TOP[kind](K, x1 - x0 + 1, z1 - z0 + 1, **({"tiers": size} if size else {}))
+        cells = motifs.TOP[kind](K, x1 - x0 + 1, z1 - z0 + 1, **({"tiers": size, "size": size} if size else {}))
+        if not cells:
+            report.append(f"{kind} on {v.id}: roof deck too small, skipped")
+            return
         y = v.y0 + v.ry + 1
         for (x, yy, z), b in cells.items():
+            if kind in motifs.ON_DECK and (x0 + x, z0 + z) not in v.fp:
+                continue  # stands on the deck: nothing hangs over the edge of a round / octagon roof
+            if any(o is not v for o in site.owners(x0 + x, y + yy, z0 + z)):
+                continue  # never into another volume's shell (something stacked on this roof)
             site.put_feature(x0 + x, y + yy, z0 + z, b, True)
         return
     if side == "top":
@@ -494,17 +560,78 @@ def _motif(site: Site, v: Vol, kind: str, side: str, pos: float, size: int, f: d
         cells = _flat_side(v, side)
         if not cells:
             return
-        for x, y, z, b in motifs.frame(motifs.LINE[kind](K, len(cells), v.hs), side, *cells[0], v.y0):
-            site.put_feature(x, y, z, b, True)
+        ax0, az0 = cells[0]
+
+        def existing(u, vv, y):  # what the facade has there now, same frame as the motif (y up from the plinth)
+            x, z = motifs.to_world(side, ax0, az0, u, vv)
+            return site.cells.get((x, v.y0 + y, z))
+        got = motifs.frame(motifs.LINE[kind](K, len(cells), v.hs, existing=existing), side, ax0, az0, v.y0)
+        n = 0
+        for x, y, z, b in got:
+            if kind in motifs.OVERLAY:  # replace-only: never add to empty cells, never touch glass or doorways
+                cur = site.cells.get((x, y, z))
+                if cur in (None, AIR) or _glassy(cur) or (x, y, z) in site.doors:
+                    continue
+                site.cells[(x, y, z)] = b
+                site.src[(x, y, z)] = "features"
+            else:
+                site.put_feature(x, y, z, b, True)
+            n += 1
+        if not n:
+            report.append(f"{kind} on {v.id} {side}: nothing to replace, skipped")
+        return
+    if kind in motifs.DOOR:
+        spot = _door_spot(site, v, side, pos)
+        if not spot:
+            report.append(f"{kind} on {v.id} {side}: no doorway on that side, skipped")
+            return
+        c, yb = spot
+        ax, az = _flat_side(v, side)[c]
+        if not _clear(site, side, ax, az, 1, 4, 3, range(yb + 1, yb + 8)):  # (the plinth-level skirt is overwritten)
+            report.append(f"{kind} on {v.id} {side}: something else is in front of that doorway, skipped")
+            return
+        style = {1: "classic", 2: "industrial"}.get(size) or ("industrial" if f.get("_kit") in INDUSTRIAL else "classic")
+        _place_cells(site, motifs.WALL[kind](K, style=style), side, ax, az, yb, False)
+        return
+    if kind in motifs.GROUND:
+        cells = _flat_side(v, side)
+        want = pos * (len(cells) - 1) if cells else 0
+        p = {"h": v.ry + max(4, min(24, size or 6)) + 1}  # highest block = roof level + size
+        for c in sorted(range(len(cells)), key=lambda c: abs(c - want)):
+            ax, az = cells[c]
+            if _clear(site, side, ax, az, 1, 5, 2, range(v.y0 + 1, v.y0 + p["h"])):
+                _place_cells(site, motifs.WALL[kind](K, **p), side, ax, az, v.y0, False)
+                return
+        report.append(f"{kind} on {v.id} {side}: no free ground beside that wall, skipped")
         return
     lv = int(f.get("level") or 0)
     top = len(v.hs) - 1 if kind == "clock" and not lv else max(0, min(len(v.hs) - 1, lv))
     ylo = v.y0 + 1 + sum(v.hs[:top])
     yhi = v.y0 + v.ry
     spot, p, blind = None, {}, False
+    if kind in motifs.ON_WINDOW:  # may sit over windows; the windows behind stay as they are
+        if kind == "balcony":  # base y = one below a floor surface, upper floors only (level = which floor)
+            lines = [v.y0 + sum(v.hs[:k]) for k in range(1, len(v.hs))]
+            lines = [y for y in lines if y == v.y0 + sum(v.hs[:lv])] if lv else lines
+        else:  # blade sign: bottom edge at head height or above, lowest first
+            lines = list(range(v.y0 + 3, v.y0 + 9))
+        for p in motifs.candidates(kind, size):
+            hw, h = motifs.SIZE[kind](p)
+            reach = 3 if kind == "blade_sign" else 2  # how far out it stands: that strip must be free ground / air
+            spot = _wall_spot(site, v, side, hw, h, ylo, yhi, pos, relaxed=True, ys=[y for y in lines if y + h <= yhi + 1],
+                              fits=lambda e, yb, hw=hw, h=h, reach=reach: _clear(site, side, e[0], e[1], 1, reach, hw,
+                                                                                 range(yb, yb + h)))
+            if spot:
+                break
+        if not spot:
+            report.append(f"{kind} on {v.id} {side}: no spot, skipped")
+            return
+        c, yb = spot
+        ax, az = _flat_side(v, side)[c]
+        _place_cells(site, motifs.WALL[kind](K, **p), side, ax, az, yb, kind in motifs.SOFT_EDGE)
+        return
     for blind in (False, True):  # blank wall first; else a blind panel (windows behind become wall), like a clock tower
-        for r in range(size or 4, 1, -1):  # shrink the motif until it fits
-            p = {"r": r}
+        for p in motifs.candidates(kind, size):  # shrink the motif until it fits
             hw, h = motifs.SIZE[kind](p)
             spot = _wall_spot(site, v, side, hw, h, ylo, yhi, pos, relaxed=blind)
             if spot:
@@ -526,8 +653,7 @@ def _motif(site: Site, v: Vol, kind: str, side: str, pos: float, size: int, f: d
         return
     c, yb = spot
     ax, az = _flat_side(v, side)[c]
-    for x, y, z, b in motifs.frame(motifs.WALL[kind](K, **p), side, ax, az, yb):
-        site.put_feature(x, y, z, b, True)
+    _place_cells(site, motifs.WALL[kind](K, **p), side, ax, az, yb, False)
 
 
 def _feature(site: Site, f: dict, by_id: dict, K: dict, kit: str, roles: dict, report: list, i: int):
@@ -544,7 +670,7 @@ def _feature(site: Site, f: dict, by_id: dict, K: dict, kit: str, roles: dict, r
     H = sum(v.hs)
     put = site.put_feature
     if kind in motifs.WALL or kind in motifs.LINE or kind in motifs.TOP:
-        _motif(site, v, kind, side, pos, size, f, K, report)
+        _motif(site, v, kind, side, pos, size, {**f, "_kit": kit}, K, report)
         return
     if kind == "spire":
         h = max(8, min(40, size or 16))
