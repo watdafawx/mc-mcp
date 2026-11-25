@@ -185,7 +185,7 @@ def structure(shape: str = "rect", w: int = 15, d: int = 11, r: int = 8, r_in: i
               roof_details: int = 3, antennas: int = 1, interior_floors: bool = True, open_ground: bool = False,
               seed: int = 1, roof: str | None = None, floor_hs: list | None = None, program: list | None = None,
               core: str = "auto", entrances: list | str | None = ("s",), pilasters: bool = True,
-              rhythm: int = 0, finial: int = 3, **_ignored) -> list:
+              rhythm: int = 0, finial: int = 3, depth: bool = True, **_ignored) -> list:
     """A styled building on any footprint. roof: flat (deck, parapet, vents, antennas) | mansard (steep stepped
     roof with dormers and a finial) | dome (ribbed glass dome with a lantern) | crown (art-deco stepped
     setbacks with glow bands and a mast). The outer ring of the footprint carries ledges/pillars; walls sit one
@@ -201,7 +201,8 @@ def structure(shape: str = "rect", w: int = 15, d: int = 11, r: int = 8, r_in: i
     pilasters: piers on the outer ring every bay, full height, plus a base course: the facade gets depth (window
     bays sit one block back between piers) instead of one flat plane.
     rhythm: 0-3, facade bay rhythm (0 = every bay the same; 1-3 mix narrow and wide bays; wide bays get a centre mullion,
-    ground floor gets a sill course + transom, upper floors run full-height glass). finial: height of roof finials."""
+    ground floor gets a sill course + transom, upper floors run full-height glass). finial: height of roof finials.
+    depth: facade depth pass (depth.py): base skirt, pier feet/capitals, cornice, window sills and hoods, all outward."""
     K = _kit(kit, roles)
     roof = roof or ROOF_DEFAULT.get(kit if isinstance(kit, str) else "", "flat")
     fp = footprint(shape, w, d, r, r_in, a0, a1, c, cut_w, cut_d)
@@ -322,6 +323,9 @@ def structure(shape: str = "rect", w: int = 15, d: int = 11, r: int = 8, r_in: i
             put(x, ry + 1, z, K["wall"])
     if program or core not in ("auto", "none") or entrances:
         _fit(put, out, inner, wall_ring, hs, y0s, ry, K, kit, program, core, entrances, seed, ledge_ring)
+    if depth:
+        import depth as _depth
+        _depth.apply(out, K, fp, ledge_ring, wall_ring, H, ry)
     if roof != "flat":
         _roof(put, roof, inner, ry, K, bay, finial)
         return [[x, y, z, b] for (x, y, z), b in out.items()]
