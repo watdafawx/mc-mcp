@@ -1,0 +1,332 @@
+{
+ "concept": "Red-brick Victorian factory: a wide machine hall with sawtooth north-light roof is the base mass, a tall clock tower attaches at its front corner as the ONE landmark (hip_steep roof, spire, clock on the south face). A furnace hall with chimneys and smokestacks sits behind it, a lower workshop wing and an office/storage block step down to the east. Red brick (minecraft:bricks) on pillar and wall2 so the facade reads red, stone brick base and copper trim as contrast, dark deepslate-tile roofs. Interiors are big: 11-12 high machine halls 15+ wide, tower floors wide enough to use. Details go outward: gears on the windowless furnace end wall, pipe rack on the process hall, smokestacks beside the furnace hall, a porch at the main entrance, a bridge across a yard gap to the workshop wing.",
+ "kit": "steampunk",
+ "roles": [
+  {
+   "role": "base",
+   "block": "minecraft:stone_bricks"
+  },
+  {
+   "role": "wall",
+   "block": "minecraft:bricks"
+  },
+  {
+   "role": "wall2",
+   "block": "minecraft:bricks"
+  },
+  {
+   "role": "pillar",
+   "block": "minecraft:bricks"
+  },
+  {
+   "role": "trim",
+   "block": "minecraft:cut_copper"
+  },
+  {
+   "role": "accent",
+   "block": "minecraft:weathered_cut_copper"
+  },
+  {
+   "role": "glass",
+   "block": "minecraft:cyan_stained_glass"
+  },
+  {
+   "role": "glow",
+   "block": "minecraft:shroomlight"
+  },
+  {
+   "role": "roof",
+   "block": "minecraft:deepslate_tiles"
+  },
+  {
+   "role": "detail",
+   "block": "minecraft:polished_deepslate"
+  },
+  {
+   "role": "rail",
+   "block": "minecraft:iron_bars"
+  }
+ ],
+ "volumes": [
+  {
+   "id": "hall",
+   "purpose": "main machine hall with north-light roof",
+   "shape": "rect",
+   "w": 28,
+   "d": 18,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    12
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "sawtooth",
+   "windows": "grid",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "at",
+    "to": "",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "tower",
+   "purpose": "clock tower landmark",
+   "shape": "rect",
+   "w": 11,
+   "d": 11,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    8,
+    6,
+    6,
+    6,
+    6
+   ],
+   "program": [
+    "workshop",
+    "lab",
+    "lab",
+    "storage",
+    "storage"
+   ],
+   "roof": "hip_steep",
+   "windows": "slit",
+   "rhythm": 0,
+   "accent_floor": 3,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [
+    {
+     "role": "roof",
+     "block": "minecraft:oxidized_cut_copper"
+    },
+    {
+     "role": "trim",
+     "block": "minecraft:weathered_cut_copper"
+    }
+   ],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "s",
+    "align": "start",
+    "offset": 2,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "furnace",
+   "purpose": "furnace and process hall behind main hall",
+   "shape": "rect",
+   "w": 20,
+   "d": 15,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    12
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "gable_low",
+   "windows": "none",
+   "rhythm": 2,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "workshop",
+   "purpose": "workshop wing across a yard",
+   "shape": "rect",
+   "w": 15,
+   "d": 14,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    7,
+    6
+   ],
+   "program": [
+    "workshop",
+    "lab"
+   ],
+   "roof": "gable",
+   "windows": "grid",
+   "rhythm": 1,
+   "accent_floor": 0,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "e",
+    "align": "start",
+    "offset": 2,
+    "gap": 4,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "office",
+   "purpose": "offices and storage annex",
+   "shape": "rect",
+   "w": 14,
+   "d": 10,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    5,
+    5
+   ],
+   "program": [
+    "living",
+    "storage"
+   ],
+   "roof": "hip_low",
+   "windows": "grid",
+   "rhythm": 3,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "workshop",
+    "side": "s",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  }
+ ],
+ "features": [
+  {
+   "kind": "clock",
+   "on": "tower",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 4,
+   "level": 0
+  },
+  {
+   "kind": "spire",
+   "on": "tower",
+   "to": "",
+   "side": "top",
+   "pos": 0.5,
+   "size": 8,
+   "level": 0
+  },
+  {
+   "kind": "smokestack",
+   "on": "furnace",
+   "to": "",
+   "side": "n",
+   "pos": 0.25,
+   "size": 16,
+   "level": 0
+  },
+  {
+   "kind": "smokestack",
+   "on": "furnace",
+   "to": "",
+   "side": "n",
+   "pos": 0.75,
+   "size": 20,
+   "level": 0
+  },
+  {
+   "kind": "chimney",
+   "on": "furnace",
+   "to": "",
+   "side": "e",
+   "pos": 0.5,
+   "size": 5,
+   "level": 0
+  },
+  {
+   "kind": "gear",
+   "on": "furnace",
+   "to": "",
+   "side": "w",
+   "pos": 0.5,
+   "size": 4,
+   "level": 0
+  },
+  {
+   "kind": "pipe_rack",
+   "on": "hall",
+   "to": "",
+   "side": "e",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "porch",
+   "on": "hall",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 2,
+   "level": 0
+  },
+  {
+   "kind": "bridge",
+   "on": "hall",
+   "to": "workshop",
+   "side": "e",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  }
+ ]
+}

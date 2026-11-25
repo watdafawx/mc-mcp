@@ -1,0 +1,257 @@
+{
+ "concept": "A white polar research station. The landmark is a tall round core tower (r 8, four floors plus a dome and antenna spire) wrapped by a low ring of labs with an orange stripe on its accent floor. A wide glass lab wing attaches to the east, and a low hangar-like machine hall plugs into the south with a landing pad on its roof. Materials: white concrete on pillar and wall2, smooth quartz base, orange concrete accent stripes, light gray trim, light blue glass. Detail goes outward: antenna, spire, and a porch on the south entrance. The ring stays lower than the core, the glass labs step down to one storey, and the roofs stay flat apart from the dome so the silhouette reads clearly.",
+ "kit": "station_white",
+ "roles": [
+  {
+   "role": "pillar",
+   "block": "minecraft:white_concrete"
+  },
+  {
+   "role": "wall2",
+   "block": "minecraft:white_concrete"
+  },
+  {
+   "role": "base",
+   "block": "minecraft:smooth_quartz"
+  },
+  {
+   "role": "trim",
+   "block": "minecraft:light_gray_concrete"
+  },
+  {
+   "role": "accent",
+   "block": "minecraft:orange_concrete"
+  },
+  {
+   "role": "glow",
+   "block": "minecraft:sea_lantern"
+  },
+  {
+   "role": "roof",
+   "block": "minecraft:white_concrete"
+  }
+ ],
+ "volumes": [
+  {
+   "id": "core",
+   "purpose": "landmark core tower",
+   "shape": "round",
+   "w": 0,
+   "d": 0,
+   "r": 8,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    8,
+    6,
+    6,
+    6,
+    6
+   ],
+   "program": [
+    "hall",
+    "lab",
+    "lab",
+    "lab",
+    "lab"
+   ],
+   "roof": "dome",
+   "windows": "band",
+   "rhythm": 1,
+   "accent_floor": 1,
+   "open_ground": false,
+   "entrances": [
+    "n"
+   ],
+   "roles": [
+    {
+     "role": "trim",
+     "block": "minecraft:orange_concrete"
+    }
+   ],
+   "place": {
+    "mode": "at",
+    "to": "",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "labs",
+   "purpose": "ring of labs around the core",
+   "shape": "ring",
+   "w": 11,
+   "d": 0,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    7,
+    6
+   ],
+   "program": [
+    "lab",
+    "lab"
+   ],
+   "roof": "flat",
+   "windows": "grid",
+   "rhythm": 2,
+   "accent_floor": 0,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "around",
+    "to": "core",
+    "side": "n",
+    "align": "center",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "glass_labs",
+   "purpose": "glass lab wing east of the ring",
+   "shape": "rect",
+   "w": 16,
+   "d": 15,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    7
+   ],
+   "program": [
+    "lab"
+   ],
+   "roof": "flat",
+   "windows": "band",
+   "rhythm": 0,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "w"
+   ],
+   "roles": [
+    {
+     "role": "wall2",
+     "block": "connectedglass:borderless_glass_light_blue"
+    },
+    {
+     "role": "pillar",
+     "block": "minecraft:white_concrete"
+    }
+   ],
+   "place": {
+    "mode": "attach",
+    "to": "labs",
+    "side": "e",
+    "align": "center",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "hangar",
+   "purpose": "machine hall with landing pad roof",
+   "shape": "rect",
+   "w": 21,
+   "d": 15,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    10
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "flat",
+   "windows": "slit",
+   "rhythm": 1,
+   "accent_floor": 0,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "e"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "labs",
+    "side": "s",
+    "align": "center",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  }
+ ],
+ "features": [
+  {
+   "kind": "spire",
+   "on": "core",
+   "to": "",
+   "side": "top",
+   "pos": 0,
+   "size": 14,
+   "level": 0
+  },
+  {
+   "kind": "landing_pad",
+   "on": "hangar",
+   "to": "",
+   "side": "top",
+   "pos": 0,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "porch",
+   "on": "hangar",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 2,
+   "level": 0
+  },
+  {
+   "kind": "pipe_rack",
+   "on": "hangar",
+   "to": "",
+   "side": "e",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "balcony",
+   "on": "core",
+   "to": "",
+   "side": "n",
+   "pos": 0.5,
+   "size": 2,
+   "level": 3
+  },
+  {
+   "kind": "platform",
+   "on": "core",
+   "to": "",
+   "side": "top",
+   "pos": 0,
+   "size": 2,
+   "level": 0
+  }
+ ]
+}
