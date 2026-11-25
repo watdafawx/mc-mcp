@@ -101,7 +101,8 @@ def _disc(r: int) -> set:
 def candidates(kind: str, size: int = 0) -> list:
     """Parameter sets to try for a wall motif, biggest first (the composer shrinks it until it fits a spot)."""
     if kind in ("clock", "gear"):
-        return [{"r": r} for r in range(size or 4, 1, -1)]
+        lo = 2 if kind == "clock" else 3
+        return [{"r": r} for r in range(max(lo, size or 4), lo - 1, -1)]
     if kind == "balcony":
         return [{"hw": hw} for hw in range(min(3, max(1, size or 2)), 0, -1)]
     if kind == "smokestack":
@@ -112,11 +113,13 @@ def candidates(kind: str, size: int = 0) -> list:
 # ---------------------------------------------------------------- WALL motifs
 
 def clock(K: dict, r: int = 4, **_) -> dict:
-    """Clock face: backing disc in the edge layer (fills the recessed bays), proud face at u=1 with a trim rim, 12 hour
-    markers, hour hand at ten, minute hand at two, lit hub, a slab hood over the top. Centre at y = r + 1."""
-    r = max(3, min(6, r))
+    """Clock face: backing disc in the edge layer (fills the recessed bays), proud face at u=1 with a trim rim, dark
+    markers at 12/3/6/9 (r >= 4), axis-aligned hands (minute up, hour to 3: clean at block scale), lit hub, a slab
+    hood over the top. Centre at y = r + 1. r 2..6 (r=2 fits a 5-wide tower face)."""
+    r = max(2, min(6, r))
     face = "minecraft:smooth_quartz" if not _light(K) else "minecraft:white_concrete"
     dark = "minecraft:polished_blackstone"
+    hand = "minecraft:black_concrete"
     rim = K.get("trim", "minecraft:stone_bricks")
     B = {}
     cy = r + 1
@@ -125,46 +128,48 @@ def clock(K: dict, r: int = 4, **_) -> dict:
             d = math.hypot(v, dy)
             if d <= r + 0.5:
                 B[(0, v, cy + dy)] = K.get("wall2", rim)
-            if d <= r - 0.5:
-                B[(1, v, cy + dy)] = face
-            elif d <= r + 0.5:
-                B[(1, v, cy + dy)] = rim
-    for k in range(12):  # hour markers just inside the rim
-        a = math.radians(k * 30)
-        B[(1, round((r - 1.2) * math.sin(a)), cy + round((r - 1.2) * math.cos(a)))] = dark
-    for frac in [i / 4 for i in range(1, 4 * r)]:
-        for ang, ln in ((-60, 0.55), (60, 0.9)):  # hour hand at ten, minute hand at two
-            t = frac / r
-            if t <= ln:
-                a = math.radians(ang)
-                B[(1, round(frac * math.sin(a)), cy + round(frac * math.cos(a)))] = "minecraft:black_concrete"
+                B[(1, v, cy + dy)] = face if d <= r - 0.5 else rim
+    if r >= 4:
+        for v, dy in ((0, r - 1), (r - 1, 0), (0, -(r - 1)), (-(r - 1), 0)):
+            B[(1, v, cy + dy)] = dark
+    for k in range(1, max(2, r - 1)):  # minute hand straight up
+        B[(1, 0, cy + k)] = hand
+    for k in range(1, max(2, r // 2 + 1)):  # hour hand to three
+        B[(1, k, cy)] = hand
     B[(1, 0, cy)] = K.get("glow", "minecraft:shroomlight")
     hood = _slab(K, ("trim", "roof"))
-    for v in range(-2, 3):
+    for v in range(-min(2, r), min(2, r) + 1):
         B[(1, v, cy + r + 1)] = hood + "[type=bottom]"
     return B
 
 
-def gear(K: dict, r: int = 3, **_) -> dict:
-    """Gear disc proud of the wall (u=1) on a backing plate (u=0): toothed rim in trim, spokes + hub in detail."""
-    r = max(2, min(5, r))
+def gear(K: dict, r: int = 4, **_) -> dict:
+    """Cog proud of the wall (u=1) on a backing plate (u=0): a solid rim ring in trim with 8 square teeth (4 on the axes,
+    4 on the diagonals, 2x2 so they read at block scale), 4 axis spokes and a 3x3 hub in detail, a lit axle.
+    Only placed on a blank stretch of wall (never over windows). r 3..5."""
+    r = max(3, min(5, r))
+    rim, body = K["trim"], K.get("detail", K["trim"])
     B = {}
-    cy = r + 2
-    for v in range(-r - 1, r + 2):
-        for dy in range(-r - 1, r + 2):
+    cy = r + 1
+    for v in range(-r, r + 1):
+        for dy in range(-r, r + 1):
             d = math.hypot(v, dy)
-            ang = math.degrees(math.atan2(dy, v)) % 45
-            b = None
-            if r - 0.6 <= d <= r + 0.4:
-                b = K["trim"]
-            elif r + 0.4 < d <= r + 1.4 and ang < 15:
-                b = K["trim"]
-            elif d < 1.5 or ((v == 0 or dy == 0 or abs(v) == abs(dy)) and d < r):
-                b = K.get("detail", K["trim"])
-            if b:
-                B[(1, v, cy + dy)] = b
-                if d <= r + 0.4:
-                    B[(0, v, cy + dy)] = K.get("wall2", K["trim"])
+            if r - 1.5 <= d <= r + 0.4:
+                B[(1, v, cy + dy)] = rim
+            elif d < r - 1.5 and (v == 0 or dy == 0 or (abs(v) <= 1 and abs(dy) <= 1)):
+                B[(1, v, cy + dy)] = body
+            if d <= r + 0.4:
+                B[(0, v, cy + dy)] = K.get("wall2", rim)
+    for v, dy in ((0, r + 1), (0, -r - 1), (r + 1, 0), (-r - 1, 0)):  # axis teeth: 3 wide, 1 deep
+        for k in (-1, 0, 1):
+            B[(1, v + (k if v == 0 else 0), cy + dy + (k if dy == 0 else 0))] = rim
+    t = round((r + 0.4) / math.sqrt(2))
+    for sv in (-1, 1):  # diagonal teeth: 2x2 on the rim
+        for sd in (-1, 1):
+            for a in (0, 1):
+                for b in (0, 1):
+                    B[(1, sv * (t + a), cy + sd * (t + b))] = rim
+    B[(1, 0, cy)] = K.get("glow", "minecraft:shroomlight")
     return B
 
 
@@ -294,8 +299,8 @@ def smokestack(K: dict, h: int = 14, **_) -> dict:
     return B
 
 
-SIZE = {"clock": lambda p: (min(6, max(3, p.get("r", 4))) + 1, 2 * min(6, max(3, p.get("r", 4))) + 4),
-        "gear": lambda p: (min(5, max(2, p.get("r", 3))) + 1, 2 * min(5, max(2, p.get("r", 3))) + 4),
+SIZE = {"clock": lambda p: (min(6, max(2, p.get("r", 4))), 2 * min(6, max(2, p.get("r", 4))) + 4),
+        "gear": lambda p: (min(5, max(3, p.get("r", 4))) + 1, 2 * min(5, max(3, p.get("r", 4))) + 3),
         "porch": lambda p: (3, 8),
         "balcony": lambda p: (max(1, min(3, p.get("hw", 2))), 3),
         "blade_sign": lambda p: (1, 7),
@@ -306,6 +311,7 @@ WALL = {"clock": clock, "gear": gear, "porch": porch, "balcony": balcony, "blade
 # How design.py places each wall motif (everything else is "find a blank stretch of wall"):
 DOOR = {"porch"}                       # centred on a ground-floor doorway (design._door_spot), never on blank wall
 GROUND = {"smokestack"}                # stands on the ground outside the footprint, no wall spot needed
+BLANK_ONLY = {"gear"}                  # blank wall or nothing: never a blind panel (a gear over windows reads as a splat)
 ON_WINDOW = {"balcony", "blade_sign"}  # may sit over windows (never doorways); windows behind are left alone
 SOFT_EDGE = {"balcony", "blade_sign"}  # u=0 cells never overwrite a pier / ledge block of the volume
 OVERLAY = {"timber_frame"}             # LINE motif that only REPLACES existing wall blocks (given `existing`)
@@ -430,8 +436,8 @@ def pagoda(K: dict, w: int, d: int, tiers: int = 3, **_) -> dict:
         for x in range(x0 + 1, x1):
             for z in range(z0 + 1, z1):
                 B[(x, y + 1, z)] = roof
-        for cx, cz in ((x0 - 2, z0 - 2), (x1 + 2, z0 - 2), (x0 - 2, z1 + 2), (x1 + 2, z1 + 2)):  # curled corners
-            B[(cx, y + 1, cz)] = slab + "[type=bottom]"
+        for cx, cz in ((x0 - 1, z0 - 1), (x1 + 1, z0 - 1), (x0 - 1, z1 + 1), (x1 + 1, z1 + 1)):  # upturned corners
+            B[(cx, y + 1, cz)] = slab + "[type=bottom]"  # sits on the corner block: no floating tips
         for cx, cz in ((x0 - 1, z0 - 1), (x1 + 1, z0 - 1), (x0 - 1, z1 + 1), (x1 + 1, z1 + 1)):
             B[(cx, y - 1, cz)] = "minecraft:lantern[hanging=true]"
         # body of the next tier: set back 2, 3 high, corner posts, a lit window band mid-side

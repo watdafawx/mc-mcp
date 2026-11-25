@@ -1,21 +1,286 @@
-{"concept":"motif bench 2: all 12 set pieces. A brick foundry hall with a tower crane, a porch on its door and half-timber on its west wall; a red timber pagoda tower with a balcony and clock; a south annex with a helipad, a blade sign and a brick smokestack; a storage shed with a water tank.",
- "kit":"steampunk",
- "roles":[{"role":"wall2","block":"minecraft:bricks"},{"role":"pillar","block":"minecraft:stone_bricks"}],
- "volumes":[
-  {"id":"hall","purpose":"foundry hall","shape":"rect","w":33,"d":21,"r":0,"cut_w":0,"cut_d":0,"floor_hs":[11,7],"program":["machine_hall","workshop"],"roof":"flat","windows":"grid","rhythm":1,"accent_floor":-1,"open_ground":false,"entrances":["s","n"],"roles":[],"place":{"mode":"at","to":"","side":"e","align":"start","offset":0,"gap":0,"x":0,"z":0}},
-  {"id":"tower","purpose":"pagoda tower","shape":"rect","w":15,"d":15,"r":0,"cut_w":0,"cut_d":0,"floor_hs":[7,6,6],"program":["workshop","lab","living"],"roof":"flat","windows":"slit","rhythm":0,"accent_floor":-1,"open_ground":false,"entrances":["s"],"roles":[{"role":"wall2","block":"minecraft:stripped_mangrove_log"},{"role":"pillar","block":"minecraft:mangrove_planks"},{"role":"roof","block":"minecraft:deepslate_tiles"}],"place":{"mode":"attach","to":"hall","side":"e","align":"center","offset":0,"gap":0,"x":0,"z":0}},
-  {"id":"annex","purpose":"helipad annex","shape":"rect","w":21,"d":17,"r":0,"cut_w":0,"cut_d":0,"floor_hs":[9],"program":["expansion"],"roof":"flat","windows":"band","rhythm":2,"accent_floor":-1,"open_ground":false,"entrances":["s"],"roles":[],"place":{"mode":"attach","to":"hall","side":"n","align":"start","offset":0,"gap":0,"x":0,"z":0}},
-  {"id":"store","purpose":"storage shed","shape":"rect","w":17,"d":15,"r":0,"cut_w":0,"cut_d":0,"floor_hs":[9],"program":["storage"],"roof":"flat","windows":"none","rhythm":0,"accent_floor":-1,"open_ground":false,"entrances":["e"],"roles":[],"place":{"mode":"attach","to":"annex","side":"w","align":"center","offset":0,"gap":0,"x":0,"z":0}}],
- "features":[
-  {"kind":"pagoda","on":"tower","to":"","side":"top","pos":0.5,"size":3,"level":0},
-  {"kind":"balcony","on":"tower","to":"","side":"s","pos":0.5,"size":2,"level":1},
-  {"kind":"clock","on":"tower","to":"","side":"e","pos":0.5,"size":4,"level":0},
-  {"kind":"crane","on":"hall","to":"","side":"top","pos":0.5,"size":16,"level":0},
-  {"kind":"porch","on":"hall","to":"","side":"s","pos":0.5,"size":0,"level":0},
-  {"kind":"gear","on":"hall","to":"","side":"s","pos":0.85,"size":3,"level":0},
-  {"kind":"timber_frame","on":"hall","to":"","side":"w","pos":0.5,"size":0,"level":0},
-  {"kind":"pipe_rack","on":"annex","to":"","side":"n","pos":0.5,"size":0,"level":0},
-  {"kind":"landing_pad","on":"annex","to":"","side":"top","pos":0.5,"size":0,"level":0},
-  {"kind":"blade_sign","on":"store","to":"","side":"s","pos":0.3,"size":0,"level":0},
-  {"kind":"smokestack","on":"annex","to":"","side":"e","pos":0.5,"size":8,"level":0},
-  {"kind":"water_tank","on":"store","to":"","side":"top","pos":0.5,"size":9,"level":0}]}
+{
+ "concept": "motif bench 2: all 12 set pieces. A brick foundry hall with a tower crane, a porch on its door and half-timber on its west wall; a red timber pagoda tower with a balcony and clock; a south annex with a helipad, a blade sign and a brick smokestack; a storage shed with a water tank.",
+ "kit": "steampunk",
+ "roles": [
+  {
+   "role": "wall2",
+   "block": "minecraft:bricks"
+  },
+  {
+   "role": "pillar",
+   "block": "minecraft:stone_bricks"
+  }
+ ],
+ "volumes": [
+  {
+   "id": "hall",
+   "purpose": "foundry hall",
+   "shape": "rect",
+   "w": 33,
+   "d": 21,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    11,
+    7
+   ],
+   "program": [
+    "machine_hall",
+    "workshop"
+   ],
+   "roof": "flat",
+   "windows": "grid",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "n"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "at",
+    "to": "",
+    "side": "e",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "tower",
+   "purpose": "pagoda tower",
+   "shape": "rect",
+   "w": 15,
+   "d": 15,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    7,
+    6,
+    6
+   ],
+   "program": [
+    "workshop",
+    "lab",
+    "living"
+   ],
+   "roof": "flat",
+   "windows": "slit",
+   "rhythm": 0,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [
+    {
+     "role": "wall2",
+     "block": "minecraft:stripped_mangrove_log"
+    },
+    {
+     "role": "pillar",
+     "block": "minecraft:mangrove_planks"
+    },
+    {
+     "role": "roof",
+     "block": "minecraft:deepslate_tiles"
+    }
+   ],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "e",
+    "align": "center",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "annex",
+   "purpose": "helipad annex",
+   "shape": "rect",
+   "w": 21,
+   "d": 17,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    9
+   ],
+   "program": [
+    "expansion"
+   ],
+   "roof": "flat",
+   "windows": "band",
+   "rhythm": 2,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "store",
+   "purpose": "storage shed",
+   "shape": "rect",
+   "w": 17,
+   "d": 15,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    9
+   ],
+   "program": [
+    "storage"
+   ],
+   "roof": "flat",
+   "windows": "none",
+   "rhythm": 0,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "e"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "annex",
+    "side": "w",
+    "align": "center",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  }
+ ],
+ "features": [
+  {
+   "kind": "pagoda",
+   "on": "tower",
+   "to": "",
+   "side": "top",
+   "pos": 0.5,
+   "size": 3,
+   "level": 0
+  },
+  {
+   "kind": "balcony",
+   "on": "tower",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 2,
+   "level": 1
+  },
+  {
+   "kind": "clock",
+   "on": "tower",
+   "to": "",
+   "side": "e",
+   "pos": 0.5,
+   "size": 4,
+   "level": 0
+  },
+  {
+   "kind": "crane",
+   "on": "hall",
+   "to": "",
+   "side": "top",
+   "pos": 0.5,
+   "size": 16,
+   "level": 0
+  },
+  {
+   "kind": "porch",
+   "on": "hall",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "gear",
+   "on": "tower",
+   "to": "",
+   "side": "e",
+   "pos": 0.85,
+   "size": 3,
+   "level": 0
+  },
+  {
+   "kind": "timber_frame",
+   "on": "hall",
+   "to": "",
+   "side": "w",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "pipe_rack",
+   "on": "annex",
+   "to": "",
+   "side": "n",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "landing_pad",
+   "on": "annex",
+   "to": "",
+   "side": "top",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "blade_sign",
+   "on": "store",
+   "to": "",
+   "side": "s",
+   "pos": 0.3,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "smokestack",
+   "on": "annex",
+   "to": "",
+   "side": "e",
+   "pos": 0.5,
+   "size": 8,
+   "level": 0
+  },
+  {
+   "kind": "water_tank",
+   "on": "store",
+   "to": "",
+   "side": "top",
+   "pos": 0.5,
+   "size": 9,
+   "level": 0
+  }
+ ]
+}

@@ -127,6 +127,9 @@ Colour fidelity (hard): the visible facade is mostly pillar (piers, ~40%) + wall
 colour the brief names (red brick, red timber, white panels) goes on BOTH pillar and wall2; trim/base are a contrasting
 secondary, the kit's dark stones only where the brief allows. Sci-fi briefs: replace gothic-looking piers with smooth
 or concrete blocks.
+Red materials: red brick = minecraft:bricks; red timber = minecraft:mangrove_planks / stripped_mangrove_log with
+dark_oak or spruce posts; NEVER crimson_* or warped_* (they render magenta/teal). Each volume may set its own roles
+(e.g. glass labs: wall2 = glass; the core tower: a different trim) so volumes read as distinct parts of one theme.
 Materials: pick the kit closest to the brief, then override roles where the brief needs it (role -> vanilla or listed
 block id that really exists; e.g. a brick factory: wall2 minecraft:bricks, pillar minecraft:stone_bricks). Roles:
 base = plinth and skirt, wall2 = main wall infill, pillar = piers between bays, trim = ledges, sills, cornice,
@@ -134,7 +137,8 @@ wall = bands and parapet, accent = stripe floor, glass, glow = light bands, roof
 antenna, tip. Keep ~3 main materials (60/30/10). Per-volume roles override for one volume (e.g. a copper roof on the tower).
 
 Features: spire (on top of `on`, size = height), chimney (2x2 stack against `on`'s `side` wall at pos 0-1, size =
-height above the roof), gear (gear disc on a blank stretch of wall, size = radius 2-5, level = floor index), clock (clock face on the
+height above the roof), gear (cog on a BLANK stretch of wall only: put it on a windowless end wall or a volume with windows none/slit
+and a floor >= 10 high, else it is skipped; size = radius 3-5, level = floor index), clock (clock face on the
 landmark's `side`, top floor unless level is set, size = radius 3-6), pipe_rack (thin pipe run with risers and valves
 along `on`'s `side` wall), pagoda (stacked flared-eave pagoda roof over `on`, size = tiers 1-4; replaces its roof),
 buttresses (gothic flying buttresses on `side`),
@@ -630,7 +634,7 @@ def _motif(site: Site, v: Vol, kind: str, side: str, pos: float, size: int, f: d
         ax, az = _flat_side(v, side)[c]
         _place_cells(site, motifs.WALL[kind](K, **p), side, ax, az, yb, kind in motifs.SOFT_EDGE)
         return
-    for blind in (False, True):  # blank wall first; else a blind panel (windows behind become wall), like a clock tower
+    for blind in ((False,) if kind in motifs.BLANK_ONLY else (False, True)):  # blank wall first; else a blind panel (windows behind become wall), like a clock tower
         for p in motifs.candidates(kind, size):  # shrink the motif until it fits
             hw, h = motifs.SIZE[kind](p)
             spot = _wall_spot(site, v, side, hw, h, ylo, yhi, pos, relaxed=blind)
@@ -801,7 +805,9 @@ def compose(spec: dict, seed: int = 1) -> tuple[list, dict]:
             if (x, y, z) not in site.cells:
                 site.cells[(x, y, z)] = b
                 site.src[(x, y, z)] = "platform"
-    for i, f in enumerate(spec.get("features") or []):
+    PRIO = {"porch": 0, "clock": 1}  # doorways and the landmark's clock claim their wall before decoration does
+    feats = sorted(enumerate(spec.get("features") or []), key=lambda t: (PRIO.get(t[1].get("kind"), 2), t[0]))
+    for i, f in feats:
         _feature(site, f, by_id, K, kit, roles, report, i)
     ghosts = {}
     for (x, y, z), b in site.cells.items():
