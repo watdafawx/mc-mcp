@@ -365,6 +365,7 @@ class Site:
         self.cells: dict = {}
         self.src: dict = {}
         self.inner = {v.id: _interior(v) for v in vols}
+        self.doors: set = set()  # doorway cells: features never cover them
 
     def owners(self, x, y, z):
         return [v for v in self.vols if (x, z) in v.fp and v.y0 <= y <= v.y0 + v.ry]
@@ -380,6 +381,8 @@ class Site:
             self.src[(x, y, z)] = v.id
 
     def put_feature(self, x, y, z, b, override=False):
+        if (x, y, z) in self.doors:
+            return
         for v in self.owners(x, y, z):
             if (x, z) in self.inner[v.id]:
                 return
@@ -415,6 +418,7 @@ def _doorway(site: Site, a: Vol, b: Vol, side: str):
     for (x, z) in cut:
         for y in range(y0 + 1, y0 + 1 + hgt):
             site.cells.pop((x, y, z), None)
+            site.doors.add((x, y, z))
     return True
 
 
@@ -566,8 +570,8 @@ def compose(spec: dict, seed: int = 1) -> tuple[list, dict]:
     for v in vols:
         v.y0 += lift
     # normalise so the site starts at 0,0
-    mx = min(p[0] for v in vols for p in v.fp) - (lift * 2 + 2 if plat else 1)
-    mz = min(p[1] for v in vols for p in v.fp) - (lift * 2 + 2 if plat else 1)
+    mx = min(p[0] for v in vols for p in v.fp) - (lift * 2 + 2 if plat else 3)
+    mz = min(p[1] for v in vols for p in v.fp) - (lift * 2 + 2 if plat else 3)
     for v in vols:
         v.fp = {(x - mx, z - mz) for x, z in v.fp}
         v.x0 -= mx

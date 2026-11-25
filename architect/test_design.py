@@ -389,7 +389,7 @@ def check_blocks(ghosts: list, rep: dict, label: str, plat: bool = False):
     check(f"{label}: no volume or platform block has negative x", not neg_x, f"{len(neg_x)}, e.g. {neg_x[:1]}")
     check(f"{label}: no volume or platform block has negative z", not neg_z, f"{len(neg_z)}, e.g. {neg_z[:1]}")
     feat = merged(ghosts, skip=tuple(g["id"] for g in ghosts if g["id"] != "features"))
-    slack = 0 if plat else 2
+    slack = 0
     out = {c: b for c, b in feat.items() if c[0] < -slack or c[2] < -slack}
     check(f"{label}: feature blocks stay on the site (>= {-slack})", not out, f"{len(out)} off, e.g. {first(out)}")
     ids = [g["id"] for g in ghosts]
