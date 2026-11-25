@@ -27,6 +27,7 @@ import anthropic
 
 import blocklib
 import campus
+import design
 import floaters
 import llm_client
 import mods
@@ -1114,6 +1115,46 @@ def prompt_request(text: str, x: int, y: int, z: int, kit: str | None, ident: st
     return out
 
 
+def run_design(arch, args) -> None:
+    """--design / --spec: one Sonnet design call (or a saved spec), the deterministic composer, ghosts. No Haiku loop."""
+    cost = 0.0
+    if args.spec:
+        spec = json.loads(Path(args.spec).read_text("utf-8"))
+    else:
+        req = " ".join(args.request).strip()
+        if not req:
+            raise SystemExit("--design needs a request")
+        print(f"DESIGN {design.MODEL} (server-side refusal fallbacks on): {req}", flush=True)
+        t0 = time.time()
+        spec, cost = design.design(arch.client, req, kit=args.kit)
+        print(f"  spec in {time.time() - t0:.0f}s, ~${cost:.4f}", flush=True)
+        out = HERE / "designs" / f"{args.session}-{time.strftime('%Y%m%d-%H%M%S')}.json"
+        out.parent.mkdir(exist_ok=True)
+        out.write_text(json.dumps(spec, indent=1), "utf-8")
+        print(f"  saved {out}", flush=True)
+    ghosts, rep = design.compose(spec, seed=args.seed)
+    if rep["kit"] == "hextech":
+        arch.mcp.nogold = True
+    prefix = args.session + "/"
+    for g in arch.mcp.json("ghost_list", {}).get("ghosts", []):  # a fresh design replaces the session's old ghosts
+        if g["id"].startswith(prefix):
+            arch.mcp.call("ghost_clear", {"id": g["id"]})
+    origin = [args.x, args.y, args.z]
+    for g in ghosts:
+        gid = prefix + g["id"]
+        res = arch.mcp.json("ghost_set", {"id": gid, "origin": origin, "mode": "replace", "blocks": g["blocks"]})
+        arch.guard.record(gid, {"origin": origin, "blocks": g["blocks"]}, True)
+        bad = res.get("bad_palette") or res.get("unknown_keys")
+        print(f"  ghost {gid}: {len(g['blocks'])} blocks" + (f"  BAD {bad}" if bad else ""), flush=True)
+    print("CONCEPT " + " ".join(str(rep["concept"]).split())[:400], flush=True)
+    for v in rep["volumes"]:
+        print(f"  {v['id']}: {v['shape']} {v['size'][0]}x{v['size'][2]} h{v['size'][1]} floors {v['floors']} "
+              f"{v['program']} roof {v['roof']}, clear inside {v['clear_inside'][0]}x{v['clear_inside'][1]}", flush=True)
+    for f in rep["fixes"] + rep["notes"]:
+        print("  fix: " + f, flush=True)
+    print(f"DONE {rep['blocks']} blocks, {rep['doorways']} doorways, cost ~${cost:.4f}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-s", "--session", default="default")
@@ -1142,6 +1183,10 @@ def main():
     ap.add_argument("--survey", help="world_survey JSON (written by the mod): fit the campus to the terrain")
     ap.add_argument("--near", help="x,z the player aimed at (site picker prefers spots close to it)")
     ap.add_argument("--site-rect", help="x,z,w,d,rot of a previewed /ghost area: build exactly there")
+    ap.add_argument("--design", action="store_true",
+                    help="step 3: Sonnet designs the build as a spec, the composer builds it (no Haiku loop)")
+    ap.add_argument("--spec", help="build a saved design spec JSON (no API call)")
+    ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("request", nargs="*")
     args = ap.parse_args()
     global MAX_COST, SITE, FREECAM
@@ -1174,6 +1219,9 @@ def main():
                                        force_3d=args.force_3d)]
     arch = Architect(args.session)
     first_refs = list(args.ref)
+    if args.design or args.spec:
+        run_design(arch, args)
+        return
 
     def auto_foundation(prefix: str) -> int:
         """For --prompt builds: survey a small patch under the generated ghosts and add stone-brick retaining walls /

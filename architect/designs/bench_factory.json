@@ -1,0 +1,14 @@
+{"concept":"Victorian brick factory: long sawtooth machine hall, taller boiler house with chimneys, clock tower landmark, office annex.",
+ "kit":"steampunk",
+ "roles":[{"role":"wall2","block":"minecraft:bricks"},{"role":"pillar","block":"minecraft:stone_bricks"},{"role":"base","block":"minecraft:stone_bricks"}],
+ "volumes":[
+  {"id":"hall","purpose":"main machine hall","shape":"rect","w":41,"d":21,"r":0,"cut_w":0,"cut_d":0,"floor_hs":[11],"program":["machine_hall"],"roof":"sawtooth","windows":"grid","rhythm":1,"accent_floor":-1,"open_ground":false,"entrances":["s"],"roles":[],"place":{"mode":"at","to":"","side":"e","align":"start","offset":0,"gap":0,"x":0,"z":0}},
+  {"id":"boiler","purpose":"boiler house","shape":"rect","w":17,"d":17,"r":0,"cut_w":0,"cut_d":0,"floor_hs":[13],"program":["machine_hall"],"roof":"gable","windows":"slit","rhythm":0,"accent_floor":-1,"open_ground":false,"entrances":["s"],"roles":[],"place":{"mode":"attach","to":"hall","side":"e","align":"start","offset":0,"gap":0,"x":0,"z":0}},
+  {"id":"tower","purpose":"clock tower landmark","shape":"rect","w":11,"d":11,"r":0,"cut_w":0,"cut_d":0,"floor_hs":[6,6,6,6],"program":["workshop","storage","storage","lab"],"roof":"mansard","windows":"slit","rhythm":0,"accent_floor":3,"open_ground":false,"entrances":["s"],"roles":[{"role":"roof","block":"minecraft:oxidized_cut_copper"}],"place":{"mode":"attach","to":"hall","side":"s","align":"start","offset":2,"gap":0,"x":0,"z":0}},
+  {"id":"office","purpose":"offices","shape":"rect","w":15,"d":11,"r":0,"cut_w":0,"cut_d":0,"floor_hs":[5,5],"program":["living","living"],"roof":"hip","windows":"band","rhythm":2,"accent_floor":0,"open_ground":false,"entrances":["s","w"],"roles":[],"place":{"mode":"attach","to":"hall","side":"w","align":"end","offset":0,"gap":0,"x":0,"z":0}}],
+ "features":[
+  {"kind":"chimney","on":"boiler","to":"","side":"n","pos":0.3,"size":10,"level":0},
+  {"kind":"chimney","on":"boiler","to":"","side":"n","pos":0.8,"size":14,"level":0},
+  {"kind":"gear","on":"hall","to":"","side":"s","pos":0.75,"size":4,"level":0},
+  {"kind":"pipes","on":"boiler","to":"","side":"e","pos":0.5,"size":0,"level":0},
+  {"kind":"spire","on":"tower","to":"","side":"top","pos":0.5,"size":8,"level":0}]}
