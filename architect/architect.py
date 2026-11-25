@@ -81,7 +81,7 @@ MAX_COST = float(os.environ.get("ARCHITECT_MAX_COST", "0") or 0)  # USD per run,
 BASE_URL = os.environ.get("ARCHITECT_BASE_URL", "")
 LOCAL = bool(BASE_URL)
 # Haiku 5.5 list prices per million tokens (cache reads ~10%, writes ~125%).
-PRICE_IN, PRICE_OUT = 0.10, 0.50
+PRICE_IN, PRICE_OUT = {"claude-sonnet-5-5": (2.0, 10.0)}.get(MODEL, (0.10, 0.50))  # Haiku 5.5 default
 
 
 def usage_cost(u) -> float:
