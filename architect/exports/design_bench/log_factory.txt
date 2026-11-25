@@ -1,0 +1,24 @@
+DESIGN claude-sonnet-5-5 (server-side refusal fallbacks on): a red-brick Victorian factory complex for a Create + Mekanism base, with a clock tower and smoke stacks
+  spec in 12s, ~$0.0323
+  saved X:\Dev\Minecraft\mc-mcp\architect\designs\bench3\factory-20261125-074321.json
+  [texture] shaded 550 cells in ghost_set bench3/factory/hall
+  ghost bench3/factory/hall: 3519 blocks
+  [texture] shaded 365 cells in ghost_set bench3/factory/boiler
+  ghost bench3/factory/boiler: 1781 blocks
+  [texture] shaded 282 cells in ghost_set bench3/factory/tower
+  ghost bench3/factory/tower: 2173 blocks
+  [texture] shaded 286 cells in ghost_set bench3/factory/office
+  ghost bench3/factory/office: 1311 blocks
+  [texture] shaded 295 cells in ghost_set bench3/factory/workshop
+  ghost bench3/factory/workshop: 1373 blocks
+  [texture] shaded 995 cells in ghost_set bench3/factory/platform
+  ghost bench3/factory/platform: 5682 blocks
+  [texture] shaded 81 cells in ghost_set bench3/factory/features
+  ghost bench3/factory/features: 825 blocks
+CONCEPT Red-brick Victorian factory complex in the steampunk kit. Silhouette: one landmark clock tower (octagon, tall, spire roof) rising well over 1.8x the next volume, flanked by a wide sawtooth-roofed machine hall and a lower boiler house with twin smoke stacks. A low living/office wing and a workshop ground the composition. Materials: red brick walls (60), stone brick piers and polished deepslate base
+  hall: rect 27x21 h13 floors [11] ['machine_hall'] roof sawtooth, clear inside 23x17
+  boiler: rect 17x15 h12 floors [10] ['machine_hall'] roof gable_low, clear inside 13x11
+  tower: octagon 11x11 h32 floors [6, 6, 6, 6, 6] ['storage', 'lab', 'lab', 'hall', 'hall'] roof spire, clear inside 7x7
+  office: rect 15x11 h11 floors [5, 4] ['living', 'living'] roof hip, clear inside 11x7
+  workshop: rect 15x13 h9 floors [7] ['workshop'] roof gable, clear inside 11x9
+DONE 16664 blocks, 3 doorways, cost ~$0.0323

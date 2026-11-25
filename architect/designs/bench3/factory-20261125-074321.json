@@ -1,0 +1,290 @@
+{
+ "concept": "Red-brick Victorian factory complex in the steampunk kit. Silhouette: one landmark clock tower (octagon, tall, spire roof) rising well over 1.8x the next volume, flanked by a wide sawtooth-roofed machine hall and a lower boiler house with twin smoke stacks. A low living/office wing and a workshop ground the composition. Materials: red brick walls (60), stone brick piers and polished deepslate base (30), copper trim and glowing lamp bands (10), with a dark slate roof and a copper-green spire. Interiors are big: machine hall 11 high and 21x27, boiler house 10 high, workshop 7 high. Detail goes outward: chimneys on the boiler house, gears on the clock tower face and hall, pipe runs on the process hall, a bridge across the yard to the workshop, and a terraced platform base.",
+ "kit": "steampunk",
+ "roles": [
+  {
+   "role": "wall2",
+   "block": "minecraft:bricks"
+  },
+  {
+   "role": "pillar",
+   "block": "minecraft:stone_bricks"
+  },
+  {
+   "role": "base",
+   "block": "minecraft:polished_blackstone_bricks"
+  },
+  {
+   "role": "trim",
+   "block": "minecraft:cut_copper"
+  },
+  {
+   "role": "glow",
+   "block": "minecraft:lantern"
+  },
+  {
+   "role": "roof",
+   "block": "minecraft:deepslate_tiles"
+  }
+ ],
+ "volumes": [
+  {
+   "id": "hall",
+   "purpose": "main machine hall with Create and Mekanism lines",
+   "shape": "rect",
+   "w": 27,
+   "d": 21,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    11
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "sawtooth",
+   "windows": "grid",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "at",
+    "to": "",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "boiler",
+   "purpose": "boiler house with furnaces and smoke stacks",
+   "shape": "rect",
+   "w": 17,
+   "d": 15,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    10
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "gable_low",
+   "windows": "slit",
+   "rhythm": 2,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "e"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "e",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "tower",
+   "purpose": "clock tower landmark and stair core",
+   "shape": "octagon",
+   "w": 11,
+   "d": 11,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    6,
+    6,
+    6,
+    6,
+    6
+   ],
+   "program": [
+    "storage",
+    "lab",
+    "lab",
+    "hall",
+    "hall"
+   ],
+   "roof": "spire",
+   "windows": "slit",
+   "rhythm": 0,
+   "accent_floor": 4,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [
+    {
+     "role": "roof",
+     "block": "minecraft:oxidized_cut_copper"
+    }
+   ],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "s",
+    "align": "start",
+    "offset": 2,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "office",
+   "purpose": "offices and living quarters",
+   "shape": "rect",
+   "w": 15,
+   "d": 11,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    5,
+    4
+   ],
+   "program": [
+    "living",
+    "living"
+   ],
+   "roof": "hip",
+   "windows": "grid",
+   "rhythm": 3,
+   "accent_floor": 0,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "tower",
+    "side": "e",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "workshop",
+   "purpose": "detached workshop across the yard",
+   "shape": "rect",
+   "w": 15,
+   "d": 13,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    7
+   ],
+   "program": [
+    "workshop"
+   ],
+   "roof": "gable",
+   "windows": "band",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "n",
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "w",
+    "align": "start",
+    "offset": 4,
+    "gap": 4,
+    "x": 0,
+    "z": 0
+   }
+  }
+ ],
+ "features": [
+  {
+   "kind": "chimney",
+   "on": "boiler",
+   "to": "",
+   "side": "e",
+   "pos": 0.25,
+   "size": 14,
+   "level": 0
+  },
+  {
+   "kind": "chimney",
+   "on": "boiler",
+   "to": "",
+   "side": "e",
+   "pos": 0.75,
+   "size": 10,
+   "level": 0
+  },
+  {
+   "kind": "gear",
+   "on": "tower",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 4,
+   "level": 4
+  },
+  {
+   "kind": "gear",
+   "on": "hall",
+   "to": "",
+   "side": "n",
+   "pos": 0.5,
+   "size": 3,
+   "level": 0
+  },
+  {
+   "kind": "pipes",
+   "on": "hall",
+   "to": "",
+   "side": "n",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "bridge",
+   "on": "hall",
+   "to": "workshop",
+   "side": "w",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "platform",
+   "on": "hall",
+   "to": "",
+   "side": "top",
+   "pos": 0,
+   "size": 2,
+   "level": 0
+  }
+ ]
+}

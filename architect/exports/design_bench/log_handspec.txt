@@ -1,0 +1,16 @@
+  [texture] shaded 1012 cells in ghost_set bench3/handspec/hall
+  ghost bench3/handspec/hall: 5132 blocks
+  [texture] shaded 390 cells in ghost_set bench3/handspec/boiler
+  ghost bench3/handspec/boiler: 2241 blocks
+  [texture] shaded 320 cells in ghost_set bench3/handspec/tower
+  ghost bench3/handspec/tower: 2103 blocks
+  [texture] shaded 291 cells in ghost_set bench3/handspec/office
+  ghost bench3/handspec/office: 1454 blocks
+  [texture] shaded 63 cells in ghost_set bench3/handspec/features
+  ghost bench3/handspec/features: 583 blocks
+CONCEPT Victorian brick factory: long sawtooth machine hall, taller boiler house with chimneys, clock tower landmark, office annex.
+  hall: rect 41x21 h13 floors [11] ['machine_hall'] roof sawtooth, clear inside 37x17
+  boiler: rect 17x17 h15 floors [13] ['machine_hall'] roof gable, clear inside 13x13
+  tower: rect 11x11 h26 floors [6, 6, 6, 6] ['workshop', 'storage', 'storage', 'lab'] roof mansard, clear inside 7x7
+  office: rect 15x11 h12 floors [5, 5] ['living', 'living'] roof hip, clear inside 11x7
+DONE 11513 blocks, 3 doorways, cost ~$0.0000
