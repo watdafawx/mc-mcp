@@ -37,8 +37,17 @@ def _variant(block: str | None, kind: str) -> str | None:
     return None
 
 
+def _contrast(K: dict, roles: tuple) -> tuple:
+    """Roles reordered so the first one stands out from the wall (bench: white sills between white piers vanish)."""
+    wl = palette._lum((K.get("pillar") or K.get("trim") or "").split("[", 1)[0])  # piers frame every sill
+    good = [r for r in roles if abs(palette._lum((K.get(r) or "").split("[", 1)[0]) - wl) >= 35]
+    extra = [r for r in ("base", "pillar", "trim") if r not in roles and r in K
+             and abs(palette._lum(K[r].split("[", 1)[0]) - wl) >= 35]
+    return tuple(good + extra + [r for r in roles if r not in good])
+
+
 def _stair(K: dict, roles: tuple, facing: str, half: str) -> str | None:
-    for r in roles:
+    for r in _contrast(K, roles):
         s = _variant(K.get(r), "stairs")
         if s:
             return f"{s}[facing={facing},half={half}]"
@@ -46,7 +55,7 @@ def _stair(K: dict, roles: tuple, facing: str, half: str) -> str | None:
 
 
 def _slab(K: dict, roles: tuple, typ: str) -> str | None:
-    for r in roles:
+    for r in _contrast(K, roles):
         s = _variant(K.get(r), "slab")
         if s:
             return f"{s}[type={typ}]"
