@@ -23,7 +23,7 @@ import dev.watdafawx.mcmcp.mcp.McpServer.Tool;
 
 /**
  * The area preview: where a generated base would go. A survey of the looked-at (or given) spot is scored by
- * architect/site.py (deterministic, no LLM, no API cost) and shown as a thin outline ghost with corner posts, lime =
+ * architect/terrain.py (deterministic, no LLM, no API cost) and shown as a thin outline ghost with corner posts, lime =
  * fits, yellow = needs foundations/terracing, red = blocked/water. The accepted area is what ghost_generate builds in.
  */
 public final class GhostArea {
@@ -86,23 +86,23 @@ public final class GhostArea {
         return a != null && System.currentTimeMillis() - a.madeMs < MAX_AGE_MS ? a : null;
     }
 
-    // ------------------------------------------------------------------ site.py
+    // ------------------------------------------------------------------ terrain.py
 
     static String problem() {
         Path dir = GhostGenerate.architectDir();
-        if (!java.nio.file.Files.isRegularFile(dir.resolve("site.py")))
-            return "site.py not found in " + dir + " (architect folder missing on this machine)";
+        if (!java.nio.file.Files.isRegularFile(dir.resolve("terrain.py")))
+            return "terrain.py not found in " + dir + " (architect folder missing on this machine)";
         String py = GhostGenerate.python(dir);
         if (!py.equals("python") && !java.nio.file.Files.isRegularFile(Path.of(py))) return "python not found: " + py;
         return null;
     }
 
-    /** Runs architect/site.py <args> and returns its JSON line. Blocking: call off the game thread. */
+    /** Runs architect/terrain.py <args> and returns its JSON line. Blocking: call off the game thread. */
     static JsonObject site(List<String> args) {
         String pr = problem();
         if (pr != null) throw new McpServer.ToolError(pr);
         Path dir = GhostGenerate.architectDir();
-        List<String> cmd = new ArrayList<>(List.of(GhostGenerate.python(dir), "-u", "site.py"));
+        List<String> cmd = new ArrayList<>(List.of(GhostGenerate.python(dir), "-u", "terrain.py"));
         cmd.addAll(args);
         try {
             ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true);
@@ -111,14 +111,14 @@ public final class GhostArea {
             String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             if (!p.waitFor(60, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
-                throw new McpServer.ToolError("site.py timed out");
+                throw new McpServer.ToolError("terrain.py timed out");
             }
             for (String line : out.split("\\R")) {
                 if (line.startsWith("{")) return JsonParser.parseString(line).getAsJsonObject();
             }
-            throw new McpServer.ToolError("site.py failed: " + out.strip().replaceAll("\\s+", " "));
+            throw new McpServer.ToolError("terrain.py failed: " + out.strip().replaceAll("\\s+", " "));
         } catch (IOException | InterruptedException e) {
-            throw new McpServer.ToolError("site.py failed: " + e.getMessage());
+            throw new McpServer.ToolError("terrain.py failed: " + e.getMessage());
         }
     }
 
@@ -236,7 +236,7 @@ public final class GhostArea {
 
     public static void registerTools(McpServer mcp) {
         mcp.add(new Tool("ghost_area",
-                "Preview where a generated base would go, WITHOUT the LLM (no API cost): surveys the terrain, scores it (architect/site.py), "
+                "Preview where a generated base would go, WITHOUT the LLM (no API cost): surveys the terrain, scores it (architect/terrain.py), "
                         + "and shows a thin outline ghost 'area/preview' with corner posts coloured by fit: lime = fits, yellow = needs "
                         + "foundations/terracing, red = blocked/water. action: preview (default) | move (dx,dz) | rotate | clear | status. "
                         + "target: look (crosshair, default) | here | x,z. Then ghost_generate with use_area=true builds in it.",

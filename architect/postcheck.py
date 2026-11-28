@@ -9,7 +9,7 @@ They run on the ghosts a `--prompt` / reference build has already placed, before
         the ghost list but nothing like the reference.
 
     local_foundation(blocks, origin, ground_fn)
-        Same idea as site.apply() but for ONE structure/component: keeps the base on the surveyed ground by
+        Same idea as terrain.apply() but for ONE structure/component: keeps the base on the surveyed ground by
         filling a stone-brick retaining wall along the footprint edge and cobblestone pillars on a 4-block grid
         inside it. Only columns near the structure's base count as footprint, so balconies and overhangs high
         up never grow stilts.
@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import re
 
-WALL_BLOCK = "minecraft:stone_bricks"      # retaining wall / plinth (same as site.FOUND_EDGE)
-PILLAR_BLOCK = "minecraft:cobblestone"     # cheap support columns (same as site.FOUND_PILLAR)
+WALL_BLOCK = "minecraft:stone_bricks"      # retaining wall / plinth (same as terrain.FOUND_EDGE)
+PILLAR_BLOCK = "minecraft:cobblestone"     # cheap support columns (same as terrain.FOUND_PILLAR)
 MAX_DEPTH = 16
 AIR = {"air", "cave_air", "void_air", "minecraft:air", "minecraft:cave_air", "minecraft:void_air"}
 FOOTPRINT_SLACK = 2      # a column belongs to the footprint when it starts within this many blocks of the base

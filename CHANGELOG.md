@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Architect refactor**: `site.py` renamed `terrain.py` (it shadowed the stdlib `site`; the importlib hacks are gone, tests are `test_terrain.py`). `architect.py` split: `mcp_client.py` (`Mcp`, `Guides`, focus guard, `emit_event`) and `views.py` (`view`, `ref_thumb`, `camera_pose`, `prune_old_images`).
+- **Vision context pruning**: only the newest 2 tool results keep their images in each model call (`ARCHITECT_KEEP_IMAGES`); older ones become a short text placeholder. Reference images and `messages.json` are untouched.
+- **NDJSON IPC**: `architect.py --ndjson` (or `ARCHITECT_NDJSON=1`) prints JSON event lines (`site`, `tool`, `cost`, `reply`, `error`, `done`); `GhostGenerate` passes it and parses them, with the old `SITE ` / `REPLY ` / `cost ~$` lines as fallback.
+
 ## 0.7.1 (2026-11-23)
 
 - **One-click Ghost Undo**: 10-step in-memory undo stack in `GhostStore` (`snapshot`, `canUndo`, `undo`), auto-snapshot before every `Iterate` run in `GhostGenerate`, `/ghost undo` command, and `Undo` button on the Ghost Builder GUI (`Undo | Export | Clear | Ghosts`).

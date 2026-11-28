@@ -40,7 +40,7 @@ import dev.watdafawx.mcmcp.mcp.McpServer.Tool;
  * columns around a centre: surface y per cell (a MOTION_BLOCKING scan that skips leaves, logs, plants and snow layers
  * down to real ground; water cells report the bed), a one-char flag per cell and summary numbers.
  *
- * <p>Wire format (also what architect/site.py reads): {@code y} = one string per z-row (north to south), two base-36
+ * <p>Wire format (also what architect/terrain.py reads): {@code y} = one string per z-row (north to south), two base-36
  * chars per cell, x west to east: value = y + 128, {@code ??} = unknown. {@code f} = one string per row, one char per
  * cell: {@code .} land, {@code w} water, {@code l} lava, {@code t} tree (log/leaves above the ground), {@code s}
  * snow, {@code ?} unknown (unloaded). Cell (i, j) is the column at (x0 + i*step, z0 + j*step) and stands for the

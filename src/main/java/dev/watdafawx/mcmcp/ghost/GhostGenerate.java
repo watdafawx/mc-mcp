@@ -18,6 +18,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
+
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -74,17 +79,62 @@ public final class GhostGenerate {
         }
 
         synchronized void line(String s) {
-            if (s.startsWith("SITE ")) {
-                site = s.substring(5).trim();
-                chat(ChatFormatting.AQUA, "site " + (site.length() > 150 ? site.substring(0, 150) : site));
-            } else if (s.startsWith("REPLY ")) {
-                reply = s.substring(6).trim();
-                chat(ChatFormatting.WHITE, reply.length() > 220 ? reply.substring(0, 220) + "..." : reply);
-            }
             log.addLast(s);
             while (log.size() > 40) log.removeFirst();
+            // Structured events (architect.py --ndjson): one JSON object per line, optionally behind "NDJSON: ".
+            String t = s.startsWith("NDJSON:") ? s.substring(7).trim() : s.trim();
+            if (t.startsWith("{") && event(t)) return;
+            // Legacy lines: older architect scripts that know nothing about --ndjson.
+            if (s.startsWith("SITE ")) {
+                setSite(s.substring(5).trim());
+            } else if (s.startsWith("REPLY ")) {
+                setReply(s.substring(6).trim());
+            }
             Matcher m = COST.matcher(s);
             while (m.find()) cost = Math.max(cost, Double.parseDouble(m.group(1)));
+        }
+
+        private void setSite(String text) {
+            site = text;
+            chat(ChatFormatting.AQUA, "site " + (site.length() > 150 ? site.substring(0, 150) : site));
+        }
+
+        private void setReply(String text) {
+            reply = text;
+            chat(ChatFormatting.WHITE, reply.length() > 220 ? reply.substring(0, 220) + "..." : reply);
+        }
+
+        /** Handles one JSON event line. Returns false when it is not an architect event (the caller falls back to the legacy parse). */
+        private boolean event(String json) {
+            JsonObject o;
+            try {
+                JsonElement e = JsonParser.parseString(json);
+                if (!e.isJsonObject()) return false;
+                o = e.getAsJsonObject();
+            } catch (JsonParseException | IllegalStateException ex) {
+                return false;
+            }
+            String type = J.str(o, "event", null);
+            if (type == null) return false;
+            try {
+                switch (type) {
+                    case "site" -> setSite(J.str(o, "summary", ""));
+                    case "reply" -> setReply(J.str(o, "text", ""));
+                    case "cost", "done" -> {
+                        cost = Math.max(cost, J.d(o, "usd", 0));
+                        if (type.equals("done") && !J.b(o, "ok", true) && error == null) error = "architect reported a failed turn";
+                    }
+                    case "error" -> {
+                        String msg = J.str(o, "message", "unknown error");
+                        if (error == null) error = msg;
+                        chat(ChatFormatting.RED, "architect error: " + (msg.length() > 200 ? msg.substring(0, 200) + "..." : msg));
+                    }
+                    default -> { } // "tool" and future events: only kept in the log tail
+                }
+            } catch (RuntimeException ex) { // a malformed field must not kill the reader thread
+                McMcp.LOG.debug("bad architect event {}: {}", json, ex.toString());
+            }
+            return true;
         }
 
         public synchronized boolean running() {
@@ -279,7 +329,7 @@ public final class GhostGenerate {
         }
 
         Path dir = architectDir();
-        List<String> cmd = new ArrayList<>(List.of(python(dir), "-u", "architect.py", "-s", id, "--generate", style,
+        List<String> cmd = new ArrayList<>(List.of(python(dir), "-u", "architect.py", "--ndjson", "-s", id, "--generate", style,
                 "--x", String.valueOf(ox), "--y", String.valueOf(at[1]), "--z", String.valueOf(oz),
                 "--max-cost", String.valueOf(Config.GEN_COST_CAP.get())));
         if (kit != null && !kit.isBlank()) cmd.addAll(List.of("--kit", kit.toLowerCase(Locale.ROOT)));
@@ -400,7 +450,7 @@ public final class GhostGenerate {
         if (iterate) GhostStore.snapshot(id + "/");
 
         Path dir = architectDir();
-        List<String> cmd = new ArrayList<>(List.of(python(dir), "-u", "architect.py", "-s", id,
+        List<String> cmd = new ArrayList<>(List.of(python(dir), "-u", "architect.py", "--ndjson", "-s", id,
                 iterate ? "--iterate" : "--prompt",
                 "--x", String.valueOf(ox), "--y", String.valueOf(oy), "--z", String.valueOf(oz),
                 "--max-cost", String.valueOf(Config.GEN_COST_CAP.get())));

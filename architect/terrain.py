@@ -5,9 +5,9 @@ per-cell flags (water / lava / tree / snow / unknown). Output: where to put the 
 much ground must be filled / cut, which trees are in the way, and the extra ghost blocks (foundation walls, support
 pillars, access stairs) that keep a build on uneven ground from floating.
 
-    python site.py plan --survey s.json --style hextech [--near x,z]     # best site + layout/size tier, JSON on stdout
-    python site.py eval --survey s.json --x 10 --z 20 --w 96 --d 80 [--rot 90]   # score one rectangle (used by /ghost area)
-    python site.py demo hill                                             # plan on a fake hill/shore/forest survey
+    python terrain.py plan --survey s.json --style hextech [--near x,z]     # best site + layout/size tier, JSON on stdout
+    python terrain.py eval --survey s.json --x 10 --z 20 --w 96 --d 80 [--rot 90]   # score one rectangle (used by /ghost area)
+    python terrain.py demo hill                                             # plan on a fake hill/shore/forest survey
 
 campus.py is NOT imported here; `apply()` only post-processes the ghost list that campus.build() returns.
 """

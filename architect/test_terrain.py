@@ -1,4 +1,4 @@
-"""Offline tests for site.py with fake surveys: python test_site.py   (no Minecraft, no API; ~30 s because it builds campuses)."""
+"""Offline tests for terrain.py with fake surveys: python test_terrain.py   (no Minecraft, no API; ~30 s because it builds campuses)."""
 import json
 import sys
 import time
@@ -6,13 +6,7 @@ from collections import deque
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import importlib.util  # noqa: E402
-
-# site.py shares its name with the stdlib `site` (already imported at interpreter start), so load it by path.
-_spec = importlib.util.spec_from_file_location("arch_site", Path(__file__).parent / "site.py")
-S = importlib.util.module_from_spec(_spec)
-sys.modules["arch_site"] = S
-_spec.loader.exec_module(S)
+import terrain as S  # noqa: E402
 
 N6 = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
 
