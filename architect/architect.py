@@ -13,14 +13,11 @@ from __future__ import annotations
 import argparse
 import base64
 import json
-import math
 import os
 import re
 import subprocess
 import sys
 import time
-import urllib.request
-import zipfile
 from pathlib import Path
 
 import anthropic
@@ -34,15 +31,12 @@ import multiblocks
 import postcheck
 import refs as refs_mod
 import shapes
+import terrain
+import views
+from mcp_client import Guides, Mcp, emit_event, hold_focus, release_focus, set_ndjson
 
 HERE = Path(__file__).resolve().parent
 
-import importlib.util as _ilu  # site.py shares its name with the stdlib `site` (already loaded): import it by path
-
-_sp = _ilu.spec_from_file_location("arch_site", HERE / "site.py")
-site = _ilu.module_from_spec(_sp)
-sys.modules["arch_site"] = site
-_sp.loader.exec_module(site)
 FEATURE_MODS: list[str] = []  # --feature-mod: registered mod rooms the brief asks for
 SITE: dict | None = None  # set from --survey: {survey, plan, near, force}; None = the old flat behaviour
 FREECAM: bool = False  # --freecam: use client-only ghost_camera in view() instead of /gamemode spectator + /tp
@@ -73,6 +67,7 @@ IMG3D_PY = Path(os.environ.get("ARCHITECT_IMG3D_PY", HERE / "img3d" / ".venv" / 
 # Screenshot paths come back as the game's paths. When the game runs on rig and this runs on FOX, rig's G: is Q:.
 PATH_MAP = os.environ.get("ARCHITECT_PATH_MAP", "G:\\=Q:\\" if os.path.exists("Q:\\") else "")
 MAX_STEPS = int(os.environ.get("ARCHITECT_MAX_STEPS", "60"))
+KEEP_IMAGES = int(os.environ.get("ARCHITECT_KEEP_IMAGES", "2") or 2)  # newest tool-result images sent to the model
 MAX_COST = float(os.environ.get("ARCHITECT_MAX_COST", "0") or 0)  # USD per run, 0 = no cap (--max-cost)
 # Local model mode: any server that speaks the Anthropic Messages API (Ollama 0.40+ on rig: http://192.168.50.3:11434).
 # No web search, no effort/caching params, no cost.
@@ -192,107 +187,6 @@ looks at them, gives feedback, and you change them until they like it; ghost_exp
 - Floors get a border or pattern; big floors get inlays that lead to the main feature.
 """
 
-
-# --------------------------------------------------------------------------------------------- mc-mcp
-
-class Mcp:
-    def __init__(self, url: str):
-        self.url = url
-        self.n = 0
-        self.nogold = False  # hextech: swap gold/yellow blocks in every ghost_set for quartz/purple/cyan
-        self.swapped = 0
-        self._rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
-                                 "clientInfo": {"name": "architect", "version": "1"}})
-
-    def _rpc(self, method: str, params: dict) -> dict:
-        self.n += 1
-        body = json.dumps({"jsonrpc": "2.0", "id": self.n, "method": method, "params": params}).encode()
-        headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
-        if os.environ.get("MCMCP_TOKEN"):
-            headers["Authorization"] = "Bearer " + os.environ["MCMCP_TOKEN"]
-        req = urllib.request.Request(self.url, body, headers)
-        with urllib.request.urlopen(req, timeout=600) as r:
-            msg = json.loads(r.read())
-        if "error" in msg:
-            raise RuntimeError(msg["error"].get("message", str(msg["error"])))
-        return msg["result"]
-
-    def tools(self) -> list[dict]:
-        return self._rpc("tools/list", {})["tools"]
-
-    def call(self, name: str, args: dict) -> tuple[str, bool]:
-        if name == "ghost_set":  # v26: explicit fluid_pipe connection states (the default all-true state draws nothing)
-            args, n = floaters.fix_pipes(args)
-            if n:
-                print(f"  [pipes] set explicit connections on {n} fluid_pipe entries in ghost_set {args.get('id')}", flush=True)
-        if name == "ghost_set" and self.nogold:
-            args, n = floaters.swap_gold(args)
-            if n:
-                self.swapped += n
-                print(f"  [no-gold] swapped {n} gold/yellow entries in ghost_set {args.get('id')}", flush=True)
-        res = self._rpc("tools/call", {"name": name, "arguments": args})
-        text = "\n".join(c.get("text", "") for c in res.get("content", []) if c.get("type") == "text")
-        return text, bool(res.get("isError"))
-
-    def json(self, name: str, args: dict) -> dict:
-        text, err = self.call(name, args)
-        if err:
-            raise RuntimeError(f"{name}: {text}")
-        return json.loads(text)
-
-
-# ----------------------------------------------------------------------------------------- mod guides
-
-class Guides:
-    """Searchable index of in-game guide pages from the pack's jars: AE2-style ae2guide pages (AE2, ExtendedAE,
-    AdvancedAE, MEGA, ...) and Patchouli books (English)."""
-
-    def __init__(self, mods: Path, cache: Path):
-        self.pages: list[dict] = []
-        if cache.exists() and mods.exists() and cache.stat().st_mtime > mods.stat().st_mtime:
-            self.pages = json.loads(cache.read_text("utf-8"))
-            return
-        if not mods.exists():
-            return
-        for jar in sorted(mods.glob("*.jar")):
-            try:
-                with zipfile.ZipFile(jar) as z:
-                    for n in z.namelist():
-                        guide = "/ae2guide/" in n and n.endswith(".md") and not re.search(r"/_[a-z]{2}_[a-z]{2}/", n)
-                        book = "/patchouli_books/" in n and "/en_us/entries/" in n and n.endswith(".json")
-                        if not (guide or book):
-                            continue
-                        raw = z.read(n).decode("utf-8", "replace")
-                        if book:
-                            try:
-                                d = json.loads(raw)
-                                title = d.get("name", n)
-                                text = "\n".join(p.get("text", "") for p in d.get("pages", []) if isinstance(p, dict))
-                            except ValueError:
-                                continue
-                        else:
-                            m = re.search(r"^\s*title:\s*(.+)$", raw, re.M)
-                            title = m.group(1).strip() if m else n.rsplit("/", 1)[-1]
-                            text = raw
-                        self.pages.append({"mod": n.split("/")[1], "jar": jar.name, "path": n,
-                                           "title": title, "text": text[:20000]})
-            except (zipfile.BadZipFile, OSError):
-                continue
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps(self.pages), "utf-8")
-
-    def search(self, query: str, mod: str | None = None, n: int = 3) -> list[dict]:
-        terms = [t for t in re.findall(r"[a-z0-9]+", query.lower()) if len(t) > 1]
-        scored = []
-        for p in self.pages:
-            if mod and mod.lower() not in (p["mod"].lower(), p["jar"].lower()) and mod.lower() not in p["jar"].lower():
-                continue
-            title, text = p["title"].lower(), p["text"].lower()
-            s = sum(title.count(t) * 8 + min(text.count(t), 20) for t in terms)
-            if s:
-                scored.append((s, p))
-        scored.sort(key=lambda x: -x[0])
-        return [p for _, p in scored[:n]]
 
 
 # ------------------------------------------------------------------------------------------- the agent
@@ -467,6 +361,7 @@ class Architect:
         mcp_tools = {t["name"]: t for t in self.mcp.tools()}
         missing = [n for n in FORWARD if n not in mcp_tools]
         if missing:
+            emit_event("error", message=f"mc-mcp is missing tools {missing}")
             sys.exit(f"mc-mcp is missing tools {missing}: is this the mc-mcp build with ghosts?")
         # Fixed order keeps the tool list byte-identical between calls, so the prompt cache hits.
         self.tools = [{"name": n, "description": mcp_tools[n]["description"], "input_schema": mcp_tools[n]["inputSchema"]}
@@ -584,7 +479,7 @@ class Architect:
                                   a.get("landmark") or "tower", a.get("roles"), layout=a.get("layout"))
             site_rep = None
             if SITE:  # surveyed terrain: re-place the campus, add foundations, report fill/cut/trees
-                ghosts, site_rep = site.apply(ghosts, SITE["survey"], near=SITE.get("near"), force=SITE.get("force"))
+                ghosts, site_rep = terrain.apply(ghosts, SITE["survey"], near=SITE.get("near"), force=SITE.get("force"))
                 a = dict(a, origin=site_rep["origin"])
             ox, oy, oz = a["origin"]
             rep = []
@@ -762,6 +657,9 @@ class Architect:
                                                         "data": base64.standard_b64encode(prev.read_bytes()).decode()}})
         return content
 
+    def view(self, target: str, angle: str, zoom: float, cut_y=None):
+        return views.view(self, target, angle, zoom, cut_y, freecam=FREECAM, path_map=PATH_MAP)
+
     def style_refs(self, kit: str, n: int):
         d = KNOWLEDGE / "style_refs"
         refs = json.loads((d / "index.json").read_text("utf-8"))
@@ -778,119 +676,6 @@ class Architect:
             content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                                         "data": base64.standard_b64encode((d / r["file"]).read_bytes()).decode()}})
         return content
-
-    def view(self, target: str, angle: str, zoom: float, cut_y=None):
-        ghosts = self.mcp.json("ghost_list", {})["ghosts"]
-        sel = [g for g in ghosts if "world_min" in g and (target == "*" or g["id"] == target
-                                                         or (target.endswith("/") and g["id"].startswith(target)))]
-        if not sel:
-            raise ValueError(f"no ghost matches {target}")
-        lo = [min(g["world_min"][i] for g in sel) for i in range(3)]
-        hi = [max(g["world_max"][i] for g in sel) + 1 for i in range(3)]
-        if cut_y is not None and int(cut_y) < lo[1]:  # a local height (e.g. 4) instead of a world y
-            cut_y = lo[1] + int(cut_y)
-        c = [(lo[i] + hi[i]) / 2 for i in range(3)]
-        size = max(hi[i] - lo[i] for i in range(3))
-        d = (size * 0.95 + 6) * zoom
-        offsets = {"iso": (-0.7, 0.55, 0.7), "iso_ne": (0.7, 0.55, -0.7), "front": (0, 0.25, 1), "back": (0, 0.25, -1),
-                   "side": (1, 0.25, 0), "top": (0.01, 1, 0.01), "inside": (0, 0, 0), "cut": (-0.35, 1, 0.45)}
-        ox, oy, oz = offsets.get(angle, offsets["iso"])
-        if angle == "inside":
-            eye = (c[0], lo[1] + 1.6, c[2])
-            look = (c[0], lo[1] + 1.6, lo[2] - 100)
-        else:
-            norm = math.sqrt(ox * ox + oy * oy + oz * oz)
-            if angle == "cut":
-                c[1] = int(cut_y) if cut_y is not None else lo[1] + 4
-            eye = (c[0] + ox / norm * d, c[1] + oy / norm * d, c[2] + oz / norm * d)
-            look = tuple(c)
-        if not FREECAM and not self.spectator:
-            # Daylight, no HUD, ghosts drawn over terrain and opaque: the screenshot shows the design, not the woods.
-            for cmd in ("gamemode spectator", "time set noon", "gamerule doDaylightCycle false",
-                        "weather clear"):
-                self.mcp.call("run_command", {"command": cmd})
-            self.spectator = True
-        # Every view: terrain can't hide the ghosts, they draw opaque, no HUD.
-        if self.prev_view is None:  # remember the player's own view modes so restore_view() can put them back
-            try:
-                self.prev_view = self.mcp.json("ghost_show", {"id": "*"})
-            except Exception:
-                self.prev_view = {}
-        show = {"id": "*", "xray": True, "solid": True, "hud": False}
-        if angle == "cut":
-            show["clip_y"] = int(cut_y) if cut_y is not None else lo[1] + 4
-        else:
-            show["clip_off"] = True
-        self.mcp.call("ghost_show", show)
-        if FREECAM:
-            self.mcp.call("ghost_camera", {"x": eye[0], "y": eye[1], "z": eye[2],
-                                           "look_x": look[0], "look_y": look[1], "look_z": look[2]})
-            try:
-                time.sleep(0.5)  # let a frame render from the detached camera
-                shot = self.mcp.json("screenshot", {})
-            finally:
-                self.mcp.call("ghost_camera", {"off": True})
-        else:
-            self.mcp.call("run_command", {"command": f"tp @s {eye[0]:.1f} {eye[1]:.1f} {eye[2]:.1f}"})
-            self.mcp.call("look_at", {"x": look[0], "y": look[1], "z": look[2]})
-            time.sleep(1.5)  # let chunks and the ghost mesh draw
-            shot = self.mcp.json("screenshot", {})
-        path = shot["path"].replace("\\.\\", "\\")
-        if PATH_MAP:
-            src, dst = PATH_MAP.split("=", 1)
-            if path.upper().startswith(src.upper()):
-                path = dst + path[len(src):]
-        data = base64.standard_b64encode(Path(path).read_bytes()).decode()
-        plan = json.loads(self.plan_file.read_text("utf-8")) if self.plan_file.exists() else {}
-        pwarns = postcheck.proportion_check(plan, sel)
-        warn_txt = ("\nPROPORTION WARNINGS: " + "; ".join(pwarns)) if pwarns else ""
-        out = [{"type": "text", "text": f"view {angle} of {target}: bounds {lo}..{hi}, camera at "
-                                        f"{[round(v) for v in eye]}{warn_txt}"},
-               {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}]
-        ref = self.ref_thumb() if angle != "cut" else None
-        if ref:
-            name, b64, is_user_ref = ref
-            if is_user_ref:
-                out += [{"type": "text", "text": f"USER REFERENCE ({name}). Compare the view above with this reference "
-                         "and list the concrete differences (proportions, silhouette, roofline, palette, missing features), "
-                         "then fix the biggest ones."},
-                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}]
-            else:
-                out += [{"type": "text", "text": f"REFERENCE ({name}, the player's mood board). Before your next build "
-                         "step, compare the view above with this reference and write the 3 biggest gaps (silhouette, "
-                         "roofline, facade depth, palette, detail, light), then fix the worst one."},
-                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}]
-        return out
-
-    def ref_thumb(self):
-        """One small reference image for side-by-side comparison on view(). Prefers user-supplied refs in
-        sessions/<name>/refs/ over kit mood boards so reference-image runs get a real compare-and-fix loop."""
-        from PIL import Image
-        import io
-        user_refs_dir = self.dir / "refs"
-        user_refs = sorted(user_refs_dir.glob("*.jpg")) if user_refs_dir.exists() else []
-        if user_refs:
-            self.user_ref_i = getattr(self, "user_ref_i", -1) + 1
-            p = user_refs[self.user_ref_i % len(user_refs)]
-            im = Image.open(p).convert("RGB")
-            im.thumbnail((640, 640))
-            buf = io.BytesIO()
-            im.save(buf, "JPEG", quality=80)
-            return p.name, base64.standard_b64encode(buf.getvalue()).decode(), True
-        kit = getattr(self, "kit", None)
-        if not kit:
-            return None
-        d = KNOWLEDGE / "style_refs"
-        refs = [r for r in json.loads((d / "index.json").read_text("utf-8")) if r["kit"] == kit]
-        if not refs:
-            return None
-        self.ref_i = getattr(self, "ref_i", -1) + 1
-        r = refs[self.ref_i % len(refs)]
-        im = Image.open(d / r["file"]).convert("RGB")
-        im.thumbnail((640, 640))
-        buf = io.BytesIO()
-        im.save(buf, "JPEG", quality=80)
-        return r["file"], base64.standard_b64encode(buf.getvalue()).decode(), False
 
     # ---- loop
 
@@ -961,14 +746,16 @@ class Architect:
         final = ""
         for step in range(MAX_STEPS):
             t0 = time.time()
+            # Old view/blocks screenshots cost thousands of tokens each: send only the newest ones (messages.json keeps all).
+            api_messages = views.prune_old_images(self.messages, keep_last=KEEP_IMAGES)
             if self.is_local:
                 resp = self.client.messages.create(model=MODEL, max_tokens=8000, system=SYSTEM,
-                                                   tools=self.tools, messages=self.messages)
+                                                   tools=self.tools, messages=api_messages)
             else:
                 resp = self.client.messages.create(
                     model=MODEL, max_tokens=16000,
                     system=[{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
-                    tools=self.tools, messages=self.messages,
+                    tools=self.tools, messages=api_messages,
                     output_config={"effort": EFFORT},
                     cache_control={"type": "ephemeral"},
                 )
@@ -978,6 +765,8 @@ class Architect:
             self.secs = getattr(self, "secs", 0.0) + time.time() - t0
             if not self.llm_info.get("local"):
                 self.cost += usage_cost(u)
+            emit_event("cost", usd=round(self.cost, 4), tokens_in=self.tokens_in, tokens_out=self.tokens_out,
+                       secs=round(self.secs, 1))
             self.messages.append({"role": "assistant",
                                   "content": [b.model_dump(mode="json", exclude_none=True) for b in resp.content]})
             self.save()
@@ -1005,6 +794,7 @@ class Architect:
             results = []
             for c in calls:
                 print(f"  -> {c.name} {json.dumps(c.input)[:140]}", flush=True)
+                emit_event("tool", name=c.name, args=json.dumps(c.input)[:140])
                 try:
                     if c.name in local:
                         out = self.run_local(c.name, c.input)
@@ -1030,39 +820,6 @@ class Architect:
         return final + f"\n(stopped after {MAX_STEPS} steps; say 'continue' to go on)"
 
 
-PAUSE_MARK = HERE / "sessions" / ".pause_on_lost_focus"
-
-
-def hold_focus(mcp) -> str | None:
-    """While a turn runs, the game must not open the pause menu when its window is in the background (it would cover
-    every view). Turns pauseOnLostFocus off without saving options.txt and returns the value to restore. The original
-    value is also kept in a marker file, so a killed run is repaired by the next one."""
-    try:
-        old = mcp.json("video_get", {"filter": "pauseOnLostFocus"}).get("pauseOnLostFocus")
-        if old is None:  # mc-mcp older than 0.2.1: no plain-field options
-            return None
-        if PAUSE_MARK.exists():
-            old = PAUSE_MARK.read_text().strip() or old
-        PAUSE_MARK.parent.mkdir(parents=True, exist_ok=True)
-        PAUSE_MARK.write_text(old)
-        mcp.json("video_set", {"option": "pauseOnLostFocus", "value": "false", "save": False})
-        scr = mcp.json("screen", {})
-        if scr.get("open") and scr.get("class", "").endswith("PauseScreen"):
-            mcp.call("close_screen", {})
-        return old
-    except Exception:
-        return None
-
-
-def release_focus(mcp, old: str | None):
-    if old is None:
-        return
-    try:
-        mcp.json("video_set", {"option": "pauseOnLostFocus", "value": old, "save": False})
-        PAUSE_MARK.unlink(missing_ok=True)
-    except Exception:
-        pass
-
 
 GEN_BRIEF = """Build my main base as ONE big, spread-out, walkable complex, site min corner at {x} {y} {z} (about 150-180 x 110-130 blocks). Ghost ids under "{id}/". I like lots of horizontal usable floor, big spaced-out machine areas, a room per mod and wings grouping similar mods; only the landmark should be tall, no stacks of empty floors.
 Start with ONE campus call (kit {kit}, home=true, landmark=tower{layout}) with wings built from the mods installed (registry_blocks namespaces): a storage/AE2 wing, a tech wing, a processing wing, a magic wing, a farming wing.
@@ -1086,7 +843,7 @@ def generate_request(style: str, x: int, y: int, z: int, kit: str, layout: str, 
     if SITE:  # survey summary only (never the raw grid): keeps the prompt cheap
         p = SITE["plan"]
         brief = brief.replace("(about 150-180 x 110-130 blocks)", f"(about {p['w']} x {p['d']} blocks, hard limit)")
-        brief += "\n" + site.prompt_note(p)
+        brief += "\n" + terrain.prompt_note(p)
     return brief
 
 
@@ -1127,6 +884,9 @@ def main():
                     help="force image_to_3d (Hunyuan3D photo->voxel) on the attached reference image")
     ap.add_argument("--freecam", action="store_true",
                     help="use client-side ghost_camera in view() instead of /gamemode spectator + /tp")
+    ap.add_argument("--ndjson", action="store_true",
+                    help="print structured JSON event lines (site, tool, cost, reply, error, done) for the mod; "
+                         "same as ARCHITECT_NDJSON=1. Without it only the legacy SITE/REPLY/cost lines are printed")
     ap.add_argument("--x", type=int, default=0)
     ap.add_argument("--y", type=int, default=66)
     ap.add_argument("--z", type=int, default=0)
@@ -1140,28 +900,33 @@ def main():
     ap.add_argument("request", nargs="*")
     args = ap.parse_args()
     global MAX_COST, SITE, FREECAM
+    if args.ndjson:
+        set_ndjson(True)
     FREECAM = bool(args.freecam)
     FEATURE_MODS[:] = args.feature_mod
     if args.max_cost is not None:
         MAX_COST = args.max_cost
     if args.survey:
-        sv = site.Survey.from_file(args.survey)
+        sv = terrain.Survey.from_file(args.survey)
         near = tuple(int(v) for v in args.near.split(",")) if args.near else None
         style = args.generate or args.kit or "hextech"
         if args.site_rect:
             fx, fz, fw, fd, frot = (int(v) for v in args.site_rect.split(","))
-            lay = args.layout or site.DEFAULT_LAYOUT.get(style, "spine")
-            plan = site.evaluate(sv, fx, fz, fw, fd, frot, near)
-            plan.update(layout=lay, wings=site.wings_for(lay, fw, fd), style=style)
+            lay = args.layout or terrain.DEFAULT_LAYOUT.get(style, "spine")
+            plan = terrain.evaluate(sv, fx, fz, fw, fd, frot, near)
+            plan.update(layout=lay, wings=terrain.wings_for(lay, fw, fd), style=style)
             plan["size"] = "m" if plan["wings"] >= 4 else "s"
             force = {"x": fx, "z": fz, "w": fw, "d": fd, "rot": frot}
         else:
-            plan = site.plan(sv, style, near, args.layout)
+            plan = terrain.plan(sv, style, near, args.layout)
             force = None
         SITE = {"survey": sv, "plan": plan, "near": near, "force": force}
         args.x, args.z, args.y = plan["x"], plan["z"], plan["ref"] - 1
         args.layout = args.layout or plan["layout"]
-        print("SITE " + site.describe(plan), flush=True)
+        site_line = terrain.describe(plan)
+        if not emit_event("site", summary=site_line, layout=plan.get("layout"), size=plan.get("size"),
+                          fit=plan.get("fit"), x=plan["x"], z=plan["z"], ref=plan["ref"]):
+            print("SITE " + site_line, flush=True)
     if args.generate:
         args.request = [generate_request(args.generate, args.x, args.y, args.z, args.kit, args.layout, args.session)]
     elif args.prompt and not args.iterate:
@@ -1183,7 +948,7 @@ def main():
             cx, cz = (lo[0] + hi[0]) // 2, (lo[2] + hi[2]) // 2
             rad = max(12, min(48, max(hi[0] - lo[0], hi[2] - lo[2]) // 2 + 4))
             sv_raw = arch.mcp.json("world_survey", {"x": cx, "z": cz, "radius": rad, "step": 1})
-            sv = site.Survey.from_json(sv_raw)
+            sv = terrain.Survey.from_json(sv_raw)
             blocks = []
             for g in ghosts:
                 info = arch.mcp.json("ghost_info", {"id": g["id"], "blocks": True, "limit": 20000})
@@ -1215,15 +980,18 @@ def main():
                 auto_foundation(args.session + "/")
         except Exception as e:  # a bad reference shouldn't kill the REPL or chat loop
             out = f"error: {e}"
+            emit_event("error", message=str(e)[:500])
         finally:
             arch.restore_view()
             release_focus(arch.mcp, held)
         first_refs = []
         summary = " ".join(out.split())
-        if summary:
+        if summary and not emit_event("reply", text=summary[:260]):
             print("REPLY " + summary[:260], flush=True)
         print(f"\n{out}\n  [{MODEL}, cost ~${arch.cost:.4f}, {getattr(arch, 'tokens_in', 0)} in / "
               f"{getattr(arch, 'tokens_out', 0)} out tokens, {getattr(arch, 'secs', 0):.0f}s model time]\n", flush=True)
+        emit_event("done", ok=not out.startswith("error:"), usd=round(arch.cost, 4), model=MODEL,
+                   tokens_in=getattr(arch, "tokens_in", 0), tokens_out=getattr(arch, "tokens_out", 0))
         return out
 
     if args.request or first_refs:

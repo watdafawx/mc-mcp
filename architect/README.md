@@ -46,23 +46,22 @@ step 1, with `y` = true ground under buildings, plus a `region` block: `built_bl
   coordinates, at most 3000, written to `--out` with the suggestions and the cost. The mod draws them as ghost `suggest`.
 - Cost: `architect.usage_cost()` (extracted from the agent loop, same prices) per response; stops at `--max-cost`. The key
   comes from `architect/.env`, read by `architect.py` when `suggest.py` imports it for the model call; `suggest.py` itself
-  never touches the key. It loads `site.py` by path like `architect.py` (the name shadows the stdlib `site`).
+  never touches the key. It imports `terrain.py` normally (renamed from `site.py`, which shadowed the stdlib `site`).
 - Offline test (fake client, canned survey, no API): `python test_suggest.py`.
 
-## World-aware sites (site.py)
+## World-aware sites (terrain.py)
 
 `ghost_generate` / `/ghost generate` survey the client world first (`world_survey`), write the JSON to a temp file and run
 `architect.py --survey <file> --near x,z` (plus `--site-rect x,z,w,d,rot` for a previewed `/ghost area`). No survey = the
 old flat behaviour, unchanged (so batch scripts keep working). The LLM only sees a one-line summary (platform height,
 foundations, trees, layout and wing limit), never the grid, so a build stays around $0.03-0.07.
 
-`site.py` is pure python and deterministic (no Minecraft, no API). It shares its name with the stdlib `site`, so
-`architect.py` and `test_site.py` load it by path (`importlib`); run it as a script:
+`terrain.py` is pure python and deterministic (no Minecraft, no API); import it normally or run it as a script:
 
-    python site.py plan --survey s.json --style hextech --near x,z     # best layout/wings/rectangle (JSON)
-    python site.py eval --survey s.json --x 10 --z 20 --w 96 --d 80 [--rot 90]   # score one rectangle (/ghost area move|rotate)
-    python site.py demo hill|slope|cliff|forest|shoreline|unknown|flat   # fake surveys
-    python test_site.py                                                # offline tests
+    python terrain.py plan --survey s.json --style hextech --near x,z     # best layout/wings/rectangle (JSON)
+    python terrain.py eval --survey s.json --x 10 --z 20 --w 96 --d 80 [--rot 90]   # score one rectangle (/ghost area move|rotate)
+    python terrain.py demo hill|slope|cliff|forest|shoreline|unknown|flat   # fake surveys
+    python test_terrain.py                                                # offline tests
 
 **Picker.** Every candidate rectangle of the campus footprint (measured per layout and wing count, 88x85 .. 235x170),
 also turned 90 degrees, is scored in O(1) from prefix sums: water, lava, trees, unknown cells, height spread, slope,
@@ -74,7 +73,7 @@ The platform level is the 60% quantile of the ground (fill is cheaper than cut: 
 cut deeper than 10; **yellow** = fill deeper than 3, cut deeper than 4, average fill/cut over 1 block or > 3% water
 (needs foundations or terracing); **lime** = fits (trees only count as obstacles to clear).
 
-**Campus integration** (`site.apply`, called by the `campus` tool when a survey is loaded): the real campus footprint is
+**Campus integration** (`terrain.apply`, called by the `campus` tool when a survey is loaded): the real campus footprint is
 re-placed (rotated with block states turned: facing, axis, side flags, rotation), the platform sits at the chosen level,
 and a `foundation` ghost adds, under every platform/tier column that stands above the ground, a stone-brick retaining
 wall on the outline and cobblestone pillars every 4 blocks (first block directly on the ground, so the floater guard is
@@ -135,3 +134,8 @@ Mod wings are sized from their machine count (wing key `machines`, default 14 cl
 - Vanilla fallbacks that draw: `iron_bars` (states for lines), `chain[axis]`, `end_rod`, copper grates, `lightning_rod`,
   `tinted_glass`, `waxed_copper_bulb`. Translucent glass conduits look like torn sheets; trays use opaque concrete.
 
+## Module layout and the mod protocol
+
+- `architect.py`: CLI, system prompt, tools and the agent loop. `mcp_client.py`: `Mcp` JSON-RPC client, `Guides`, `hold_focus` / `release_focus`, `emit_event`. `views.py`: `view()`, `ref_thumb()`, `camera_pose()` and `prune_old_images()`. `terrain.py`: survey, site picking, foundations.
+- Vision context pruning: before every model call only the newest `ARCHITECT_KEEP_IMAGES` (default 2) tool results keep their images; older ones keep their text plus `[earlier view image pruned to save context]`. Reference images you attach to a request are never pruned, and `sessions/<name>/messages.json` keeps everything.
+- `--ndjson` (or `ARCHITECT_NDJSON=1`): stdout carries one JSON object per line for the mod: `{"event":"site","summary":...}`, `tool` (`name`, `args`), `cost` (`usd`, `tokens_in`, `tokens_out`, `secs`), `reply` (`text`), `error` (`message`), `done` (`ok`, `usd`). Without the flag only the legacy `SITE ` / `REPLY ` / `cost ~$` lines are printed, so older mods keep working.

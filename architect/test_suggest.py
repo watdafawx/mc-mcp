@@ -20,7 +20,7 @@ check.failed = 0
 
 # ---- canned survey: flat ground y=64 over 41x41, one 9x7 flat-roofed box (bbox 10..18 x 64..., z 10..16), lights on the west only
 X0, Z0, N = 0, 0, 41
-sv0 = S.site.Survey.from_fn(X0, Z0, 1, N, N, lambda x, z: (64, "."))
+sv0 = S.terrain.Survey.from_fn(X0, Z0, 1, N, N, lambda x, z: (64, "."))
 SURVEY = sv0.to_json()
 SURVEY["center"] = [20, 20]
 SURVEY["radius"] = 20

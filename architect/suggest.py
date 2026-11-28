@@ -11,14 +11,13 @@ ghost overlay, absolute world coordinates). Result JSON written to --out:
   {"suggestions": [{"text", "fix", "building", "material"}], "blocks": [[x, y, z, "minecraft:block[state]"]], "cost": usd}
 
 No Minecraft connection is needed (the survey is the only input). The API key comes from architect/.env, read by
-architect.py when it is imported (api key is never read, printed or logged here). site.py is loaded by path (it shadows
-the stdlib `site`). Offline test: python test_suggest.py
+architect.py when it is imported (api key is never read, printed or logged here). Terrain code lives in terrain.py (was
+site.py, which shadowed the stdlib `site`). Offline test: python test_suggest.py
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib.util as _ilu
 import json
 import re
 import sys
@@ -26,10 +25,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-_sp = _ilu.spec_from_file_location("arch_site", HERE / "site.py")
-site = _ilu.module_from_spec(_sp)
-sys.modules.setdefault("arch_site", site)
-_sp.loader.exec_module(site)
+import terrain
 
 FIXES = ("gable_roof", "lanterns", "corner_posts")
 MAX_SUGGESTIONS = 6
@@ -65,11 +61,11 @@ SYSTEM = (
 # ------------------------------------------------------------------ survey
 
 
-def load_region(path) -> tuple[dict, "site.Survey"]:
+def load_region(path) -> tuple[dict, "terrain.Survey"]:
     raw = json.loads(Path(path).read_text("utf-8"))
     if "region" not in raw:
         raise ValueError("survey has no 'region' block (use the mod's ghost_suggest survey)")
-    return raw, site.Survey.from_json(raw)
+    return raw, terrain.Survey.from_json(raw)
 
 
 def summarize(raw: dict) -> dict:
