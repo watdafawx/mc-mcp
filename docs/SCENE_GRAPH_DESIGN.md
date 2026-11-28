@@ -190,6 +190,19 @@ against the 1.21.1 list, and every mod id was checked against the ATM10 block li
 - **Generic `floor` on non-structure nodes is the lowest layer.** Right for bridges and decks, meaningless for a solid
   prop. The model gets the anchor list in `describe()` and can use `top`.
 
+## Phase 2A: wired into the architect (`scene_set` / `scene_patch`)
+
+- `massing.KITS` / `massing.ROOF_DEFAULT` are now built from `kits.json` (element 0 of each chain); the hardcoded tables and
+  `.update()` patches are gone. Values are identical, so `campus.py` and every test see the same dicts.
+- `architect.py` has two local tools. `scene_set {scene}` compiles a whole scene; `scene_patch {ops}` applies atomic patch
+  ops to the saved scene. Both diff against the last compile and send only `ghost_set` for `diff.set` and `ghost_clear`
+  for `diff.clear`; the reply is `describe()` plus a `redraw: {set, keep, clear, warnings}` line.
+- The active scene is saved as `sessions/<name>/scene.json`; a new `Architect` on the same session (`--iterate`) reloads it,
+  compiles it as the baseline and re-sends scene ghosts the game no longer has (checked with `ghost_list`).
+- The live registry is fetched once per session (`registry_blocks`; per kit/mod namespace when the unfiltered list is
+  truncated) and passed to `compile(available_blocks=...)`; no registry = preferred blocks.
+- Tests: `architect/test_agent_scene.py` (mock Mcp, records every call).
+
 ## Phase 1B (not in this change)
 
 - Model tools in `architect.py`: `scene_apply(ops)` -> `compile` -> `diff` -> `ghost_set` only for `set`,
