@@ -13,73 +13,25 @@ from __future__ import annotations
 import math
 import random
 
+import palettes
 from shapes import ShapeError, disk
 
 # ------------------------------------------------------------------------------------------ style kits
 # Roles: base (plinth, ground), wall, wall2 (second wall tone / interior floor), trim (ledges, pillars, frames),
 # pillar (corner piers, default trim), accent (one bold stripe), glass, glow (light bands), rail, roof (deck), detail (vents, units), antenna, tip.
+# The kit definitions live in kits.json (palettes.py): every role there is a fallback chain whose first entry is the
+# preferred ATM10 block. KITS holds those preferred blocks (what massing always built with); the scene compiler and
+# the architect resolve the chains against the live block registry (palettes.resolve_kit) and pass the result in as
+# `roles=` overrides, so a kit looks right on any pack.
 KITS: dict[str, dict[str, str]] = {
-    # Every block here is survival-cheap in ATM10 (<= ~3 cobble units per block, see blocklib.py); no gold, sea lanterns,
-    # prismarine or froglights in bulk. Mod blocks: chipped / rechiseled / chisel (free chisel variants), xtonesreworked,
-    # luminax (cheap coloured glow cubes), create, connectedglass, mcwfences.
-    "station_white": {  # white/grey station with orange-red stripe (space station, sausbuilds lab)
-        "base": "minecraft:smooth_quartz", "wall": "minecraft:white_concrete", "wall2": "chisel:large_tile/white_concrete",
-        "trim": "minecraft:light_gray_concrete", "accent": "minecraft:orange_concrete", "glass": "connectedglass:borderless_glass_light_blue",
-        "glow": "luminax:white_luminax_block", "rail": "minecraft:iron_bars", "roof": "minecraft:white_concrete",
-        "detail": "create:industrial_iron_block", "antenna": "minecraft:iron_bars", "tip": "luminax:red_luminax_block"},
-    "cyber_dark": {  # dark tech with cyan glow (cyberpunk shop, data core)
-        "base": "minecraft:polished_deepslate", "wall": "minecraft:deepslate_tiles", "wall2": "minecraft:polished_blackstone",
-        "trim": "minecraft:smooth_basalt", "accent": "minecraft:cyan_concrete", "glass": "connectedglass:borderless_glass_cyan",
-        "glow": "luminax:cyan_luminax_block", "rail": "minecraft:iron_bars", "roof": "minecraft:polished_deepslate",
-        "detail": "create:industrial_iron_block", "antenna": "minecraft:iron_bars", "tip": "luminax:red_luminax_block"},
-    "ae_sky": {  # AE2 house style: sky stone, quartz glass, fluix purple glow
-        "base": "ae2:smooth_sky_stone_block", "wall": "ae2:sky_stone_brick", "wall2": "ae2:smooth_sky_stone_block",
-        "trim": "ae2:sky_stone_block", "accent": "luminax:purple_luminax_block", "glass": "ae2:quartz_glass",
-        "glow": "luminax:purple_luminax_block", "rail": "minecraft:iron_bars", "roof": "ae2:smooth_sky_stone_block",
-        "detail": "create:industrial_iron_block", "antenna": "minecraft:iron_bars", "tip": "luminax:purple_luminax_block"},
-    "hextech": {  # Arcane/Piltover: cream panelled stone, gold piers, greek-key blue band, teal roofs, hextech-blue glow
-        "base": "minecraft:smooth_sandstone", "wall": "chipped:smooth_inlayed_sandstone", "wall2": "chipped:rounded_sandstone_bricks",
-        "trim": "rechiseled:bone_block_decorated_bordered", "pillar": "xtonesreworked:sols_block_0",
-        "accent": "xtonesreworked:azur_block_2", "glass": "connectedglass:borderless_glass_light_blue",
-        "glow": "luminax:light_blue_luminax_block", "rail": "mcwfences:railing_sandstone_wall", "roof": "xtonesreworked:zane_block_5",
-        "detail": "xtonesreworked:sols_block_10", "antenna": "minecraft:lightning_rod", "tip": "minecraft:end_rod"},
-    "steampunk": {  # dark brick, copper, brass casing, spruce, warm light
-        "base": "minecraft:polished_blackstone_bricks", "wall": "minecraft:deepslate_bricks", "wall2": "minecraft:spruce_planks",
-        "trim": "minecraft:cut_copper", "accent": "minecraft:exposed_cut_copper", "glass": "connectedglass:borderless_glass_orange",
-        "glow": "minecraft:shroomlight", "rail": "minecraft:spruce_fence", "roof": "minecraft:deepslate_tiles",
-        "detail": "create:andesite_casing", "antenna": "minecraft:lightning_rod", "tip": "minecraft:lantern"},
-    "gothic": {  # deepslate, blackstone, purple glass, violet glow
-        "base": "minecraft:polished_blackstone_bricks", "wall": "minecraft:deepslate_bricks", "wall2": "minecraft:deepslate_tiles",
-        "trim": "minecraft:stone_bricks", "pillar": "minecraft:polished_deepslate", "accent": "chisel:ornate/purpur", "glass": "connectedglass:borderless_glass_purple",
-        "glow": "luminax:purple_luminax_block", "rail": "minecraft:polished_blackstone_wall", "roof": "minecraft:deepslate_tiles",
-        "detail": "minecraft:chiseled_deepslate", "antenna": "minecraft:chain", "tip": "minecraft:soul_lantern"},
-    "solarpunk": {  # warm white limestone, moss, wood, lots of glass, green roofs
-        "base": "minecraft:mossy_stone_bricks", "wall": "create:polished_cut_limestone", "wall2": "minecraft:birch_planks",
-        "trim": "create:cut_limestone_bricks", "pillar": "create:limestone_pillar", "accent": "minecraft:moss_block", "glass": "connectedglass:borderless_glass",
-        "glow": "minecraft:shroomlight", "band": "minecraft:green_terracotta", "rail": "minecraft:oak_fence", "roof": "minecraft:moss_block",
-        "detail": "minecraft:oak_leaves[persistent=true]", "antenna": "minecraft:lightning_rod", "tip": "minecraft:lantern"},
-    "rust_industrial": {  # teal concrete, rusty copper, iron (sea platform)
-        "base": "minecraft:gray_concrete", "wall": "minecraft:cyan_terracotta", "wall2": "minecraft:light_gray_concrete",
-        "trim": "minecraft:weathered_cut_copper", "accent": "minecraft:orange_terracotta", "glass": "connectedglass:borderless_glass_gray",
-        "glow": "luminax:orange_luminax_block", "rail": "minecraft:iron_bars", "roof": "minecraft:gray_concrete",
-        "detail": "create:andesite_casing", "antenna": "minecraft:iron_bars", "tip": "luminax:red_luminax_block"},
+    name: palettes.resolve_kit(name) for name in palettes.list_kits()
 }
 
-
-# v7 contrast: cheap structural stone, bright metal accents, warm gothic windows.
-KITS["steampunk"].update(pillar="minecraft:polished_deepslate", glass="minecraft:cyan_stained_glass",
-    dome_rib="minecraft:deepslate_tiles", wall2="minecraft:polished_deepslate")
-KITS["gothic"].update(glow="minecraft:shroomlight", glass="minecraft:orange_stained_glass", tip="minecraft:lantern",
-    ridge="minecraft:polished_deepslate")
-# v10 hextech: Arcane/Piltover, less yellow. Quartz + polished blackstone body, purple glass, cyan glow, brass only as small accents.
-KITS["hextech"].update(base="minecraft:polished_blackstone_bricks", wall="minecraft:quartz_bricks", wall2="minecraft:polished_blackstone",
-    trim="minecraft:smooth_quartz", pillar="minecraft:quartz_pillar", accent="minecraft:purple_concrete",
-    glass="minecraft:purple_stained_glass", glow="luminax:light_blue_luminax_block", roof="minecraft:deepslate_tiles",
-    detail="create:brass_casing", rail="minecraft:iron_bars", antenna="minecraft:lightning_rod", tip="minecraft:amethyst_block",
-    dome_rib="minecraft:chiseled_polished_blackstone")
-
-# Default roof shape per kit when a structure doesn't pass roof=.
-ROOF_DEFAULT = {"hextech": "mansard", "gothic": "mansard", "steampunk": "mansard"}
+# Default roof shape per kit when a structure doesn't pass roof=. Only kits that differ from "flat" are listed.
+ROOF_DEFAULT: dict[str, str] = {
+    name: roof for name in palettes.list_kits()
+    if (roof := palettes.kit_info(name)["meta"].get("roof_default", "flat")) != "flat"
+}
 
 
 def _kit(k: str | dict | None, overrides: dict | None = None) -> dict[str, str]:

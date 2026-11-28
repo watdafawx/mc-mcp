@@ -28,8 +28,10 @@ import floaters
 import llm_client
 import mods
 import multiblocks
+import palettes
 import postcheck
 import refs as refs_mod
+import scene as scene_ir
 import shapes
 import terrain
 import views
@@ -117,6 +119,33 @@ looks at them, gives feedback, and you change them until they like it; ghost_exp
   `minecraft:end_rod`, copper grates, `minecraft:lightning_rod`, `minecraft:tinted_glass`, `minecraft:waxed_copper_bulb`.
   Ceiling trays and pipe runs: opaque concrete, never translucent glass (glass conduits look like torn sheets).
 
+## Scene graph (preferred for buildings and for every follow-up edit)
+`scene_set` takes a small JSON scene and compiles it into one ghost per node. You name things and attach them to
+each other by NAME instead of doing world arithmetic; the compiler places them, so nothing floats and a change to a
+parent moves everything attached to it. `scene_patch` edits the saved scene with atomic ops and re-sends ONLY the
+ghosts that changed, so iterating ("make the hall wider", "move the porch", "swap the spire") is cheap and exact.
+- Scene: {id, origin:[x,y,z] (world position of scene-local 0,0,0; the ground is at its y), kit (one of the 8 kits),
+  roles:{role: block} (optional palette override), nodes:[...]}. Ghost ids become "<scene id>/<node id>".
+- Node: {id, kind, params, attach:{target, surface, align, offset} | at:[x,y,z], tag?, kit?, roles?}.
+  kind: structure (the styled facade volume: w, d, floors/floor_hs, roof, program, entrances...), platform, bridge,
+  slope, spire, shape (params.shape=<classic part kind> or params.parts=[...]), multiblock (params.kind=...), boxes
+  (a raw ghost spec: the escape hatch). params are the generator's own arguments; a wrong name is rejected with a hint.
+- "$glass", "$trim", "$accent", ... anywhere in params = the kit's block for that role (the kit follows the pack).
+- Anchors (named, never coordinates): top, roof_deck, floor, floor[i], interior, wall:north|south|east|west,
+  door:<side>, pad[i] (ground-floor rooms of params.program), bottom, ground, center. The compile result lists each
+  node's anchors. attach.surface picks one: the child sits ON roof_deck/top, IN FRONT OF a wall, UNDER bottom. align =
+  center|min|max (dict {x,z,y} per axis) slides it along the surface; offset [dx,dy,dz] nudges it last.
+- Put the base first (platform or a ground-level structure), then attach everything else. A spire on the hall's
+  top, a porch on its wall:south, a dish on the wing's top: attach, never hand-compute coordinates.
+- `top` is the highest face (spires, domes, antennas and anything standing on the roof); roof_deck is the deck inside
+  the parapet (props that sit among the vents; they may overlap the parapet).
+- The result says `floating` (parts touching nothing: fix the attach), `overlaps` and `missing_blocks`; fix those first.
+- scene_patch ops: add_node, set_node (replace), patch_node {id, patch:{params:{w:31}}} (JSON merge patch, null
+  deletes a key), remove_node {id, orphans: error|remove|pin}, set_palette {kit?, roles?, id?}, set_scene {origin?,
+  ground_y?}. All ops apply or none do. Use it for every change to a scene instead of calling scene_set again.
+- Use campus for a full multi-wing base, and shapes / multiblock / ghost_set for one-off parts and details; they all
+  keep working next to scenes (give them other ghost id prefixes than the scene id).
+
 ## Workflow
 1. Read the request. Call plan(action=get). For a new area, write a plan first with plan(action=set): areas,
    rooms (name, theme, purpose, world origin, size), how rooms connect (doors, corridors), and the overall style.
@@ -150,6 +179,7 @@ looks at them, gives feedback, and you change them until they like it; ghost_exp
    per knowledge(craft): a base, wings 1-2 floors with tall machine floors (floor_h 8-9), one landmark, a curve
    or angle, designed links. Write the layout in one sentence in the plan first. Never draw an exterior wall
    as a plain ghost_set box.
+   For a single building or a landmark, write a scene (scene_set) and iterate with scene_patch; a base is campus.
    Then interiors and details with ghost_set, multiblock and the classic shapes.
    Build room by room with ghost_set. Prefer boxes (fill | hollow | walls | frame) over single blocks; use blocks
    for details. Keep one ghost_set under ~3000 entries; split big rooms into several ghosts or calls with mode=merge.
@@ -166,8 +196,8 @@ looks at them, gives feedback, and you change them until they like it; ghost_exp
    it against the craft checklist like a picky builder: one clear silhouette? height hierarchy? a base? a curve or angle? bands and one accent stripe? lit?
    rooftop detail? Then look INSIDE with view(angle=cut, cut_y=<floor y + 3>): a cutaway from above that hides
    every ghost block higher than cut_y, to check rooms, machines and aisles. Fix and view again. 2-4 rounds.
-6. For feedback ("taller", "less purple", "move the door"), change only what was asked, with mode=merge or a
-   redraw of that one ghost. Update the plan when rooms move or change.
+6. For feedback ("taller", "less purple", "move the door"), change only what was asked: scene_patch for scene
+   nodes, otherwise mode=merge or a redraw of that one ghost. Update the plan when rooms move or change.
 7. Use mod_guide for questions about a mod block or machine (what it is, rules, sizes). Use web_search for
    building ideas or anything not in the pack's guides.
 8. End each turn with a short summary for the player: what you built or changed, ghost ids, and 1-2 ideas for
@@ -292,6 +322,26 @@ LOCAL_TOOLS = [
                     "description": "only needed for a new ghost; existing ghosts keep theirs"},
          "mode": {"type": "string", "enum": ["merge", "replace"]},
          "parts": {"type": "array", "items": {"type": "object"}}}, "required": ["ghost_id", "parts"]}},
+    {"name": "scene_set", "description": "Build or replace a whole structure from a declarative scene: a small JSON graph "
+     "of named nodes attached to each other by semantic anchors, compiled into one ghost per node (ids \"<scene id>/<node id>\"). "
+     "Pass `scene` = {id, origin:[x,y,z] world position of scene-local 0,0,0, kit, roles?, nodes:[{id, kind: structure|platform|"
+     "bridge|slope|spire|shape|multiblock|boxes, params:{...the generator's own arguments}, attach:{target, surface: top|"
+     "roof_deck|floor|wall:north|south|east|west|door:<side>|pad[i]|bottom|ground|center, align: center|min|max, offset:[dx,dy,dz]} "
+     "or at:[x,y,z]}]}. \"$glass\", \"$trim\", ... in params = the kit's block for that role (resolved against this pack's "
+     "real blocks). Only ghosts that changed since the last scene call are sent. Returns each node's size, bounds and anchor "
+     "names plus floating / overlap / missing_block checks and what was redrawn. Fix `floating` by attaching the node.",
+     "input_schema": {"type": "object", "properties": {
+         "scene": {"type": "object", "description": "the scene IR (or pass id/kit/origin/roles/nodes at top level)"},
+         "id": {"type": "string"}, "kit": {"type": "string"}, "roles": {"type": "object"},
+         "origin": {"type": "array", "items": {"type": "integer"}, "minItems": 3, "maxItems": 3},
+         "nodes": {"type": "array", "items": {"type": "object"}}}}},
+    {"name": "scene_patch", "description": "Edit the saved scene atomically (all ops apply or none) and re-send ONLY the ghosts "
+     "that changed; everything attached to a changed node follows it automatically. ops: {op: add_node, node:{...}}, "
+     "{op: set_node, node:{...}} (add or replace), {op: patch_node, id, patch:{params:{w:31}}} (JSON merge patch; null "
+     "deletes a key; setting attach drops at), {op: remove_node, id, orphans: error|remove|pin}, {op: set_palette, kit?, "
+     "roles?, id?} (scene or one node), {op: set_scene, origin?, ground_y?}. Use this for every change to a scene.",
+     "input_schema": {"type": "object", "properties": {
+         "ops": {"type": "array", "items": {"type": "object"}}}, "required": ["ops"]}},
     {"name": "image_to_3d", "description": "Turn one image of a single object (statue, creature, ship, vehicle, "
      "tree, small building) into a voxel ghost: a 3D model is generated on rig's GPU from the picture, then "
      "voxelized and coloured with real blocks. Best for organic shapes boxes can't draw; for buildings, model "
@@ -354,6 +404,7 @@ class Architect:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.msgs_file = self.dir / "messages.json"
         self.plan_file = self.dir / "plan.json"
+        self.scene_file = self.dir / "scene.json"  # the active scene IR: scene_patch works on it across runs (--iterate)
         self.messages: list[dict] = json.loads(self.msgs_file.read_text("utf-8")) if self.msgs_file.exists() else []
         self.client, self.llm_info = llm_client.make_client()
         self.is_local = bool(self.llm_info.get("local")) or self.llm_info.get("provider") != "anthropic"
@@ -374,6 +425,11 @@ class Architect:
         self.protected: set[str] = set()  # featured registry mod wing ghosts: never cleared or replaced, only added to
         self.prev_view: dict | None = None  # ghost view modes before the first screenshot view of a run
         self.cost = 0.0
+        self._scene: scene_ir.Scene | None = None  # the active scene (loaded lazily from scene_file)
+        self._last_scene_compile: scene_ir.CompileResult | None = None  # what is drawn: the diff baseline
+        self._scene_unsent: set[str] = set()  # scene ghost ids whose last ghost_set failed or that were cleared by hand
+        self._available_blocks = None  # live registry (normalized), cached once per session; None = preferred kit blocks
+        self._registry_tried = False
         self.active_mods: list[str] = list(FEATURE_MODS)  # registered mod room themes whose whitelist the blocks tool adds
 
     # ---- local tools
@@ -406,6 +462,129 @@ class Architect:
             out = (out if isinstance(out, str) else json.dumps(out)) + "\nDROPPED floating parts (touch nothing): " + \
                 json.dumps(floating) + " -- attach them to a building or remove them."
         return out, is_err
+
+    # ---- scene graph (scene_set / scene_patch)
+
+    def available_blocks(self):
+        """The pack's block registry as a set of ids, fetched once per session via registry_blocks. None when it is
+        unavailable (offline, tool missing, error): the scene then resolves kits to their preferred blocks."""
+        if self._available_blocks is not None or self._registry_tried:
+            return self._available_blocks
+        self._registry_tried = True
+        try:
+            res = self.mcp.json("registry_blocks", {"limit": 5000})
+            blocks = list(res.get("blocks") or [])
+            if res.get("truncated") and isinstance(res.get("namespaces"), dict):
+                # The unfiltered list is capped: fetch the mods the kits and mod rooms can use, one by one.
+                want = {"minecraft"} | {palettes.base_id(b).split(":")[0] for chain in self._kit_chains() for b in chain}
+                want |= {n for r in mods.REGISTRY.values() for n in r.namespaces}
+                blocks = []
+                for ns in sorted(want & set(res["namespaces"])):
+                    try:
+                        blocks += list(self.mcp.json("registry_blocks", {"namespace": ns, "limit": 5000}).get("blocks") or [])
+                    except Exception:
+                        pass
+            self._available_blocks = palettes.normalize_available({"blocks": blocks}) if blocks else None
+        except Exception as e:  # no game / old mc-mcp: preferred blocks
+            print(f"  (registry_blocks unavailable, kits use their preferred blocks: {e})", flush=True)
+            self._available_blocks = None
+        return self._available_blocks
+
+    @staticmethod
+    def _kit_chains():
+        for kit in palettes.load_kits()["kits"].values():
+            yield from (kit.get("roles") or {}).values()
+
+    def _scene_compile(self, scene: scene_ir.Scene) -> scene_ir.CompileResult:
+        return scene.compile(available_blocks=self.available_blocks())
+
+    def _ensure_scene(self):
+        """Session resume (--iterate): load scene.json and compile it as the diff baseline, so scene_patch works across
+        CLI runs. Scene ghosts the game no longer has (restart) are queued for a re-send."""
+        if self._scene is not None or not self.scene_file.exists():
+            return
+        sc = scene_ir.Scene.from_json(self.scene_file.read_text("utf-8"))
+        res = self._scene_compile(sc)
+        self._scene, self._last_scene_compile = sc, res
+        for a in res.ghost_set_args(compact=True):
+            self.guard.record(a["id"], a, True)
+        try:
+            have = {g.get("id") for g in self.mcp.json("ghost_list", {}).get("ghosts", [])}
+            self._scene_unsent |= {g["ghost_id"] for g in res.ghosts if g["ghost_id"] not in have}
+        except Exception:
+            pass
+
+    def _scene_push(self, scene: scene_ir.Scene, extra: dict | None = None) -> str:
+        """Compile `scene`, send only the ghosts that differ from what is drawn, save it, and describe the result."""
+        res = self._scene_compile(scene)
+        diff = res.diff(self._last_scene_compile)
+        order = [g["ghost_id"] for g in res.ghosts]
+        resend = set(diff["set"]) | (self._scene_unsent & set(order))
+        diff["set"] = [g for g in order if g in resend]
+        diff["keep"] = [g for g in diff["keep"] if g not in resend]
+        notes: list[str] = []
+        for gid in diff["clear"]:
+            try:
+                self.mcp.call("ghost_clear", {"id": gid})
+            except Exception as e:
+                notes.append(f"ghost_clear {gid} failed: {e}")
+            self.guard.cells.pop(gid, None)
+            self.guard.origins.pop(gid, None)
+            self._scene_unsent.discard(gid)
+        for a in res.ghost_set_args(compact=True):
+            if a["id"] not in resend:
+                continue
+            try:
+                r = self.mcp.json("ghost_set", a)
+            except Exception as e:
+                self._scene_unsent.add(a["id"])
+                notes.append(f"ghost_set {a['id']} failed: {e}")
+                continue
+            self._scene_unsent.discard(a["id"])
+            self.guard.record(a["id"], a, True)
+            bad = (r.get("bad_palette") or r.get("unknown_keys")) if isinstance(r, dict) else None
+            if bad:
+                notes.append(f"ghost_set {a['id']}: bad palette/keys {bad}")
+        self._scene, self._last_scene_compile = scene, res
+        self.scene_file.write_text(scene.to_json(), "utf-8")
+        warn = []
+        if res.floating:
+            warn.append(f"FLOATING (touch no supported node: attach them): {res.floating}")
+        if res.overlaps:
+            warn.append(f"overlaps: {res.overlaps}")
+        if res.missing_blocks:
+            warn.append("missing blocks: " + ", ".join(f"{k} ({v})" for k, v in sorted(res.missing_blocks.items())[:8]))
+        summary = {"set": diff["set"], "keep": len(diff["keep"]), "clear": diff["clear"]}
+        if extra:
+            summary.update(extra)
+        if warn or notes:
+            summary["warnings"] = warn + notes
+        return res.describe() + "\nredraw: " + json.dumps(summary)
+
+    def scene_set(self, a: dict) -> str:
+        raw = a.get("scene")
+        if isinstance(raw, str):
+            raw = json.loads(raw)
+        if raw is None:
+            raw = {k: a[k] for k in scene_ir.SCENE_KEYS if k in a}
+        if not raw or not raw.get("nodes"):
+            raise ValueError("scene_set needs a scene: {id, origin, kit, nodes:[...]} (pass it as `scene`)")
+        self._ensure_scene()
+        return self._scene_push(scene_ir.Scene.from_dict(raw))
+
+    def scene_patch(self, a: dict) -> str:
+        self._ensure_scene()
+        if self._scene is None:
+            raise ValueError("no scene yet: build one with scene_set first")
+        ops = a.get("ops")
+        if isinstance(ops, str):
+            ops = json.loads(ops)
+        if not ops:
+            raise ValueError("scene_patch needs ops: [{op: patch_node, id, patch: {...}}, ...]")
+        work = self._scene.copy()
+        info = work.apply_patch(ops)  # atomic; raises SceneError and leaves the saved scene untouched
+        extra = {k: v for k, v in info.items() if v}
+        return self._scene_push(work, {"patched": extra} if extra else None)
 
     def clear_hits_protected(self, gid: str) -> bool:
         return any(k == gid or gid == "*" or (gid.endswith("/") and k.startswith(gid)) for k in self.protected)
@@ -472,6 +651,10 @@ class Architect:
             if info:
                 res["info"] = info
             return json.dumps(res)
+        if name == "scene_set":
+            return self.scene_set(a)
+        if name == "scene_patch":
+            return self.scene_patch(a)
         if name == "campus":
             if str(a["kit"]).lower() == "hextech":
                 self.mcp.nogold = True
@@ -810,6 +993,9 @@ class Architect:
                             gid = str(c.input.get("id", ""))
                             for k in [k for k in self.guard.cells if k == gid or (gid.endswith("/") and k.startswith(gid))]:
                                 del self.guard.cells[k]
+                            if self._last_scene_compile:  # a hand-cleared scene ghost must be re-sent by the next scene call
+                                self._scene_unsent |= {g["ghost_id"] for g in self._last_scene_compile.ghosts
+                                                       if gid in ("*", g["ghost_id"]) or (gid.endswith("/") and g["ghost_id"].startswith(gid))}
                 except Exception as e:  # tool failures go back to the model, not up the stack
                     out, is_err = f"error: {e}", True
                 if isinstance(out, str) and len(out) > 30000:
@@ -848,9 +1034,9 @@ def generate_request(style: str, x: int, y: int, z: int, kit: str, layout: str, 
 
 
 PROMPT_BRIEF = """Build the player's request as a focused structure or architectural component grounded at world coordinates ({x}, {y}, {z}), using ghost ids under "{id}/".
-- Unless the player explicitly asks for a full base or multi-wing campus, do NOT call campus: build ONE clean, well-proportioned structure or component using shapes + ghost_set (or image_to_3d for organic reference objects like statues/creatures/ships/trees).
-- Aim for a strong silhouette, clean proportions, and cheap survival-obtainable blocks so the player can either improve it by hand or ask you to iterate on it. Prefer the `shapes` tool (square_tower, round_tower, gable_roof, cone_roof, dormer, arch, buttress_row, arch_bridge, wall_segment, spiral_stair) plus contrasting roof/trim/wood accents over plain monochrome stone boxes.{kit_hint}
-- Ground everything at y={y} (no floating parts). Check with view once and fix the worst issues, then give a brief 1-2 sentence summary of what you built.
+- Unless the player explicitly asks for a full base or multi-wing campus, do NOT call campus: build ONE clean, well-proportioned structure or component as a scene with scene_set (nodes attached to each other by semantic anchors: attach {{target, surface, align}}, e.g. a spire on the hall's top, a porch on its wall:south), then refine it with scene_patch (scene id "{id}", origin [{x}, {y}, {z}]). Use shapes + ghost_set for extra one-off parts and image_to_3d for organic reference objects like statues/creatures/ships/trees.
+- Aim for a strong silhouette, clean proportions, and cheap survival-obtainable blocks so the player can either improve it by hand or ask you to iterate on it. Scene nodes take the same parts as the `shapes` tool (square_tower, round_tower, gable_roof, cone_roof, dormer, arch, buttress_row, arch_bridge, wall_segment, spiral_stair) plus contrasting roof/trim/wood accents over plain monochrome stone boxes.{kit_hint}
+- Ground everything at y={y} (scene origin y={y}; no floating parts: fix any `floating` the scene result reports). Check with view once and fix the worst issues, then give a brief 1-2 sentence summary of what you built.
 
 Player request: {text}"""
 
