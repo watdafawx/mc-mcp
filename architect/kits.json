@@ -1,0 +1,226 @@
+{
+  "version": 1,
+  "doc": "Style kits for the architect (see docs/SCENE_GRAPH_DESIGN.md and palettes.py). Every role is an ordered fallback chain [preferred, ..., vanilla]: the resolver picks the first block that exists in the pack, else the last entry, which is always a vanilla minecraft: block. Element 0 of every chain is exactly the block massing.KITS uses today (v7/v10 overrides folded in). meta holds the per-kit layout tables from massing/interiors/campus (v15 roof_cycle, v16 roof_mats). Blockstate suffixes ([persistent=true]) are kept; only the id before '[' is checked against the registry.",
+  "roles": {
+    "base": "plinth, ground course, platform field",
+    "wall": "main wall tone",
+    "wall2": "second wall tone, interior floors, window spandrels",
+    "trim": "ledges, frames, mullions, parapet cap",
+    "pillar": "corner piers and pilasters (optional, default trim)",
+    "accent": "one bold stripe (accent floor lintel)",
+    "band": "lintel band on glow floors (optional, default glow)",
+    "glass": "windows",
+    "glow": "light bands, lantern cores",
+    "rail": "parapet rail, lamp posts",
+    "roof": "roof deck and roof surface",
+    "detail": "roof units, vents",
+    "antenna": "masts, finial shafts",
+    "tip": "mast and finial tips",
+    "dome_rib": "dome frame (optional, default trim)",
+    "ridge": "roof ridge; its presence switches on gothic gable ends (optional)"
+  },
+  "required": ["base", "wall", "wall2", "trim", "accent", "glass", "glow", "rail", "roof", "detail", "antenna", "tip"],
+  "kits": {
+    "station_white": {
+      "description": "white/grey station with an orange stripe (space station, research lab)",
+      "roles": {
+        "base": ["minecraft:smooth_quartz"],
+        "wall": ["minecraft:white_concrete"],
+        "wall2": ["chisel:large_tile/white_concrete", "minecraft:quartz_bricks"],
+        "trim": ["minecraft:light_gray_concrete"],
+        "accent": ["minecraft:orange_concrete"],
+        "glass": ["connectedglass:borderless_glass_light_blue", "minecraft:light_blue_stained_glass"],
+        "glow": ["luminax:white_luminax_block", "minecraft:sea_lantern"],
+        "rail": ["minecraft:iron_bars"],
+        "roof": ["minecraft:white_concrete"],
+        "detail": ["create:industrial_iron_block", "minecraft:polished_andesite"],
+        "antenna": ["minecraft:iron_bars"],
+        "tip": ["luminax:red_luminax_block", "minecraft:redstone_lamp[lit=true]"]
+      },
+      "meta": {
+        "roof_default": "flat", "wood": "birch", "colour": "orange",
+        "alt_roof": "dome", "tower_roof": "dome", "hub_roof": "dome",
+        "roof_cycle": ["barrel", "gable_low", "flat", "dome", "hip_low", "sawtooth", "gable"],
+        "roof_mats": [["minecraft:white_concrete"], ["minecraft:light_gray_concrete"], ["minecraft:smooth_quartz"],
+                      ["minecraft:orange_terracotta"], ["minecraft:gray_concrete"], ["minecraft:light_blue_concrete"],
+                      ["minecraft:calcite"]],
+        "glass_cycle": ["minecraft:light_blue_stained_glass", "minecraft:cyan_stained_glass", "minecraft:gray_stained_glass"]
+      }
+    },
+    "cyber_dark": {
+      "description": "dark tech with cyan glow (cyberpunk shop, data core)",
+      "roles": {
+        "base": ["minecraft:polished_deepslate"],
+        "wall": ["minecraft:deepslate_tiles"],
+        "wall2": ["minecraft:polished_blackstone"],
+        "trim": ["minecraft:smooth_basalt"],
+        "accent": ["minecraft:cyan_concrete"],
+        "glass": ["connectedglass:borderless_glass_cyan", "minecraft:cyan_stained_glass"],
+        "glow": ["luminax:cyan_luminax_block", "minecraft:sea_lantern"],
+        "rail": ["minecraft:iron_bars"],
+        "roof": ["minecraft:polished_deepslate"],
+        "detail": ["create:industrial_iron_block", "minecraft:polished_basalt"],
+        "antenna": ["minecraft:iron_bars"],
+        "tip": ["luminax:red_luminax_block", "minecraft:redstone_lamp[lit=true]"]
+      },
+      "meta": {
+        "roof_default": "flat", "wood": "dark_oak", "colour": "cyan",
+        "alt_roof": "crown", "tower_roof": "crown"
+      }
+    },
+    "ae_sky": {
+      "description": "AE2 house style: sky stone, quartz glass, fluix purple glow",
+      "roles": {
+        "base": ["ae2:smooth_sky_stone_block", "minecraft:polished_blackstone"],
+        "wall": ["ae2:sky_stone_brick", "minecraft:polished_blackstone_bricks"],
+        "wall2": ["ae2:smooth_sky_stone_block", "minecraft:polished_blackstone"],
+        "trim": ["ae2:sky_stone_block", "minecraft:blackstone"],
+        "accent": ["luminax:purple_luminax_block", "minecraft:purple_concrete"],
+        "glass": ["ae2:quartz_glass", "minecraft:glass"],
+        "glow": ["luminax:purple_luminax_block", "minecraft:pearlescent_froglight"],
+        "rail": ["minecraft:iron_bars"],
+        "roof": ["ae2:smooth_sky_stone_block", "minecraft:polished_blackstone"],
+        "detail": ["create:industrial_iron_block", "minecraft:polished_basalt"],
+        "antenna": ["minecraft:iron_bars"],
+        "tip": ["luminax:purple_luminax_block", "minecraft:pearlescent_froglight"]
+      },
+      "meta": {"roof_default": "flat", "wood": "dark_oak", "colour": "purple"}
+    },
+    "hextech": {
+      "description": "Arcane/Piltover (v10): quartz + polished blackstone body, purple glass, cyan glow, brass only as small accents",
+      "roles": {
+        "base": ["minecraft:polished_blackstone_bricks"],
+        "wall": ["minecraft:quartz_bricks"],
+        "wall2": ["minecraft:polished_blackstone"],
+        "trim": ["minecraft:smooth_quartz"],
+        "pillar": ["minecraft:quartz_pillar"],
+        "accent": ["minecraft:purple_concrete"],
+        "glass": ["minecraft:purple_stained_glass"],
+        "glow": ["luminax:light_blue_luminax_block", "minecraft:sea_lantern"],
+        "rail": ["minecraft:iron_bars"],
+        "roof": ["minecraft:deepslate_tiles"],
+        "detail": ["create:brass_casing", "minecraft:cut_copper"],
+        "antenna": ["minecraft:lightning_rod"],
+        "tip": ["minecraft:amethyst_block"],
+        "dome_rib": ["minecraft:chiseled_polished_blackstone"]
+      },
+      "meta": {
+        "roof_default": "mansard", "wood": "dark_oak", "colour": "blue",
+        "alt_roof": "flat", "tower_roof": "crown", "hub_roof": "crown", "no_gold": true,
+        "roof_cycle": ["hip_low", "mansard", "gable_low", "flat", "gable", "hip", "barrel"],
+        "roof_mats": [["minecraft:deepslate_tiles"], ["minecraft:purple_terracotta"], ["minecraft:polished_blackstone_bricks"],
+                      ["minecraft:blackstone"], ["minecraft:cyan_terracotta"], ["minecraft:purple_concrete"],
+                      ["minecraft:polished_deepslate"]],
+        "glass_cycle": ["minecraft:purple_stained_glass", "minecraft:light_blue_stained_glass", "minecraft:purple_stained_glass"]
+      }
+    },
+    "steampunk": {
+      "description": "dark brick, copper, deepslate piers, cyan glass, warm light (v7 contrast)",
+      "roles": {
+        "base": ["minecraft:polished_blackstone_bricks"],
+        "wall": ["minecraft:deepslate_bricks"],
+        "wall2": ["minecraft:polished_deepslate"],
+        "trim": ["minecraft:cut_copper"],
+        "pillar": ["minecraft:polished_deepslate"],
+        "accent": ["minecraft:exposed_cut_copper"],
+        "glass": ["minecraft:cyan_stained_glass"],
+        "glow": ["minecraft:shroomlight"],
+        "rail": ["minecraft:spruce_fence"],
+        "roof": ["minecraft:deepslate_tiles"],
+        "detail": ["create:andesite_casing", "minecraft:polished_andesite"],
+        "antenna": ["minecraft:lightning_rod"],
+        "tip": ["minecraft:lantern"],
+        "dome_rib": ["minecraft:deepslate_tiles"]
+      },
+      "meta": {
+        "roof_default": "mansard", "wood": "spruce", "colour": "brown",
+        "alt_roof": "flat", "tower_roof": "mansard", "hub_roof": "dome",
+        "roof_cycle": ["sawtooth", "gable_low", "mansard", "barrel", "hip_low", "flat", "gable_steep"],
+        "roof_mats": [["minecraft:deepslate_tiles"], ["minecraft:oxidized_cut_copper"], ["minecraft:bricks"],
+                      ["minecraft:cut_copper"], ["minecraft:polished_blackstone_bricks"], ["minecraft:red_nether_bricks"],
+                      ["minecraft:weathered_cut_copper"]],
+        "glass_cycle": ["minecraft:cyan_stained_glass", "minecraft:light_blue_stained_glass", "minecraft:gray_stained_glass"]
+      }
+    },
+    "gothic": {
+      "description": "deepslate and blackstone, stone-brick tracery, orange lancets, warm glow (v7)",
+      "roles": {
+        "base": ["minecraft:polished_blackstone_bricks"],
+        "wall": ["minecraft:deepslate_bricks"],
+        "wall2": ["minecraft:deepslate_tiles"],
+        "trim": ["minecraft:stone_bricks"],
+        "pillar": ["minecraft:polished_deepslate"],
+        "accent": ["chisel:ornate/purpur", "minecraft:purpur_pillar"],
+        "glass": ["minecraft:orange_stained_glass"],
+        "glow": ["minecraft:shroomlight"],
+        "rail": ["minecraft:polished_blackstone_wall"],
+        "roof": ["minecraft:deepslate_tiles"],
+        "detail": ["minecraft:chiseled_deepslate"],
+        "antenna": ["minecraft:chain"],
+        "tip": ["minecraft:lantern"],
+        "ridge": ["minecraft:polished_deepslate"]
+      },
+      "meta": {
+        "roof_default": "mansard", "wood": "dark_oak", "colour": "purple",
+        "alt_roof": "flat", "tower_roof": "mansard", "hub_roof": "hip_steep", "hall_style": "open",
+        "roof_cycle": ["gable_steep", "hip_steep", "gable_steep", "hip", "gable_steep", "hip_steep", "gable"],
+        "roof_mats": [["minecraft:deepslate_tiles"], ["minecraft:polished_blackstone_bricks"], ["minecraft:blackstone"],
+                      ["minecraft:polished_deepslate"], ["minecraft:deepslate_bricks"], ["minecraft:cobbled_deepslate"],
+                      ["minecraft:deepslate_tiles"]],
+        "glass_cycle": ["minecraft:orange_stained_glass", "minecraft:yellow_stained_glass", "minecraft:red_stained_glass"],
+        "wing_roles": {
+          "wall": ["minecraft:stone_bricks"],
+          "wall2": ["minecraft:polished_andesite"],
+          "trim": ["minecraft:smooth_stone"],
+          "ridge": ["minecraft:smooth_stone"]
+        }
+      }
+    },
+    "solarpunk": {
+      "description": "warm white limestone, moss, wood, lots of glass, green roofs",
+      "roles": {
+        "base": ["minecraft:mossy_stone_bricks"],
+        "wall": ["create:polished_cut_limestone", "minecraft:calcite"],
+        "wall2": ["minecraft:birch_planks"],
+        "trim": ["create:cut_limestone_bricks", "minecraft:polished_diorite"],
+        "pillar": ["create:limestone_pillar", "minecraft:quartz_pillar"],
+        "accent": ["minecraft:moss_block"],
+        "band": ["minecraft:green_terracotta"],
+        "glass": ["connectedglass:borderless_glass", "minecraft:glass"],
+        "glow": ["minecraft:shroomlight"],
+        "rail": ["minecraft:oak_fence"],
+        "roof": ["minecraft:moss_block"],
+        "detail": ["minecraft:oak_leaves[persistent=true]"],
+        "antenna": ["minecraft:lightning_rod"],
+        "tip": ["minecraft:lantern"]
+      },
+      "meta": {
+        "roof_default": "flat", "wood": "oak", "colour": "lime",
+        "alt_roof": "flat", "tower_roof": "dome", "hub_roof": "dome",
+        "roof_cycle": ["garden", "barrel", "hip_low", "gable_low", "garden", "sawtooth", "dome"],
+        "roof_mats": [["minecraft:moss_block"], ["create:cut_limestone_bricks", "minecraft:polished_diorite"],
+                      ["minecraft:green_terracotta"], ["minecraft:mossy_cobblestone"], ["minecraft:moss_block"],
+                      ["minecraft:terracotta"], ["minecraft:lime_terracotta"]],
+        "glass_cycle": ["minecraft:green_stained_glass", "minecraft:light_blue_stained_glass", "minecraft:white_stained_glass"]
+      }
+    },
+    "rust_industrial": {
+      "description": "teal concrete, rusty copper, iron (sea platform)",
+      "roles": {
+        "base": ["minecraft:gray_concrete"],
+        "wall": ["minecraft:cyan_terracotta"],
+        "wall2": ["minecraft:light_gray_concrete"],
+        "trim": ["minecraft:weathered_cut_copper"],
+        "accent": ["minecraft:orange_terracotta"],
+        "glass": ["connectedglass:borderless_glass_gray", "minecraft:gray_stained_glass"],
+        "glow": ["luminax:orange_luminax_block", "minecraft:shroomlight"],
+        "rail": ["minecraft:iron_bars"],
+        "roof": ["minecraft:gray_concrete"],
+        "detail": ["create:andesite_casing", "minecraft:polished_andesite"],
+        "antenna": ["minecraft:iron_bars"],
+        "tip": ["luminax:red_luminax_block", "minecraft:redstone_lamp[lit=true]"]
+      },
+      "meta": {"roof_default": "flat", "wood": "spruce", "colour": "orange"}
+    }
+  }
+}
