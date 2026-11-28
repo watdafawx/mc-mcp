@@ -1,0 +1,307 @@
+{
+ "concept": "Silhouette: one tall red-timber refinery tower is the landmark, stacked on a wide machine hall base so it reads as vertical stacking. Its pagoda-style steep hip roof and a tall spire sit well above everything else, at least 1.8x the next volume. Two side workshops step down in height and roof type: a wide process hall with a sawtooth roof and furnace chimney, and a lower lab wing with a hip roof, joined by a short bridge across a gap to a small crane/gantry annex. Materials: dark deepslate base and plinth (60), red-stained timber look from crimson planks and stripped crimson stems for piers and walls (30), copper trim, cut copper cornices and cyan glass plus glow for ember light (10). Features: chimneys on the furnace hall, gears on the workshop face, pipe runs on the process hall, a spire on the tower, a platform for the terraced base, and a bridge across the yard to the crane annex. Interiors stay big: wide 11-13 high halls, and the height goes into the tower.",
+ "kit": "steampunk",
+ "roles": [
+  {
+   "role": "wall2",
+   "block": "minecraft:crimson_planks"
+  },
+  {
+   "role": "pillar",
+   "block": "minecraft:stripped_crimson_stem"
+  },
+  {
+   "role": "wall",
+   "block": "minecraft:dark_oak_planks"
+  },
+  {
+   "role": "roof",
+   "block": "minecraft:deepslate_tiles"
+  },
+  {
+   "role": "trim",
+   "block": "minecraft:cut_copper"
+  },
+  {
+   "role": "glow",
+   "block": "minecraft:shroomlight"
+  },
+  {
+   "role": "detail",
+   "block": "minecraft:copper_block"
+  },
+  {
+   "role": "tip",
+   "block": "minecraft:copper_block"
+  }
+ ],
+ "volumes": [
+  {
+   "id": "hall",
+   "purpose": "main machine hall base of the refinery",
+   "shape": "rect",
+   "w": 25,
+   "d": 19,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    11
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "flat",
+   "windows": "grid",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "at",
+    "to": "",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "tower",
+   "purpose": "landmark refinery tower with stacked process floors",
+   "shape": "rect",
+   "w": 15,
+   "d": 13,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    9,
+    7,
+    6,
+    5,
+    5
+   ],
+   "program": [
+    "expansion",
+    "lab",
+    "workshop",
+    "storage",
+    "living"
+   ],
+   "roof": "hip_steep",
+   "windows": "grid",
+   "rhythm": 2,
+   "accent_floor": 1,
+   "open_ground": false,
+   "entrances": [],
+   "roles": [
+    {
+     "role": "roof",
+     "block": "minecraft:copper_block"
+    }
+   ],
+   "place": {
+    "mode": "stack",
+    "to": "hall",
+    "side": "n",
+    "align": "center",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "furnace",
+   "purpose": "wide process hall with furnaces",
+   "shape": "rect",
+   "w": 19,
+   "d": 15,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    10
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "sawtooth",
+   "windows": "band",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "e",
+    "s"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "e",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "lab",
+   "purpose": "lower workshop wing",
+   "shape": "rect",
+   "w": 15,
+   "d": 13,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    7,
+    5
+   ],
+   "program": [
+    "workshop",
+    "lab"
+   ],
+   "roof": "hip",
+   "windows": "grid",
+   "rhythm": 3,
+   "accent_floor": 0,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "w",
+    "align": "end",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "crane",
+   "purpose": "gantry annex with crane arm",
+   "shape": "rect",
+   "w": 9,
+   "d": 9,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    6,
+    5
+   ],
+   "program": [
+    "storage",
+    "hall"
+   ],
+   "roof": "gable",
+   "windows": "slit",
+   "rhythm": 0,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "furnace",
+    "side": "e",
+    "align": "start",
+    "offset": 0,
+    "gap": 4,
+    "x": 0,
+    "z": 0
+   }
+  }
+ ],
+ "features": [
+  {
+   "kind": "spire",
+   "on": "tower",
+   "to": "",
+   "side": "top",
+   "pos": 0.5,
+   "size": 14,
+   "level": 0
+  },
+  {
+   "kind": "chimney",
+   "on": "furnace",
+   "to": "",
+   "side": "n",
+   "pos": 0.3,
+   "size": 9,
+   "level": 0
+  },
+  {
+   "kind": "chimney",
+   "on": "furnace",
+   "to": "",
+   "side": "n",
+   "pos": 0.75,
+   "size": 6,
+   "level": 0
+  },
+  {
+   "kind": "gear",
+   "on": "lab",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 4,
+   "level": 0
+  },
+  {
+   "kind": "gear",
+   "on": "hall",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 5,
+   "level": 0
+  },
+  {
+   "kind": "pipes",
+   "on": "furnace",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "bridge",
+   "on": "furnace",
+   "to": "crane",
+   "side": "e",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "platform",
+   "on": "hall",
+   "to": "",
+   "side": "top",
+   "pos": 0,
+   "size": 2,
+   "level": 0
+  }
+ ]
+}

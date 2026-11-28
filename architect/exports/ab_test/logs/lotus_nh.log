@@ -1,0 +1,24 @@
+DESIGN claude-haiku-5-5 (server-side refusal fallbacks on): a tall red timber refinery tower with stacked pagoda roofs, side workshops and a crane, steampunk
+  spec in 21s, ~$0.0033
+  saved X:\Dev\Minecraft\mc-mcp\architect\designs\ab\lotus_nh-20261125-093050.json
+  [texture] shaded 333 cells in ghost_set ab/lotus_nh/tower
+  ghost ab/lotus_nh/tower: 3877 blocks
+  [texture] shaded 228 cells in ghost_set ab/lotus_nh/process_hall
+  ghost ab/lotus_nh/process_hall: 1683 blocks
+  [texture] shaded 87 cells in ghost_set ab/lotus_nh/boiler_drum
+  ghost ab/lotus_nh/boiler_drum: 805 blocks
+  [texture] shaded 118 cells in ghost_set ab/lotus_nh/workshop_east
+  ghost ab/lotus_nh/workshop_east: 1013 blocks
+  [pipes] set explicit connections on 30 fluid_pipe entries in ghost_set ab/lotus_nh/features
+  [texture] shaded 33 cells in ghost_set ab/lotus_nh/features
+  ghost ab/lotus_nh/features: 1380 blocks
+CONCEPT Red timber refinery: one tall landmark tower (13x13, four floors totalling 37 high, crowned by a 4-tier pagoda) rises above a wide 18x12 machine hall to its west, which carries a tower crane on its flat roof. A boiler drum sits north of the hall with a smokestack beside it, and a 9x9 two-storey workshop attaches east of the tower with a gable roof. Hierarchy: the tower is the sole landmark (over 1
+  tower: rect 15x15 h39 floors [10, 9, 9, 9] ['machine_hall', 'expansion', 'expansion', 'expansion'] roof flat, clear inside 11x11
+  process_hall: rect 18x15 h12 floors [10] ['machine_hall'] roof flat, clear inside 14x11
+  boiler_drum: round 11x11 h10 floors [8] ['storage'] roof dome, clear inside 7x7
+  workshop_east: rect 9x9 h16 floors [7, 7] ['workshop', 'storage'] roof gable, clear inside 5x5
+  fix: tower: w 13 -> 15
+  fix: tower: d 13 -> 15
+  fix: process_hall: d 12 -> 15
+DONE 8758 blocks, 3 doorways, cost ~$0.0033
+exit=0 wall=24s

@@ -1,0 +1,13 @@
+  -> plan {"action": "get"}
+  -> shapes {"ghost_id": "ab/factory_os/main", "origin": [200, 120, 0], "parts": [{"kind": "platform", "shape": "rect", "w": 47, "d": 27, "steps": 1, "k
+  [texture] shaded 413 cells in ghost_set ab/factory_os/main
+  -> ghost_set {"id": "ab/factory_os/main", "mode": "merge", "palette": {"W": "minecraft:white_concrete", "B": "minecraft:black_concrete", "G": "minecraft:
+  -> view {"target": "ab/factory_os/main"}
+REPLY I built the red-brick factory as one ghost, `ab/factory_os/main`, at (200, 120, 0). It has a long main hall with a dark slate gable roof and a smaller east annex with a hipped roof. A 30-block clock tower rises from the north side, with clock faces on three si
+
+I built the red-brick factory as one ghost, `ab/factory_os/main`, at (200, 120, 0). It has a long main hall with a dark slate gable roof and a smaller east annex with a hipped roof. A 30-block clock tower rises from the north side, with clock faces on three sides and a lightning-rod tip. Two round brick smokestacks stand along the south side, with stone-brick buttresses between them and the hall. It sits on a rust-industrial platform.
+
+I only checked it with one iso view. The ghost looks speckled and see-through there, so I couldn't judge how the smokestacks and windows read. The clock faces are plain white concrete with black hands and a glowstone centre. I haven't added interiors or Create and Mekanism machines yet. I can do those next, or add more stacks and a loading dock.
+  [claude-sonnet-5-5, cost ~$0.0759, 10 in / 1974 out tokens, 17s model time]
+
+exit=0 wall=21s

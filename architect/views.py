@@ -77,12 +77,19 @@ def camera_pose(lo, hi, angle: str, zoom: float = 1.0, cut_y=None):
     size = max(hi[i] - lo[i] for i in range(3))
     d = (size * 0.95 + 6) * zoom
     offsets = {"iso": (-0.7, 0.55, 0.7), "iso_ne": (0.7, 0.55, -0.7), "front": (0, 0.25, 1), "back": (0, 0.25, -1),
-               "side": (1, 0.25, 0), "top": (0.01, 1, 0.01), "inside": (0, 0, 0), "cut": (-0.35, 1, 0.45)}
+               "side": (1, 0.25, 0), "top": (0.01, 1, 0.01), "inside": (0, 0, 0), "cut": (-0.35, 1, 0.45),
+               "se": (0.7, 0.55, 0.7), "nw": (-0.7, 0.55, -0.7)}
     ox, oy, oz = offsets.get(angle, offsets["iso"])
     if angle == "inside":
         eye = (c[0], lo[1] + 1.6, c[2])
         look = (c[0], lo[1] + 1.6, lo[2] - 100)
+    elif angle == "street":
+        ext = [hi[i] - lo[i] for i in range(3)]
+        eye = (c[0], lo[1] + 2.6, hi[2] + max(ext[0], ext[2]) * 0.6 + 10)
+        look = (c[0], lo[1] + ext[1] * 0.3, c[2])
     else:
+        if angle in ("se", "nw"):  # bounding-sphere fit at FOV 70, the same rule the A/B shots used
+            d = 0.5 * math.sqrt(sum((hi[i] - lo[i]) ** 2 for i in range(3))) / math.tan(math.radians(35)) * zoom
         norm = math.sqrt(ox * ox + oy * oy + oz * oz)
         if angle == "cut":
             c[1] = int(cut_y) if cut_y is not None else lo[1] + 4
@@ -92,7 +99,7 @@ def camera_pose(lo, hi, angle: str, zoom: float = 1.0, cut_y=None):
 
 
 def view(arch, target: str, angle: str, zoom: float, cut_y=None, *, freecam: bool = False, path_map: str = "",
-         shot_delay: float = 1.5):
+         shot_delay: float = 1.5, xray: bool = True):
     """Moves the camera (client-only freecam or spectator + /tp), takes a screenshot and returns tool_result content blocks."""
     ghosts = arch.mcp.json("ghost_list", {})["ghosts"]
     sel = [g for g in ghosts if "world_min" in g and (target == "*" or g["id"] == target
@@ -114,7 +121,7 @@ def view(arch, target: str, angle: str, zoom: float, cut_y=None, *, freecam: boo
             arch.prev_view = arch.mcp.json("ghost_show", {"id": "*"})
         except Exception:
             arch.prev_view = {}
-    show = {"id": "*", "xray": True, "solid": True, "hud": False}
+    show = {"id": "*", "xray": bool(xray), "solid": True, "hud": False}
     if angle == "cut":
         show["clip_y"] = int(cut_y) if cut_y is not None else lo[1] + 4
     else:
@@ -124,7 +131,7 @@ def view(arch, target: str, angle: str, zoom: float, cut_y=None, *, freecam: boo
         arch.mcp.call("ghost_camera", {"x": eye[0], "y": eye[1], "z": eye[2],
                                        "look_x": look[0], "look_y": look[1], "look_z": look[2]})
         try:
-            time.sleep(0.5)  # let a frame render from the detached camera
+            time.sleep(1.5 if angle in ("se", "nw", "street") else 0.5)  # let a frame render from the detached camera
             shot = arch.mcp.json("screenshot", {})
         finally:
             arch.mcp.call("ghost_camera", {"off": True})

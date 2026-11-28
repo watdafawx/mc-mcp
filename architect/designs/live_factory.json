@@ -1,0 +1,339 @@
+{
+ "concept": "Red-brick Victorian factory complex in the steampunk kit. Silhouette: a tall clock tower is the single landmark, rising from a long sawtooth-roofed machine hall. Hierarchy: the wide 2-storey machine hall (28x20, 11 high) forms the main body. A boiler/furnace house with a chimney attaches east. A lower workshop and lab wing attaches south as an L, and a small octagonal counting-house sits at the west entrance. A bridge crosses the yard gap to a separate storage annex. Materials: red bricks (wall2) with stone-brick piers, cut-copper trim and cornice, a dark deepslate-tile roof, and cyan glass with glowing lantern bands. Detail goes outward only: gears on the hall face, pipes on the process hall, chimneys on the boiler house, so interiors stay open and huge.",
+ "kit": "steampunk",
+ "roles": [
+  {
+   "role": "wall2",
+   "block": "minecraft:bricks"
+  },
+  {
+   "role": "pillar",
+   "block": "minecraft:stone_bricks"
+  },
+  {
+   "role": "base",
+   "block": "minecraft:polished_blackstone_bricks"
+  },
+  {
+   "role": "trim",
+   "block": "minecraft:cut_copper"
+  },
+  {
+   "role": "roof",
+   "block": "minecraft:deepslate_tiles"
+  },
+  {
+   "role": "glow",
+   "block": "minecraft:shroomlight"
+  },
+  {
+   "role": "accent",
+   "block": "minecraft:weathered_cut_copper"
+  }
+ ],
+ "volumes": [
+  {
+   "id": "hall",
+   "purpose": "main machine hall with north-light roof",
+   "shape": "rect",
+   "w": 28,
+   "d": 20,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    11
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "sawtooth",
+   "windows": "grid",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "at",
+    "to": "",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "boiler",
+   "purpose": "furnace and boiler house",
+   "shape": "rect",
+   "w": 16,
+   "d": 16,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    12
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "gable_low",
+   "windows": "slit",
+   "rhythm": 2,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "e"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "e",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "wing",
+   "purpose": "workshop and lab wing",
+   "shape": "L",
+   "w": 24,
+   "d": 14,
+   "r": 0,
+   "cut_w": 8,
+   "cut_d": 6,
+   "floor_hs": [
+    7,
+    7
+   ],
+   "program": [
+    "workshop",
+    "lab"
+   ],
+   "roof": "hip_low",
+   "windows": "grid",
+   "rhythm": 0,
+   "accent_floor": 1,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "s",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "tower",
+   "purpose": "clock tower landmark with offices",
+   "shape": "rect",
+   "w": 9,
+   "d": 9,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    5,
+    5,
+    5
+   ],
+   "program": [
+    "hall",
+    "living",
+    "storage"
+   ],
+   "roof": "spire",
+   "windows": "slit",
+   "rhythm": 0,
+   "accent_floor": 2,
+   "open_ground": false,
+   "entrances": [],
+   "roles": [
+    {
+     "role": "tip",
+     "block": "minecraft:copper_block"
+    },
+    {
+     "role": "roof",
+     "block": "minecraft:waxed_oxidized_cut_copper"
+    }
+   ],
+   "place": {
+    "mode": "stack",
+    "to": "hall",
+    "side": "n",
+    "align": "center",
+    "offset": 0,
+    "gap": 0,
+    "x": -8,
+    "z": -4
+   }
+  },
+  {
+   "id": "counting",
+   "purpose": "octagonal counting-house entrance",
+   "shape": "octagon",
+   "w": 11,
+   "d": 11,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    5
+   ],
+   "program": [
+    "hall"
+   ],
+   "roof": "dome",
+   "windows": "band",
+   "rhythm": 0,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "w"
+   ],
+   "roles": [
+    {
+     "role": "roof",
+     "block": "minecraft:waxed_weathered_cut_copper"
+    }
+   ],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "w",
+    "align": "center",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "annex",
+   "purpose": "storage annex across the yard",
+   "shape": "rect",
+   "w": 14,
+   "d": 12,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    9
+   ],
+   "program": [
+    "storage"
+   ],
+   "roof": "gable",
+   "windows": "band",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "n"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "boiler",
+    "side": "s",
+    "align": "start",
+    "offset": 0,
+    "gap": 4,
+    "x": 0,
+    "z": 0
+   }
+  }
+ ],
+ "features": [
+  {
+   "kind": "chimney",
+   "on": "boiler",
+   "to": "",
+   "side": "e",
+   "pos": 0.25,
+   "size": 14,
+   "level": 0
+  },
+  {
+   "kind": "chimney",
+   "on": "boiler",
+   "to": "",
+   "side": "n",
+   "pos": 0.75,
+   "size": 10,
+   "level": 0
+  },
+  {
+   "kind": "gear",
+   "on": "hall",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 4,
+   "level": 0
+  },
+  {
+   "kind": "pipes",
+   "on": "hall",
+   "to": "",
+   "side": "n",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "pipes",
+   "on": "boiler",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "bridge",
+   "on": "boiler",
+   "to": "annex",
+   "side": "s",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "spire",
+   "on": "tower",
+   "to": "",
+   "side": "top",
+   "pos": 0.5,
+   "size": 6,
+   "level": 0
+  },
+  {
+   "kind": "platform",
+   "on": "hall",
+   "to": "",
+   "side": "top",
+   "pos": 0.5,
+   "size": 2,
+   "level": 0
+  }
+ ]
+}

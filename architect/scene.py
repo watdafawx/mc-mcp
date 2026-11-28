@@ -818,6 +818,8 @@ def _structure_anchors(params) -> dict:
     y0s = [1 + sum(hs[:f]) for f in range(len(hs))]
     ry = sum(hs) + 1
     fx0, fx1, fz0, fz1 = _bbox2(fp)
+    if p.get("depth"):  # depth.apply() adds outward skirt/cornice 1 block beyond the footprint
+        fx0, fx1, fz0, fz1 = fx0 - 1, fx1 + 1, fz0 - 1, fz1 + 1
     ix0, ix1, iz0, iz1 = _bbox2(icells)
     deck = {q for q in inner if q not in edge(inner)} or inner
     dx0, dx1, dz0, dz1 = _bbox2(deck)

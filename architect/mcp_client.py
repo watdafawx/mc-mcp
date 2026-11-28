@@ -11,6 +11,7 @@ import zipfile
 from pathlib import Path
 
 import floaters
+import palette
 
 HERE = Path(__file__).resolve().parent
 
@@ -78,6 +79,10 @@ class Mcp:
             args, n = floaters.fix_pipes(args)
             if n:
                 print(f"  [pipes] set explicit connections on {n} fluid_pipe entries in ghost_set {args.get('id')}", flush=True)
+        if name == "ghost_set":  # step 1 palette engine: shade ramps + height gradient on every ghost
+            args, n = palette.texture(args)
+            if n:
+                print(f"  [texture] shaded {n} cells in ghost_set {args.get('id')}", flush=True)
         if name == "ghost_set" and self.nogold:
             args, n = floaters.swap_gold(args)
             if n:

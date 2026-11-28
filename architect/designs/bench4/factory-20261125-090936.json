@@ -1,0 +1,264 @@
+{
+ "concept": "Red-brick Victorian factory complex. Landmark is a tall clock tower (octagon, 8x8 footprint, 4 floors plus a spire) that is well over 1.8x the height of the main hall. A wide sawtooth-roofed machine hall (25x17, 11 high) forms the body, with a lower two-storey workshop wing attached beside it and a small boiler house set back as a step-down. Materials: red bricks on both pillar and wall2 for the main colour, polished deepslate base, cut copper trim, with copper-oxidised roof accents. Features: two brick smokestacks and a chimney on the boiler house, a pipe rack on the hall's south face, a gear on the workshop wall, a clock on the tower, a porch at the main entrance, and a bridge across the yard gap to the boiler house. All detail is outside so the interiors stay big.",
+ "kit": "steampunk",
+ "roles": [
+  {
+   "role": "wall2",
+   "block": "minecraft:bricks"
+  },
+  {
+   "role": "pillar",
+   "block": "minecraft:bricks"
+  },
+  {
+   "role": "base",
+   "block": "minecraft:polished_blackstone_bricks"
+  },
+  {
+   "role": "trim",
+   "block": "minecraft:cut_copper"
+  },
+  {
+   "role": "roof",
+   "block": "minecraft:deepslate_tiles"
+  },
+  {
+   "role": "glass",
+   "block": "minecraft:cyan_stained_glass"
+  },
+  {
+   "role": "wall",
+   "block": "minecraft:stone_bricks"
+  }
+ ],
+ "volumes": [
+  {
+   "id": "hall",
+   "purpose": "main machine hall with north-light roof",
+   "shape": "rect",
+   "w": 25,
+   "d": 17,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    11
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "sawtooth",
+   "windows": "band",
+   "rhythm": 1,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "s",
+    "w"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "at",
+    "to": "",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "tower",
+   "purpose": "clock tower landmark",
+   "shape": "octagon",
+   "w": 9,
+   "d": 9,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    6,
+    5,
+    5,
+    5
+   ],
+   "program": [
+    "workshop",
+    "lab",
+    "storage",
+    "living"
+   ],
+   "roof": "spire",
+   "windows": "slit",
+   "rhythm": 0,
+   "accent_floor": 3,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [
+    {
+     "role": "roof",
+     "block": "minecraft:oxidized_cut_copper"
+    }
+   ],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "e",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "workshop",
+   "purpose": "two-storey workshop and lab wing",
+   "shape": "rect",
+   "w": 19,
+   "d": 13,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    7,
+    6
+   ],
+   "program": [
+    "workshop",
+    "lab"
+   ],
+   "roof": "gable_low",
+   "windows": "grid",
+   "rhythm": 2,
+   "accent_floor": 1,
+   "open_ground": false,
+   "entrances": [
+    "s"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "s",
+    "align": "start",
+    "offset": 0,
+    "gap": 0,
+    "x": 0,
+    "z": 0
+   }
+  },
+  {
+   "id": "boiler",
+   "purpose": "boiler house with furnaces and stacks",
+   "shape": "rect",
+   "w": 15,
+   "d": 13,
+   "r": 0,
+   "cut_w": 0,
+   "cut_d": 0,
+   "floor_hs": [
+    9
+   ],
+   "program": [
+    "machine_hall"
+   ],
+   "roof": "flat",
+   "windows": "slit",
+   "rhythm": 0,
+   "accent_floor": -1,
+   "open_ground": false,
+   "entrances": [
+    "e"
+   ],
+   "roles": [],
+   "place": {
+    "mode": "attach",
+    "to": "hall",
+    "side": "n",
+    "align": "start",
+    "offset": 0,
+    "gap": 4,
+    "x": 0,
+    "z": 0
+   }
+  }
+ ],
+ "features": [
+  {
+   "kind": "clock",
+   "on": "tower",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 4,
+   "level": 3
+  },
+  {
+   "kind": "smokestack",
+   "on": "boiler",
+   "to": "",
+   "side": "n",
+   "pos": 0.25,
+   "size": 16,
+   "level": 0
+  },
+  {
+   "kind": "smokestack",
+   "on": "boiler",
+   "to": "",
+   "side": "n",
+   "pos": 0.75,
+   "size": 12,
+   "level": 0
+  },
+  {
+   "kind": "chimney",
+   "on": "hall",
+   "to": "",
+   "side": "w",
+   "pos": 0.5,
+   "size": 5,
+   "level": 0
+  },
+  {
+   "kind": "pipe_rack",
+   "on": "hall",
+   "to": "",
+   "side": "w",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  },
+  {
+   "kind": "gear",
+   "on": "workshop",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 3,
+   "level": 1
+  },
+  {
+   "kind": "porch",
+   "on": "workshop",
+   "to": "",
+   "side": "s",
+   "pos": 0.5,
+   "size": 2,
+   "level": 0
+  },
+  {
+   "kind": "bridge",
+   "on": "hall",
+   "to": "boiler",
+   "side": "n",
+   "pos": 0.5,
+   "size": 0,
+   "level": 0
+  }
+ ]
+}

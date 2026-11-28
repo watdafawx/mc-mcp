@@ -57,8 +57,9 @@ def _gothic_roof(ghosts, x0, z0, feat):
         for (x, z) in (ridge[0], ridge[-1]):
             spire(x, z, 5)
     for c in {(min(xs), min(zs)), (min(xs), max(zs)), (max(xs), min(zs)), (max(xs), max(zs))}:
+        base_y = top.get(c)
         for q in [c] + [(c[0] + a, c[1] + b) for a in (-1, 0, 1) for b in (-1, 0, 1)]:
-            if q in top and top[q] >= top[c] - 1:
+            if q in top and (base_y is None or top[q] >= base_y - 1):
                 spire(q[0], q[1], 4)
                 break
 

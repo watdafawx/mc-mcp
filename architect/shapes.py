@@ -28,7 +28,11 @@ _NO_PLURAL = {"minecraft:bricks": "minecraft:brick", "minecraft:nether_bricks": 
               "minecraft:polished_basalt": "minecraft:polished_blackstone", "minecraft:obsidian": "minecraft:polished_blackstone",
               "minecraft:dirt": "minecraft:mud_brick", "minecraft:clay": "minecraft:mud_brick",
               "minecraft:terracotta": "minecraft:granite", "minecraft:sea_lantern": "minecraft:prismarine",
-              "minecraft:amethyst_block": "minecraft:purpur", "minecraft:iron_block": "minecraft:smooth_stone"}
+              "minecraft:amethyst_block": "minecraft:purpur", "minecraft:iron_block": "minecraft:smooth_stone",
+              "minecraft:light_gray_concrete": "minecraft:smooth_stone",
+              "minecraft:gray_concrete": "minecraft:deepslate_brick",
+              "minecraft:black_concrete": "minecraft:polished_blackstone",
+              "minecraft:cyan_terracotta": "minecraft:deepslate_brick"}
 # Used when a guessed id turns out not to exist (the architect retries once with these).
 FALLBACK = {"stairs": "minecraft:stone_brick_stairs", "slab": "minecraft:stone_brick_slab"}
 

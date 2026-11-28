@@ -1,0 +1,22 @@
+DESIGN claude-sonnet-5-5 (server-side refusal fallbacks on): a white research station with an orange stripe, a ring lab around a core tower, glass labs and a landing pad
+  spec in 12s, ~$0.0295
+  saved X:\Dev\Minecraft\mc-mcp\architect\designs\bench4\station-20261125-091004.json
+  [texture] shaded 372 cells in ghost_set bench4/station/ring
+  ghost bench4/station/ring: 5871 blocks
+  [texture] shaded 128 cells in ghost_set bench4/station/core
+  ghost bench4/station/core: 3389 blocks
+  [texture] shaded 151 cells in ghost_set bench4/station/glasslab
+  ghost bench4/station/glasslab: 1481 blocks
+  [texture] shaded 154 cells in ghost_set bench4/station/hall
+  ghost bench4/station/hall: 1802 blocks
+  [texture] shaded 1494 cells in ghost_set bench4/station/platform
+  ghost bench4/station/platform: 8906 blocks
+  [texture] shaded 15 cells in ghost_set bench4/station/features
+  ghost bench4/station/features: 421 blocks
+CONCEPT A white research station on a stepped platform. Landmark: a tall octagonal core tower (about 5 floors plus antenna spire) rising from the centre of an L-shaped ring lab that wraps its south and west sides. Roof lines step down from the tower to the wide 2-storey ring lab, then to a low glass lab annex and a machine hall. The orange stripe runs on the accent floor of every volume, with orange concr
+  ring: L 34x30 h18 floors [9, 7] ['machine_hall', 'lab'] roof flat, clear inside 30x26
+  core: octagon 15x15 h32 floors [6, 6, 6, 6, 6] ['lab', 'lab', 'workshop', 'storage', 'lab'] roof flat, clear inside 11x11
+  glasslab: rect 18x14 h9 floors [7] ['lab'] roof flat, clear inside 14x10
+  hall: rect 20x15 h12 floors [10] ['machine_hall'] roof flat, clear inside 16x11
+  fix: hall: d 14 -> 15
+DONE 21870 blocks, 2 doorways, cost ~$0.0295

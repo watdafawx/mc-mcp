@@ -10,6 +10,7 @@ import layouts
 from layouts import (ALT_ROOF, GAP, GD, GLASS, HALL_STYLE, HUB, HUB_ROOF, LAYOUT_NAMES, LAYOUTS as LAYOUT_BUILDERS, RISE,
                      ROOF_CYCLE, ROOF_MATS, SIZES, STEPS, TOWER_ROOF, build, summary)
 from layouts.common import DEFAULT_LAYOUT as LAYOUTS  # kit -> default layout name (the old campus.LAYOUTS)
+from layouts.facades import _buttresses, _chimney  # used by design.py
 
 __all__ = ["ALT_ROOF", "GAP", "GD", "GLASS", "HALL_STYLE", "HUB", "HUB_ROOF", "LAYOUTS", "LAYOUT_BUILDERS", "LAYOUT_NAMES",
            "RISE", "ROOF_CYCLE", "ROOF_MATS", "SIZES", "STEPS", "TOWER_ROOF", "build", "layouts", "summary"]

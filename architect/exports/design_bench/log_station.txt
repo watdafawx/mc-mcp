@@ -1,0 +1,27 @@
+DESIGN claude-sonnet-5-5 (server-side refusal fallbacks on): a white research station with an orange stripe, a ring lab around a core tower, glass labs and a landing pad
+  spec in 12s, ~$0.0284
+  saved X:\Dev\Minecraft\mc-mcp\architect\designs\bench3\station-20261125-074356.json
+  [texture] shaded 536 cells in ghost_set bench3/station/ring
+  ghost bench3/station/ring: 5353 blocks
+  [texture] shaded 86 cells in ghost_set bench3/station/core
+  ghost bench3/station/core: 2999 blocks
+  [texture] shaded 186 cells in ghost_set bench3/station/glass_lab
+  ghost bench3/station/glass_lab: 1847 blocks
+  [texture] shaded 199 cells in ghost_set bench3/station/machine
+  ghost bench3/station/machine: 2205 blocks
+  [texture] shaded 108 cells in ghost_set bench3/station/annex
+  ghost bench3/station/annex: 1005 blocks
+  [texture] shaded 1404 cells in ghost_set bench3/station/platform
+  ghost bench3/station/platform: 7570 blocks
+  [texture] shaded 13 cells in ghost_set bench3/station/features
+  ghost bench3/station/features: 602 blocks
+CONCEPT White research station on a stepped platform. Landmark: a tall octagonal core tower with a crown roof and antenna spire, at least 1.8x taller than anything else. Around it wraps a wide round ring lab (low, big interior, orange accent stripe), with a glass lab hall attached on one side and a wide flat landing pad block with a machine hall attached on the other. Materials: white concrete walls (60),
+  ring: round 33x33 h16 floors [8, 6] ['lab', 'workshop'] roof flat, clear inside 29x29
+  core: octagon 13x13 h36 floors [6, 6, 6, 6, 5, 5] ['hall', 'lab', 'lab', 'workshop', 'storage', 'living'] roof crown, clear inside 9x9
+  glass_lab: rect 19x15 h11 floors [9] ['lab'] roof flat, clear inside 15x11
+  machine: rect 23x17 h12 floors [10] ['machine_hall'] roof flat, clear inside 19x13
+  annex: rect 15x11 h8 floors [6] ['storage'] roof flat, clear inside 11x7
+  fix: core: floor 1 height 5 -> 6 (lab)
+  fix: core: floor 2 height 5 -> 6 (lab)
+  fix: core: floor 3 height 5 -> 6 (workshop)
+DONE 21581 blocks, 2 doorways, cost ~$0.0284
